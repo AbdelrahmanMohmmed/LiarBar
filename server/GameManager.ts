@@ -8,7 +8,7 @@ import {
   validateDeclaration,
 } from "./Deck.js";
 import { validateDeclarationByType } from "./Validation.js";
-import { BotAI } from "./BotAI.js";
+import { BotAI, type BotDifficulty } from "./BotAI.js";
 import { Player, type PlayerData } from "./Player.js";
 import { nanoid } from "nanoid";
 
@@ -126,11 +126,11 @@ export class GameManager {
     return player;
   }
 
-  addBot(name: string): Player {
+  addBot(name: string, difficulty: BotDifficulty = "medium"): Player {
     const id = `bot_${nanoid(6)}`;
     const player = new Player(id, name, true, false);
     this.players.push(player);
-    this.botAIs.set(id, new BotAI(id, "medium", this.deckCount));
+    this.botAIs.set(id, new BotAI(id, difficulty, this.deckCount));
     return player;
   }
 

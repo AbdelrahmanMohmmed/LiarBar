@@ -4,6 +4,7 @@ import { useGame } from "@/lib/gameContext";
 import {
   Copy, User, Bot, Play, X, Loader2, ArrowLeft, Crown, MessageCircle,
 } from "lucide-react";
+import type { BotDifficulty } from "@/lib/types";
 
 const BOT_NAMES = ["Lucky", "Ace", "Deuce", "Sly", "Smokey", "Whiskey"];
 
@@ -18,6 +19,8 @@ export default function Room() {
   const [chatInput, setChatInput] = useState("");
   const [starting, setStarting] = useState(false);
   const [reconnected, setReconnected] = useState(false);
+  // Track pending difficulty for the "Add Bot" button
+  const [pendingDifficulty, setPendingDifficulty] = useState<BotDifficulty>("medium");
 
   useEffect(() => {
     if (reconnected) return;
@@ -57,11 +60,11 @@ export default function Room() {
   const handleAddBot = useCallback(async () => {
     try {
       const randomName = BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)];
-      await addBot(randomName);
+      await addBot(randomName, pendingDifficulty);
     } catch (err) {
       addToast(err instanceof Error ? err.message : "Failed to add bot", "error");
     }
-  }, [addBot, addToast]);
+  }, [addBot, pendingDifficulty, addToast]);
 
   const handleRemoveBot = useCallback(async (botId: string) => {
     try {
@@ -152,7 +155,16 @@ export default function Room() {
                     Players ({gameState.players.length}/{gameState.maxPlayers})
                   </h2>
                   {isHost && (
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 items-center">
+                      <select
+                        value={pendingDifficulty}
+                        onChange={(e) => setPendingDifficulty(e.target.value as BotDifficulty)}
+                        className="px-2 py-1.5 rounded-lg bg-[#2a1515] border border-amber-900/40 text-white text-xs focus:border-amber-500/60 focus:outline-none"
+                      >
+                        <option value="easy">Easy</option>
+                        <option value="medium">Medium</option>
+                        <option value="hard">Hard</option>
+                      </select>
                       <button
                         onClick={handleAddBot}
                         disabled={gameState.players.length >= gameState.maxPlayers}

@@ -7,6 +7,7 @@ import type {
   CardDeclaration,
   GameVariant,
   ClaimType,
+  BotDifficulty,
   ChatMessage,
   ToastNotification,
   PlayerData,
@@ -30,7 +31,7 @@ interface GameActions {
     playerId: string,
   ) => Promise<void>;
   startGame: () => Promise<void>;
-  addBot: (botName?: string) => Promise<void>;
+  addBot: (botName?: string, difficulty?: BotDifficulty) => Promise<void>;
   removeBot: (botId: string) => Promise<void>;
   playCards: (
     cardIndices: number[],
@@ -254,9 +255,9 @@ export const [GameProvider, useGame] = createContextHook(() => {
   }, [myRoomId, emitWithAck]);
 
   const addBot = useCallback(
-    async (botName?: string) => {
+    async (botName?: string, difficulty?: BotDifficulty) => {
       if (!myRoomId) throw new Error("Not in a room");
-      await emitWithAck("add_bot", { roomId: myRoomId, botName });
+      await emitWithAck("add_bot", { roomId: myRoomId, botName, difficulty });
     },
     [myRoomId, emitWithAck],
   );
@@ -334,12 +335,12 @@ export const [GameProvider, useGame] = createContextHook(() => {
         if (data) {
           if (data.isTruth) {
             addToast(
-              `Truth! ${data.challengedName} was honest. ${lastAction.playerName} takes the pile!`,
+              `${lastAction.playerName} checked cards for ${data.challengedName} — Truth! ${data.challengedName} was honest. ${lastAction.playerName} takes the pile!`,
               "success",
             );
           } else {
             addToast(
-              `Liar! ${data.challengedName} was bluffing and takes the pile!`,
+              `${lastAction.playerName} checked cards for ${data.challengedName} — Liar! ${data.challengedName} was bluffing and takes the pile!`,
               "error",
             );
           }

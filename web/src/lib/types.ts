@@ -33,6 +33,8 @@ export type GameVariant = "cards" | "dominoes";
 
 export type ClaimType = "suit" | "rank";
 
+export type BotDifficulty = "easy" | "medium" | "hard";
+
 export type CardDeclaration =
   | { type: "playing-card"; rank: Rank; suit: Suit; count: number }
   | { type: "dominoe"; value: number; count: number };

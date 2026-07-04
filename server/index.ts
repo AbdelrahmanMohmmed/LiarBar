@@ -5,6 +5,7 @@ import cors from "cors";
 import { nanoid } from "nanoid";
 import { GameManager, type GamePhase } from "./GameManager.js";
 import type { CardDeclaration, GameVariant, ClaimType } from "./Deck.js";
+import type { BotDifficulty } from "./BotAI.js";
 import type { Player } from "./Player.js";
 
 const PORT = parseInt(process.env.PORT || "3001", 10);
@@ -245,7 +246,7 @@ io.on("connection", (socket: Socket) => {
 
   socket.on(
     "add_bot",
-    (data: { roomId: string; botName: string }, callback) => {
+    (data: { roomId: string; botName: string; difficulty?: BotDifficulty }, callback) => {
       const room = getRoom(data.roomId);
       if (!room) {
         callback?.({ error: "Room not found" });
@@ -263,7 +264,8 @@ io.on("connection", (socket: Socket) => {
       }
 
       const botName = data.botName || `Bot ${room.players.length + 1}`;
-      room.addBot(botName);
+      const difficulty = data.difficulty || "medium";
+      room.addBot(botName, difficulty);
 
       const state = room.toState();
       io.to(data.roomId).emit("game_state", state);

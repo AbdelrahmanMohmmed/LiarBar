@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useGame } from "@/lib/gameContext";
 import { GameTable } from "@/components/GameTable";
@@ -164,6 +164,15 @@ export default function Game() {
     ? gameState.players.find((p) => p.id === gameState.lastPlayerId)
     : null;
 
+  // Get the challenge caller from the action log
+  const challengeAction = useMemo(() => {
+    if (!gameState?.actionLog) return null;
+    const challengeResult = [...gameState.actionLog].reverse().find(
+      (a) => a.type === "challenge_result" || a.type === "call_liar",
+    );
+    return challengeResult;
+  }, [gameState?.actionLog]);
+
   if (!gameState) {
     return (
       <div className="min-h-screen bg-[#1a0a0a] flex items-center justify-center">
@@ -299,7 +308,7 @@ export default function Game() {
                 <div className="text-center mb-4">
                   <Eye className="w-8 h-8 text-red-400 mx-auto mb-2" />
                   <p className="text-white font-bold text-lg">
-                    Cards Revealed!
+                    {challengeAction?.playerName ?? "Someone"} called Liar on {lastPlayer?.name ?? "unknown"}!
                   </p>
                   <p className="text-amber-200/60 text-xs mt-1">
                     {lastPlayer?.name} claimed{" "}
