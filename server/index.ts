@@ -9,16 +9,16 @@ import type { BotDifficulty } from "./BotAI.js";
 import type { Player } from "./Player.js";
 
 const PORT = parseInt(process.env.PORT || "3001", 10);
-const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:5173";
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "http://localhost:5173,https://your-vercel-app.vercel.app").split(",");
 
 const app = express();
-app.use(cors({ origin: CLIENT_URL, credentials: true }));
+app.use(cors({ origin: ALLOWED_ORIGINS, credentials: true }));
 app.use(express.json());
 
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: CLIENT_URL,
+    origin: ALLOWED_ORIGINS,
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -540,7 +540,7 @@ io.on("connection", (socket: Socket) => {
   });
 });
 
-httpServer.listen(PORT, () => {
-  console.log(`Liar's Bar server running on port ${PORT}`);
-  console.log(`Client URL: ${CLIENT_URL}`);
+httpServer.listen(PORT, "0.0.0.0", () => {
+  console.log(`Liar's Bar server running on port ${PORT} (0.0.0.0)`);
+  console.log(`Allowed origins: ${ALLOWED_ORIGINS.join(", ")}`);
 });
