@@ -548,8 +548,18 @@ export class GameManager {
       this.skipCount++;
 
       if (this.skipCount >= this.players.length - 1) {
-        // Full round of skips — clear the pile and reset claim
-        this.clearPileAndResetClaim();
+        // All players skipped — advance to next player and reset claim (pile stays)
+        this.currentTurn = (this.currentTurn + 1) % this.players.length;
+        this.currentRequiredClaim = null;
+        this.lastDeclaration = null;
+        this.lastPlayerId = null;
+        this.skipCount = 0;
+        this.revealedCards = [];
+        this.challengeDeadline = null;
+        this.phase = "playing";
+        const state = this.toState();
+        this.broadcast(state);
+        this.triggerBotIfNeeded();
       } else {
         this.advanceTurn();
       }
@@ -769,22 +779,6 @@ export class GameManager {
       ...base,
       hand: player ? [...player.hand] : [],
     };
-  }
-
-  /** Clear the central pile and reset the persistent claim. Used when all players skip or after a challenge. */
-  private clearPileAndResetClaim(): void {
-    this.centralPile = [];
-    this.currentRequiredClaim = null;
-    this.lastDeclaration = null;
-    this.lastPlayerId = null;
-    this.skipCount = 0;
-    this.revealedCards = [];
-    this.challengeDeadline = null;
-    this.phase = "playing";
-
-    const state = this.toState();
-    this.broadcast(state);
-    this.triggerBotIfNeeded();
   }
 
   /** Check if a declaration matches the current required claim (persistent suit/rank/value) */

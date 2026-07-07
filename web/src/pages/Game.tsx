@@ -217,9 +217,9 @@ export default function Game() {
               {gameState.claimType === "suit" ? "Suit Claim" : "Rank Claim"}
             </span>
           )}
-          {gameState.currentRequiredClaim && gameState.phase === "playing" && (
+          {gameState.currentRequiredClaim && (
             <span className="text-xs text-amber-300 bg-amber-900/30 px-2 py-1 rounded-full font-mono">
-              Must play: {declarationToString(gameState.currentRequiredClaim, gameState.claimType)}
+              Current Claim: {declarationToString(gameState.currentRequiredClaim, gameState.claimType)}
             </span>
           )}
           {gameState.phase === "revealing" && (
