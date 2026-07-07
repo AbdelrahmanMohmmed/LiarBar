@@ -163,6 +163,7 @@ const SYMBOL_TO_SUIT: Record<string, Suit> = {
 };
 
 export function parseCardString(cardStr: string): Card | null {
+  // Try symbol format: "5♥", "K♠"
   const symbol = cardStr.slice(-1);
   const suit = SYMBOL_TO_SUIT[symbol];
   if (suit) {
@@ -170,8 +171,21 @@ export function parseCardString(cardStr: string): Card | null {
     if (rank && getRankValue(rank)) {
       return { type: "playing-card", rank, suit };
     }
-    return null;
   }
+
+  // Try "rank of suit" format: "5 of hearts", "K of spades"
+  const ofMatch = cardStr.match(/^(.+?) of (.+)$/i);
+  if (ofMatch) {
+    const rank = ofMatch[1].toUpperCase() as Rank;
+    const suitName = ofMatch[2].toLowerCase();
+    const suitMap: Record<string, Suit> = { hearts: "hearts", diamonds: "diamonds", clubs: "clubs", spades: "spades" };
+    const matchedSuit = suitMap[suitName];
+    if (matchedSuit && getRankValue(rank)) {
+      return { type: "playing-card", rank, suit: matchedSuit };
+    }
+  }
+
+  // Try domino format: "2-3"
   const parts = cardStr.split("-");
   if (parts.length === 2) {
     const left = parseInt(parts[0], 10);

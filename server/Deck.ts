@@ -40,10 +40,17 @@ export type GameVariant = "cards" | "dominoes";
 /** Claim type for playing cards (suit-only or rank-only) */
 export type ClaimType = "suit" | "rank";
 
+export const SUIT_SYMBOLS: Record<Suit, string> = {
+  hearts: "\u2665",
+  diamonds: "\u2666",
+  clubs: "\u2663",
+  spades: "\u2660",
+};
+
 /** String representation of a card */
 export function cardToString(card: Card): string {
   if (card.type === "playing-card") {
-    return `${card.rank} of ${card.suit}`;
+    return `${card.rank}${SUIT_SYMBOLS[card.suit]}`;
   }
   return `${card.left}-${card.right}`;
 }
