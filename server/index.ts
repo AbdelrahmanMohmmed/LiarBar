@@ -85,8 +85,8 @@ io.on("connection", (socket: Socket) => {
           return;
         }
 
-        if (maxPlayers < 3 || maxPlayers > 6) {
-          callback({ error: "Players must be between 3 and 6" });
+        if (maxPlayers < 2 || maxPlayers > 6) {
+          callback({ error: "Players must be between 2 and 6" });
           return;
         }
 
@@ -310,7 +310,7 @@ io.on("connection", (socket: Socket) => {
 
     if (!room.canStart()) {
       callback?.({
-        error: "Need at least 3 players (including bots) to start",
+        error: "Need at least 2 players (including bots) to start",
       });
       return;
     }

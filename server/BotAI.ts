@@ -272,7 +272,7 @@ export class BotAI {
   makePlay(
     hand: Card[],
     pileSize: number,
-    _lastDeclaration: CardDeclaration | null,
+    currentRequiredClaim: CardDeclaration | null,
     claimType?: ClaimType,
   ): { cardIndices: number[]; declaration: CardDeclaration } | null {
     if (hand.length === 0) return null;
@@ -282,6 +282,11 @@ export class BotAI {
     // More truthful when close to winning (few cards)
     const handSizeBonus = hand.length <= 3 ? 0.2 : 0;
     const truthThreshold = this.profile.truthBias + handSizeBonus;
+
+    // If there's a persistent claim, try to match it
+    if (currentRequiredClaim) {
+      return this.createClaimMatchingPlay(hand, groups, currentRequiredClaim, claimType);
+    }
 
     // Decide whether to lie
     const willLie = Math.random() > truthThreshold && hand.length >= this.profile.minCardsToBluff;
@@ -293,6 +298,59 @@ export class BotAI {
     return this.createTruthfulPlay(groups, claimType);
   }
 
+  /** Create a play that matches the persistent claim */
+  private createClaimMatchingPlay(
+    hand: Card[],
+    groups: { cards: Card[]; indices: number[]; key: string }[],
+    requiredClaim: CardDeclaration,
+    claimType?: ClaimType,
+  ): { cardIndices: number[]; declaration: CardDeclaration } | null {
+    // Find cards in hand that match the required claim
+    let matchingKey = "";
+    if (requiredClaim.type === "playing-card") {
+      if (claimType === "suit") {
+        matchingKey = `suit-${requiredClaim.suit}`;
+      } else if (claimType === "rank") {
+        matchingKey = `rank-${requiredClaim.rank}`;
+      } else {
+        matchingKey = `card-${requiredClaim.rank}-${requiredClaim.suit}`;
+      }
+    } else {
+      matchingKey = `dom-${Math.min(requiredClaim.value, requiredClaim.value)}-${Math.max(requiredClaim.value, requiredClaim.value)}`;
+      // For domino value match, we need broader matching
+    }
+
+    // Find the matching group
+    let matchingGroup = groups.find((g) => g.key === matchingKey);
+
+    // For dominoes, also check groups that contain the value
+    if (!matchingGroup && requiredClaim.type === "dominoe") {
+      matchingGroup = groups.find((g) => g.key.startsWith(`dom-`) &&
+        (g.key.includes(`-${requiredClaim.value}`) || g.key.includes(`${requiredClaim.value}-`)));
+    }
+
+    if (matchingGroup && matchingGroup.cards.length > 0) {
+      // Play truthfully — use the matching cards
+      return this.createTruthfulPlayFromGroup(matchingGroup);
+    }
+
+    // Bluff: claim the required value but play different cards
+    const bluffCount = weightedPick([
+      { value: 1, weight: 0.4 },
+      { value: 2, weight: hand.length >= 2 ? 0.35 : 0 },
+      { value: 3, weight: hand.length >= 3 ? 0.2 : 0 },
+      { value: 4, weight: hand.length >= 4 ? 0.05 : 0 },
+    ]);
+
+    const indices = this.pickSacrificialCards(groups, bluffCount);
+    if (indices.length === 0) return null;
+
+    return {
+      cardIndices: indices,
+      declaration: { ...requiredClaim, count: bluffCount },
+    };
+  }
+
   /** Create a truthful play from the largest matching group */
   private createTruthfulPlay(
     groups: { cards: Card[]; indices: number[]; key: string }[],
@@ -300,13 +358,23 @@ export class BotAI {
   ): { cardIndices: number[]; declaration: CardDeclaration } | null {
     if (groups.length === 0) return null;
 
-    const group = groups[0];
-    const maxPlay = Math.min(4, group.cards.length);
+    return this.createTruthfulPlayFromGroup(groups[0]);
+  }
+
+  /** Create a truthful play from a specific group */
+  private createTruthfulPlayFromGroup(
+    group: { cards: Card[]; indices: number[]; key: string },
+  ): { cardIndices: number[]; declaration: CardDeclaration } | null {
+    const maxPlay = group.cards.length;
+    if (maxPlay === 0) return null;
+
     const playCount = weightedPick([
-      { value: 1, weight: maxPlay >= 4 ? 0.3 : 0.5 },
-      { value: 2, weight: maxPlay >= 2 ? 0.4 : 0 },
+      { value: 1, weight: maxPlay >= 1 ? 0.25 : 1 },
+      { value: 2, weight: maxPlay >= 2 ? 0.3 : 0 },
       { value: 3, weight: maxPlay >= 3 ? 0.2 : 0 },
-      { value: 4, weight: maxPlay >= 4 ? 0.1 : 0 },
+      { value: 4, weight: maxPlay >= 4 ? 0.15 : 0 },
+      { value: 5, weight: maxPlay >= 5 ? 0.07 : 0 },
+      { value: 6, weight: maxPlay >= 6 ? 0.03 : 0 },
     ]);
 
     const indices = group.indices.slice(0, playCount);
@@ -316,7 +384,6 @@ export class BotAI {
     if (first.type === "playing-card") {
       declaration = { type: "playing-card", rank: first.rank, suit: first.suit, count: playCount };
     } else {
-      // For dominoes, pick a value that all played dominoes share
       const playedCards = group.cards.slice(0, playCount);
       const commonVal = findCommonDominoValue(playedCards);
       declaration = { type: "dominoe", value: commonVal ?? first.left, count: playCount };
@@ -331,12 +398,14 @@ export class BotAI {
     groups: { cards: Card[]; indices: number[]; key: string }[],
     claimType?: ClaimType,
   ): { cardIndices: number[]; declaration: CardDeclaration } | null {
-    const maxPlay = Math.min(4, hand.length);
+    const maxPlay = hand.length;
     const playCount = weightedPick([
-      { value: 1, weight: 0.5 },
+      { value: 1, weight: 0.4 },
       { value: 2, weight: maxPlay >= 2 ? 0.3 : 0 },
       { value: 3, weight: maxPlay >= 3 ? 0.15 : 0 },
-      { value: 4, weight: maxPlay >= 4 ? 0.05 : 0 },
+      { value: 4, weight: maxPlay >= 4 ? 0.1 : 0 },
+      { value: 5, weight: maxPlay >= 5 ? 0.03 : 0 },
+      { value: 6, weight: maxPlay >= 6 ? 0.02 : 0 },
     ]);
 
     // Pick cards to sacrifice (small groups first)

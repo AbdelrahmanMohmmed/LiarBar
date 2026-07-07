@@ -178,7 +178,7 @@ export default function Index() {
                     onChange={(e) => setMaxPlayers(e.target.value)}
                     className="w-full px-3 py-2.5 rounded-lg bg-[#2a1515] border border-amber-900/40 text-white text-sm focus:border-amber-500/60 focus:outline-none"
                   >
-                    {[3, 4, 5, 6].map((n) => (
+                    {[2, 3, 4, 5, 6].map((n) => (
                       <option key={n} value={String(n)}>{n} Players</option>
                     ))}
                   </select>

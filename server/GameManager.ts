@@ -40,6 +40,7 @@ export interface GameState {
   pileCount: number;
   lastDeclaration: CardDeclaration | null;
   lastPlayerId: string | null;
+  currentRequiredClaim: CardDeclaration | null;
   winner: string | null;
   actionLog: GameAction[];
   variant: GameVariant;
@@ -62,6 +63,8 @@ export class GameManager {
   centralPile: Card[];
   lastDeclaration: CardDeclaration | null;
   lastPlayerId: string | null;
+  currentRequiredClaim: CardDeclaration | null;
+  skipCount: number;
   actionLog: GameAction[];
   variant: GameVariant;
   deckCount: number;
@@ -99,6 +102,8 @@ export class GameManager {
     this.centralPile = [];
     this.lastDeclaration = null;
     this.lastPlayerId = null;
+    this.currentRequiredClaim = null;
+    this.skipCount = 0;
     this.actionLog = [];
     this.variant = variant;
     this.deckCount = deckCount;
@@ -182,7 +187,7 @@ export class GameManager {
 
   canStart(): boolean {
     const realPlayers = this.players.filter((p) => !p.isBot);
-    return this.players.length >= 3 && realPlayers.length >= 1;
+    return this.players.length >= 2 && realPlayers.length >= 1;
   }
 
   startGame(): GameState | null {
@@ -205,6 +210,8 @@ export class GameManager {
     this.currentTurn = 0;
     this.lastDeclaration = null;
     this.lastPlayerId = null;
+    this.currentRequiredClaim = null;
+    this.skipCount = 0;
     this.actionLog = [];
     this.revealedCards = [];
     this.revealDeadline = null;
@@ -253,12 +260,20 @@ export class GameManager {
       return { success: false, error: "Not your turn" };
     }
 
-    if (cardIndices.length < 1 || cardIndices.length > 4) {
-      return { success: false, error: "Must play 1-4 cards" };
+    if (cardIndices.length < 1 || cardIndices.length > currentPlayer.hand.length) {
+      return { success: false, error: "Must play at least 1 card" };
     }
 
     if (cardIndices.length !== declaration.count) {
       return { success: false, error: "Declaration count must match number of cards played" };
+    }
+
+    // Validate against current required claim (persistent claim)
+    if (this.currentRequiredClaim) {
+      const matchesRequired = this.isDeclarationMatchingRequiredClaim(declaration);
+      if (!matchesRequired) {
+        return { success: false, error: "Declaration must match the current required claim" };
+      }
     }
 
     const unique = new Set(cardIndices);
@@ -276,6 +291,12 @@ export class GameManager {
     currentPlayer.recordPlay(played.length);
 
     this.centralPile.push(...played);
+
+    // Set the persistent claim if this starts a new round
+    if (!this.currentRequiredClaim) {
+      this.currentRequiredClaim = declaration;
+    }
+    this.skipCount = 0;
 
     this.lastDeclaration = declaration;
     this.lastPlayerId = playerId;
@@ -441,6 +462,8 @@ export class GameManager {
     this.centralPile = [];
     this.lastDeclaration = null;
     this.lastPlayerId = null;
+    this.currentRequiredClaim = null;
+    this.skipCount = 0;
     this.revealedCards = [];
     this.challengeDeadline = null;
 
@@ -503,17 +526,37 @@ export class GameManager {
   /**
    * Called when a player chooses to NOT challenge and lets the turn advance.
    * Any non-lastPlayer can call this during the challenge window.
+   * Also called during playing phase to skip your turn to play.
    */
   passTurn(playerId: string): { success: true } | { success: false; error: string } {
-    if (this.phase !== "waiting_for_challenge") {
-      return { success: false, error: "Not in challenge window" };
+    if (this.phase === "waiting_for_challenge") {
+      if (playerId === this.lastPlayerId) {
+        return { success: false, error: "You can't pass on your own claim" };
+      }
+      // First caller wins - effectively advance turn immediately
+      this.onChallengeWindowEnd();
+      return { success: true };
     }
-    if (playerId === this.lastPlayerId) {
-      return { success: false, error: "You can't pass on your own claim" };
+
+    if (this.phase === "playing") {
+      // Skip your turn to play
+      const currentPlayer = this.players[this.currentTurn];
+      if (!currentPlayer || currentPlayer.id !== playerId) {
+        return { success: false, error: "Not your turn" };
+      }
+
+      this.skipCount++;
+
+      if (this.skipCount >= this.players.length - 1) {
+        // Full round of skips — clear the pile and reset claim
+        this.clearPileAndResetClaim();
+      } else {
+        this.advanceTurn();
+      }
+      return { success: true };
     }
-    // First caller wins - effectively advance turn immediately
-    this.onChallengeWindowEnd();
-    return { success: true };
+
+    return { success: false, error: "Cannot pass at this time" };
   }
 
   /** Advance turn to next player (for disconnects) */
@@ -618,11 +661,15 @@ export class GameManager {
     const move = botAI.makePlay(
       player.hand,
       this.centralPile.length,
-      this.lastDeclaration,
+      this.currentRequiredClaim,
       this.claimType,
     );
 
-    if (!move) return;
+    if (!move) {
+      // Bot can't find a valid play - skip turn
+      this.passTurn(botId);
+      return;
+    }
 
     this.playCards(botId, move.cardIndices, move.declaration);
   }
@@ -697,6 +744,7 @@ export class GameManager {
       pileCount: this.centralPile.length,
       lastDeclaration: this.lastDeclaration,
       lastPlayerId: this.lastPlayerId,
+      currentRequiredClaim: this.currentRequiredClaim,
       winner:
         this.phase === "game_over"
           ? this.players.find((p) => p.hasWon)?.id ?? null
@@ -721,6 +769,43 @@ export class GameManager {
       ...base,
       hand: player ? [...player.hand] : [],
     };
+  }
+
+  /** Clear the central pile and reset the persistent claim. Used when all players skip or after a challenge. */
+  private clearPileAndResetClaim(): void {
+    this.centralPile = [];
+    this.currentRequiredClaim = null;
+    this.lastDeclaration = null;
+    this.lastPlayerId = null;
+    this.skipCount = 0;
+    this.revealedCards = [];
+    this.challengeDeadline = null;
+    this.phase = "playing";
+
+    const state = this.toState();
+    this.broadcast(state);
+    this.triggerBotIfNeeded();
+  }
+
+  /** Check if a declaration matches the current required claim (persistent suit/rank/value) */
+  private isDeclarationMatchingRequiredClaim(declaration: CardDeclaration): boolean {
+    if (!this.currentRequiredClaim) return true;
+
+    if (declaration.type === "playing-card" && this.currentRequiredClaim.type === "playing-card") {
+      if (this.claimType === "suit") {
+        return declaration.suit === this.currentRequiredClaim.suit;
+      }
+      if (this.claimType === "rank") {
+        return declaration.rank === this.currentRequiredClaim.rank;
+      }
+      return declaration.suit === this.currentRequiredClaim.suit && declaration.rank === this.currentRequiredClaim.rank;
+    }
+
+    if (declaration.type === "dominoe" && this.currentRequiredClaim.type === "dominoe") {
+      return declaration.value === this.currentRequiredClaim.value;
+    }
+
+    return false;
   }
 
   /** Clean up */

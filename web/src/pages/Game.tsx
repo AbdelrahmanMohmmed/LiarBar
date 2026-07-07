@@ -8,7 +8,7 @@ import { VoiceControls } from "@/components/VoiceControls";
 import { GameOver } from "@/components/GameOver";
 import type { CardDeclaration } from "@/lib/types";
 import { declarationToString } from "@/lib/types";
-import { AlertTriangle, ThumbsDown, Play, Clock, Eye } from "lucide-react";
+import { AlertTriangle, ThumbsDown, Play, Clock, Eye, SkipForward } from "lucide-react";
 
 export default function Game() {
   const { roomId: paramRoomId } = useParams<{ roomId: string }>();
@@ -112,7 +112,6 @@ export default function Game() {
         if (prev.includes(index)) {
           return prev.filter((i) => i !== index);
         }
-        if (prev.length >= 4) return prev;
         return [...prev, index].sort((a, b) => a - b);
       });
     },
@@ -146,6 +145,19 @@ export default function Game() {
       );
     }
   }, [callLiar, addToast]);
+
+  const handleSkipTurn = useCallback(async () => {
+    try {
+      await passTurn();
+      setSelectedCards([]);
+      addToast("You skipped your turn!", "info");
+    } catch (err) {
+      addToast(
+        err instanceof Error ? err.message : "Failed to skip",
+        "error",
+      );
+    }
+  }, [passTurn, addToast]);
 
   const handlePlayInstead = useCallback(async () => {
     try {
@@ -203,6 +215,11 @@ export default function Game() {
           {gameState.claimType && gameState.variant === "cards" && (
             <span className="text-[10px] text-amber-200/40 bg-amber-900/20 px-2 py-0.5 rounded-full">
               {gameState.claimType === "suit" ? "Suit Claim" : "Rank Claim"}
+            </span>
+          )}
+          {gameState.currentRequiredClaim && gameState.phase === "playing" && (
+            <span className="text-xs text-amber-300 bg-amber-900/30 px-2 py-1 rounded-full font-mono">
+              Must play: {declarationToString(gameState.currentRequiredClaim, gameState.claimType)}
             </span>
           )}
           {gameState.phase === "revealing" && (
@@ -346,6 +363,19 @@ export default function Game() {
                   />
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Skip/Pass button when it's your turn */}
+          {isMyTurn && selectedCards.length === 0 && (
+            <div className="flex justify-center mb-2">
+              <button
+                onClick={handleSkipTurn}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-amber-900/40 text-amber-200/80 hover:bg-[#2a1515] hover:text-white transition-all text-sm"
+              >
+                <SkipForward className="w-4 h-4" />
+                Skip / Pass
+              </button>
             </div>
           )}
 

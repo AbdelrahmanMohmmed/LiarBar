@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useGame } from "@/lib/gameContext";
 import {
-  Copy, User, Bot, Play, X, Loader2, ArrowLeft, Crown, MessageCircle,
+  Copy, User, Bot, Play, X, Loader2, ArrowLeft, Crown, MessageCircle, LogIn,
 } from "lucide-react";
 import type { BotDifficulty } from "@/lib/types";
 
@@ -12,15 +12,19 @@ export default function Room() {
   const { roomId: paramRoomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
   const {
-    gameState, myPlayerId, myRoomId, startGame, addBot, removeBot,
+    gameState, myPlayerId, myRoomId, joinRoom, startGame, addBot, removeBot,
     addToast, reconnectRoom, sendChat, chatMessages,
   } = useGame();
 
   const [chatInput, setChatInput] = useState("");
   const [starting, setStarting] = useState(false);
   const [reconnected, setReconnected] = useState(false);
+  const [joinName, setJoinName] = useState("");
+  const [isJoining, setIsJoining] = useState(false);
   // Track pending difficulty for the "Add Bot" button
   const [pendingDifficulty, setPendingDifficulty] = useState<BotDifficulty>("medium");
+
+  const isInRoom = myPlayerId && gameState?.players.some((p) => p.id === myPlayerId);
 
   useEffect(() => {
     if (reconnected) return;
@@ -30,11 +34,32 @@ export default function Room() {
     if (storedRoomId === paramRoomId && storedPlayerId && !gameState) {
       reconnectRoom(storedRoomId, storedPlayerId).then(() => {
         setReconnected(true);
-      }).catch(() => {});
-    } else if (paramRoomId === myRoomId) {
+      }).catch(() => {
+        // Reconnection failed — user needs to join fresh
+        setReconnected(true);
+      });
+    } else if (paramRoomId === myRoomId && isInRoom) {
+      setReconnected(true);
+    } else if (!gameState && !storedPlayerId) {
+      // No stored credentials — show join prompt
       setReconnected(true);
     }
-  }, [paramRoomId, myRoomId, gameState, reconnectRoom, reconnected]);
+  }, [paramRoomId, myRoomId, gameState, reconnectRoom, reconnected, isInRoom]);
+
+  const handleJoinRoom = useCallback(async () => {
+    if (!joinName.trim()) {
+      addToast("Enter your name first", "error");
+      return;
+    }
+    setIsJoining(true);
+    try {
+      await joinRoom(paramRoomId!, joinName.trim());
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : "Failed to join room", "error");
+    } finally {
+      setIsJoining(false);
+    }
+  }, [joinName, paramRoomId, joinRoom, addToast]);
 
   useEffect(() => {
     if (gameState && gameState.phase !== "lobby" && gameState.phase !== "game_over") {
@@ -88,12 +113,59 @@ export default function Room() {
     setChatInput("");
   }, [chatInput, sendChat]);
 
-  if (!gameState) {
+  if (isJoining) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-[#1a0a0a] via-[#2d1111] to-[#1a0a0a] flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-8 h-8 text-amber-500 animate-spin mx-auto mb-4" />
-          <p className="text-amber-200/60">Loading room...</p>
+          <p className="text-amber-200/60">Joining room...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!gameState || !isInRoom) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-[#1a0a0a] via-[#2d1111] to-[#1a0a0a] flex flex-col items-center justify-center p-4">
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-1/3 left-1/3 w-96 h-96 bg-amber-600/5 rounded-full blur-3xl" />
+        </div>
+
+        <div className="w-full max-w-md bg-[#1c0d0d]/90 backdrop-blur-xl border border-amber-900/30 shadow-2xl shadow-black/50 rounded-2xl relative z-10">
+          <div className="p-6 pb-2">
+            <h2 className="text-white text-xl font-bold">Join Room</h2>
+            <p className="text-amber-200/50 text-sm">
+              Enter your name to join <span className="text-amber-400 font-mono">{paramRoomId}</span>
+            </p>
+          </div>
+          <div className="p-6 pt-2 space-y-4">
+            <div className="space-y-2">
+              <label htmlFor="joinName" className="text-amber-200/80 text-sm block">Your Name</label>
+              <input
+                id="joinName"
+                placeholder="Enter your name..."
+                value={joinName}
+                onChange={(e) => setJoinName(e.target.value)}
+                maxLength={16}
+                onKeyDown={(e) => { if (e.key === "Enter") handleJoinRoom(); }}
+                className="w-full px-3 py-2.5 rounded-lg bg-[#2a1515] border border-amber-900/40 text-white placeholder:text-amber-200/30 focus:border-amber-500/60 focus:outline-none text-sm"
+              />
+            </div>
+            <button
+              onClick={handleJoinRoom}
+              disabled={isJoining}
+              className="w-full inline-flex items-center justify-center gap-2 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white font-semibold py-3 rounded-xl shadow-lg shadow-amber-900/30 transition-all active:scale-95 disabled:opacity-50"
+            >
+              <LogIn className="w-4 h-4" />
+              {isJoining ? "Joining..." : "Join Room"}
+            </button>
+            <button
+              onClick={() => navigate("/")}
+              className="w-full text-amber-200/40 hover:text-amber-200/60 text-sm py-2 transition-all"
+            >
+              Back to Home
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -175,7 +247,7 @@ export default function Room() {
                       </button>
                       <button
                         onClick={handleStart}
-                        disabled={starting || gameState.players.length < 3}
+                        disabled={starting || gameState.players.length < 2}
                         className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white font-semibold text-sm shadow-lg disabled:opacity-50 transition-all"
                       >
                         {starting ? (
@@ -189,8 +261,8 @@ export default function Room() {
                   )}
                 </div>
                 <p className="text-amber-200/50 text-xs mt-1">
-                  {gameState.players.length < 3
-                    ? "Need at least 3 players. Add bots to fill slots."
+                  {gameState.players.length < 2
+                    ? "Need at least 2 players. Add bots to fill slots."
                     : "Ready to play!"}
                 </p>
               </div>

@@ -89,6 +89,7 @@ export interface GameState {
   pileCount: number;
   lastDeclaration: CardDeclaration | null;
   lastPlayerId: string | null;
+  currentRequiredClaim: CardDeclaration | null;
   winner: string | null;
   actionLog: GameAction[];
   variant: GameVariant;
