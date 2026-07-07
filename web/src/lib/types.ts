@@ -154,3 +154,31 @@ export function getRankValue(rank: Rank): number {
   const values: Record<Rank, number> = { A: 14, "2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 7, "8": 8, "9": 9, "10": 10, J: 11, Q: 12, K: 13 };
   return values[rank];
 }
+
+const SYMBOL_TO_SUIT: Record<string, Suit> = {
+  "\u2665": "hearts",
+  "\u2666": "diamonds",
+  "\u2663": "clubs",
+  "\u2660": "spades",
+};
+
+export function parseCardString(cardStr: string): Card | null {
+  const symbol = cardStr.slice(-1);
+  const suit = SYMBOL_TO_SUIT[symbol];
+  if (suit) {
+    const rank = cardStr.slice(0, -1) as Rank;
+    if (rank && getRankValue(rank)) {
+      return { type: "playing-card", rank, suit };
+    }
+    return null;
+  }
+  const parts = cardStr.split("-");
+  if (parts.length === 2) {
+    const left = parseInt(parts[0], 10);
+    const right = parseInt(parts[1], 10);
+    if (!isNaN(left) && !isNaN(right)) {
+      return { type: "dominoe", left, right };
+    }
+  }
+  return null;
+}

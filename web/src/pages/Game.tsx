@@ -4,11 +4,12 @@ import { useGame } from "@/lib/gameContext";
 import { GameTable } from "@/components/GameTable";
 import { PlayerHand } from "@/components/PlayerHand";
 import { DeclarationModal } from "@/components/DeclarationModal";
+import { RevealedCardView } from "@/components/RevealedCardView";
 import { VoiceControls } from "@/components/VoiceControls";
 import { GameOver } from "@/components/GameOver";
 import type { CardDeclaration } from "@/lib/types";
 import { declarationToString } from "@/lib/types";
-import { AlertTriangle, ThumbsDown, Play, Clock, Eye, SkipForward } from "lucide-react";
+import { AlertTriangle, ThumbsDown, Play, Clock, Eye, SkipForward, MessageCircle } from "lucide-react";
 
 export default function Game() {
   const { roomId: paramRoomId } = useParams<{ roomId: string }>();
@@ -17,9 +18,11 @@ export default function Game() {
     gameState,
     myHand,
     myPlayerId,
+    chatMessages,
     playCards,
     callLiar,
     passTurn,
+    sendChat,
     addToast,
     reconnectRoom,
   } = useGame();
@@ -27,6 +30,8 @@ export default function Game() {
   const [selectedCards, setSelectedCards] = useState<number[]>([]);
   const [showDeclaration, setShowDeclaration] = useState(false);
   const [reconnected, setReconnected] = useState(false);
+  const [chatInput, setChatInput] = useState("");
+  const [showChat, setShowChat] = useState(false);
   const [challengeCountdown, setChallengeCountdown] = useState<number | null>(null);
   const [revealCountdown, setRevealCountdown] = useState<number | null>(null);
 
@@ -159,6 +164,13 @@ export default function Game() {
     }
   }, [passTurn, addToast]);
 
+  const handleSendChat = useCallback((e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatInput.trim()) return;
+    sendChat(chatInput.trim());
+    setChatInput("");
+  }, [chatInput, sendChat]);
+
   const handlePlayInstead = useCallback(async () => {
     try {
       await passTurn();
@@ -239,9 +251,61 @@ export default function Game() {
               Challenge Window
             </span>
           )}
+          <button
+            onClick={() => setShowChat(!showChat)}
+            className="relative p-2 rounded-lg text-amber-200/60 hover:text-white hover:bg-[#2a1515] transition-all"
+            title={showChat ? "Hide Chat" : "Show Chat"}
+          >
+            <MessageCircle className="w-4 h-4" />
+            {chatMessages.length > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 rounded-full text-[9px] font-bold text-white flex items-center justify-center">
+                {chatMessages.length > 9 ? "9+" : chatMessages.length}
+              </span>
+            )}
+          </button>
           <VoiceControls roomId={paramRoomId!} />
         </div>
       </div>
+
+      {/* Chat panel */}
+      {showChat && (
+        <div className="absolute top-14 right-4 z-30 w-72 h-[calc(100vh-7rem)] flex flex-col bg-[#0d1a0d]/95 backdrop-blur-xl border border-amber-900/30 rounded-2xl shadow-2xl shadow-black/60 overflow-hidden animate-in slide-in-from-right-2 duration-200">
+          <div className="p-3 pb-1 border-b border-amber-900/20">
+            <h3 className="text-white text-sm font-bold flex items-center gap-2">
+              <MessageCircle className="w-4 h-4 text-amber-400" />
+              Chat
+            </h3>
+          </div>
+          <div className="flex-1 flex flex-col p-3 gap-2 min-h-0">
+            <div className="flex-1 overflow-y-auto space-y-1.5">
+              {chatMessages.map((msg, i) => (
+                <div key={i} className="text-xs">
+                  <span className="text-amber-400 font-medium">{msg.playerName}:</span>{" "}
+                  <span className="text-amber-100/80">{msg.message}</span>
+                </div>
+              ))}
+              {chatMessages.length === 0 && (
+                <p className="text-amber-200/30 text-xs text-center mt-8">No messages yet</p>
+              )}
+            </div>
+            <form onSubmit={handleSendChat} className="flex gap-2 shrink-0">
+              <input
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                placeholder="Type a message..."
+                maxLength={200}
+                className="flex-1 px-2.5 py-2 rounded-lg bg-[#2a1515] border border-amber-900/40 text-white placeholder:text-amber-200/30 text-xs focus:border-amber-500/60 focus:outline-none"
+              />
+              <button
+                type="submit"
+                className="p-2 rounded-lg bg-amber-700 hover:bg-amber-600 text-white shrink-0 transition-all"
+              >
+                <MessageCircle className="w-3.5 h-3.5" />
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Main game area */}
       <div className="flex-1 flex flex-col relative z-10">
@@ -339,14 +403,7 @@ export default function Game() {
 
                 <div className="flex gap-2 justify-center flex-wrap mb-4">
                   {gameState.revealedCards.map((cardStr, i) => (
-                    <div
-                      key={i}
-                      className="w-12 h-16 rounded-lg bg-gradient-to-b from-[#faf3e0] to-[#e8d5b0] border border-amber-700/60 shadow-lg flex items-center justify-center"
-                    >
-                      <span className="text-gray-900 font-mono text-xs font-bold">
-                        {cardStr}
-                      </span>
-                    </div>
+                    <RevealedCardView key={i} cardStr={cardStr} />
                   ))}
                 </div>
 

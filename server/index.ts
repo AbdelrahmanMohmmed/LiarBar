@@ -190,6 +190,8 @@ io.on("connection", (socket: Socket) => {
 
         socketToPlayer.set(socket.id, { roomId, playerId: player.id });
 
+        io.to(roomId).emit("game_state", room.toState());
+
         console.log(`${playerName} joined room ${roomId}`);
 
         callback({
