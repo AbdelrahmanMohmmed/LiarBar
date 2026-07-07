@@ -1,6 +1,6 @@
 import { memo, useMemo, useState, useEffect } from "react";
 import type { GameState, Card, Suit } from "@/lib/types";
-import { SUIT_SYMBOLS, SUIT_COLORS, declarationToString, parseCardString } from "@/lib/types";
+import { SUIT_SYMBOLS, SUIT_COLORS, declarationToString } from "@/lib/types";
 import { Card as CardView } from "@/components/Card";
 import { cn } from "@/lib/utils";
 import { Crown, Bot, User, Zap, Clock, Eye } from "lucide-react";
@@ -219,10 +219,9 @@ export const GameTable = memo(function GameTable({
                     <span className="text-red-400 text-[10px] font-semibold">Revealed:</span>
                   </div>
                   <div className="flex gap-1 justify-center flex-wrap max-w-[150px] mx-auto">
-                    {gameState.revealedCards.map((cardStr, i) => {
-                      const card = parseCardString(cardStr);
-                      return card ? <CardView key={i} card={card} small /> : null;
-                    })}
+                    {gameState.revealedCards.map((cardStr, i) => (
+                      <CardView key={i} cardStr={cardStr} small />
+                    ))}
                   </div>
                 </div>
               )}
