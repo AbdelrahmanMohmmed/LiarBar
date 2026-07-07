@@ -1,80 +1,16 @@
 import { memo, useCallback } from "react";
-import type { Card, Rank } from "@/lib/types";
-import { SUIT_SYMBOLS, SUIT_COLORS } from "@/lib/types";
+import type { Card as CardType } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Send, Hand } from "lucide-react";
+import { Card } from "@/components/Card";
 
 interface PlayerHandProps {
-  cards: Card[];
+  cards: CardType[];
   selectedCards: number[];
   onCardSelect: (index: number) => void;
   canPlay: boolean;
   onPlayClick: () => void;
 }
-
-const PlayingCardView = memo(function PlayingCardView({
-  card,
-  selected,
-  onClick,
-  disabled,
-  index,
-}: {
-  card: Card;
-  selected: boolean;
-  onClick: () => void;
-  disabled: boolean;
-  index: number;
-}) {
-  if (card.type === "dominoe") {
-    return (
-      <button
-        onClick={onClick}
-        disabled={disabled && !selected}
-        className={cn(
-          "relative w-14 h-20 rounded-lg border-2 transition-all duration-200 flex flex-col items-center justify-center gap-1 select-none",
-          selected
-            ? "border-amber-400 bg-amber-500/20 -translate-y-5 shadow-lg shadow-amber-500/30 scale-105 z-10"
-            : "border-amber-900/40 bg-gradient-to-b from-[#faf3e0] to-[#e8d5b0] hover:border-amber-600/60 hover:-translate-y-2",
-          disabled && !selected && "opacity-50 cursor-not-allowed",
-        )}
-        style={{ animationDelay: `${index * 40}ms` }}
-      >
-        <div className="w-full h-px bg-gray-400 absolute top-1/2" />
-        <span className="text-gray-900 font-mono font-bold text-sm z-10">{card.left}</span>
-        <span className="text-gray-900 font-mono font-bold text-sm z-10">{card.right}</span>
-      </button>
-    );
-  }
-
-  const color = SUIT_COLORS[card.suit];
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled && !selected}
-      className={cn(
-        "relative w-14 h-20 rounded-lg border-2 transition-all duration-200 flex flex-col items-center justify-center select-none animate-in fade-in",
-        selected
-          ? "border-amber-400 bg-white -translate-y-5 shadow-lg shadow-amber-500/30 scale-105 z-10"
-          : "border-gray-300/80 bg-white hover:border-amber-600/60 hover:-translate-y-2 shadow-md",
-        disabled && !selected && "opacity-50 cursor-not-allowed",
-      )}
-      style={{ animationDelay: `${index * 40}ms` }}
-    >
-      <span className="absolute top-1 left-1.5 text-xs font-bold leading-none" style={{ color }}>
-        {card.rank}
-      </span>
-      <span className="absolute top-3.5 left-1.5 text-[10px] leading-none" style={{ color }}>
-        {SUIT_SYMBOLS[card.suit]}
-      </span>
-      <span className="text-xl" style={{ color }}>
-        {SUIT_SYMBOLS[card.suit]}
-      </span>
-      <span className="absolute bottom-1 right-1.5 text-xs font-bold leading-none rotate-180" style={{ color }}>
-        {card.rank}
-      </span>
-    </button>
-  );
-});
 
 export const PlayerHand = memo(function PlayerHand({
   cards,
@@ -130,14 +66,18 @@ export const PlayerHand = memo(function PlayerHand({
 
       <div className="flex flex-wrap justify-center gap-1.5 max-w-2xl mx-auto">
         {cards.map((card, index) => (
-          <PlayingCardView
+          <button
             key={index}
-            card={card}
-            index={index}
-            selected={selectedCards.includes(index)}
             onClick={() => handleCardClick(index)}
             disabled={!canPlay}
-          />
+            className={cn(
+              "transition-all duration-200",
+              selectedCards.includes(index) && "-translate-y-5 scale-105 z-10",
+              !canPlay && !selectedCards.includes(index) && "opacity-50 cursor-not-allowed",
+            )}
+          >
+            <Card card={card} />
+          </button>
         ))}
       </div>
     </div>

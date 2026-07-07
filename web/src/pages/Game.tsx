@@ -4,8 +4,9 @@ import { useGame } from "@/lib/gameContext";
 import { GameTable } from "@/components/GameTable";
 import { PlayerHand } from "@/components/PlayerHand";
 import { DeclarationModal } from "@/components/DeclarationModal";
-import { RevealedCardView } from "@/components/RevealedCardView";
+import { Card } from "@/components/Card";
 import { VoiceControls } from "@/components/VoiceControls";
+import { parseCardString } from "@/lib/types";
 import { GameOver } from "@/components/GameOver";
 import type { CardDeclaration } from "@/lib/types";
 import { declarationToString } from "@/lib/types";
@@ -402,9 +403,10 @@ export default function Game() {
                 </div>
 
                 <div className="flex gap-2 justify-center flex-wrap mb-4">
-                  {gameState.revealedCards.map((cardStr, i) => (
-                    <RevealedCardView key={i} cardStr={cardStr} />
-                  ))}
+                  {gameState.revealedCards.map((cardStr, i) => {
+                    const card = parseCardString(cardStr);
+                    return card ? <Card key={i} card={card} /> : null;
+                  })}
                 </div>
 
                 {revealCountdown !== null && (
