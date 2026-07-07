@@ -9,7 +9,7 @@ import type { BotDifficulty } from "./BotAI.js";
 import type { Player } from "./Player.js";
 
 const PORT = parseInt(process.env.PORT || "3001", 10);
-const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "http://localhost:5173,https://your-vercel-app.vercel.app").split(",");
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "*").split(",");
 
 const app = express();
 app.use(cors({ origin: ALLOWED_ORIGINS, credentials: true }));
