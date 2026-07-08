@@ -8,10 +8,11 @@ import { Card } from "@/components/Card";
 import { VoiceControls } from "@/components/VoiceControls";
 import { GameOver } from "@/components/GameOver";
 import { GuideModal } from "@/components/GuideModal";
+import { LangToggle } from "@/components/LangToggle";
 import { useLanguage } from "@/lib/languageContext";
 import type { CardDeclaration } from "@/lib/types";
 import { declarationToString } from "@/lib/types";
-import { AlertTriangle, ThumbsDown, Play, Clock, Eye, SkipForward, MessageCircle, Globe, HelpCircle } from "lucide-react";
+import { AlertTriangle, ThumbsDown, Play, Clock, Eye, SkipForward, MessageCircle, HelpCircle } from "lucide-react";
 
 export default function Game() {
   const { roomId: paramRoomId } = useParams<{ roomId: string }>();
@@ -227,53 +228,47 @@ export default function Game() {
             onClick={() => navigate(`/room/${paramRoomId}`)}
             className="text-amber-200/50 hover:text-white text-xs bg-transparent"
           >
-            Room {gameState.roomId}
+            {t("game.back_to_room")} {gameState.roomId}
           </button>
           {gameState.claimType && gameState.variant === "cards" && (
             <span className="text-[10px] text-amber-200/40 bg-amber-900/20 px-2 py-0.5 rounded-full">
-              {gameState.claimType === "suit" ? "Suit Claim" : "Rank Claim"}
+              {gameState.claimType === "suit" ? t("game.suit_claim") : t("game.rank_claim")}
             </span>
           )}
           {gameState.currentRequiredClaim && (
             <span className="text-xs text-amber-300 bg-amber-900/30 px-2 py-1 rounded-full font-mono">
-              Current Claim: {declarationToString(gameState.currentRequiredClaim, gameState.claimType)}
+              {t("game.current_claim")} {declarationToString(gameState.currentRequiredClaim, gameState.claimType)}
             </span>
           )}
           {gameState.phase === "revealing" && (
             <span className="text-xs text-red-400 bg-red-900/30 px-2 py-1 rounded-full animate-pulse">
-              Revealing...
+              {t("game.revealing")}
             </span>
           )}
         </div>
         <div className="flex items-center gap-3">
           {gameState.phase === "playing" && (
             <span className="text-xs text-emerald-400 bg-emerald-900/30 px-2 py-1 rounded-full">
-              Playing
+              {t("game.playing")}
             </span>
           )}
           {gameState.phase === "waiting_for_challenge" && (
             <span className="text-xs text-amber-400 bg-amber-900/30 px-2 py-1 rounded-full animate-pulse">
-              Challenge Window
+              {t("game.challenge_window")}
             </span>
           )}
-          <button
-            onClick={toggleLang}
-            className="p-2 rounded-lg text-amber-200/60 hover:text-white hover:bg-[#2a1515] transition-all"
-            title={t("lang.switch_to")}
-          >
-            <Globe className="w-4 h-4" />
-          </button>
+          <LangToggle />
           <button
             onClick={() => setShowGuide(true)}
             className="p-2 rounded-lg text-amber-200/60 hover:text-white hover:bg-[#2a1515] transition-all"
-            title="How to play"
+            title={t("guide.title")}
           >
             <HelpCircle className="w-4 h-4" />
           </button>
           <button
             onClick={() => setShowChat(!showChat)}
             className="relative p-2 rounded-lg text-amber-200/60 hover:text-white hover:bg-[#2a1515] transition-all"
-            title={showChat ? "Hide Chat" : "Show Chat"}
+            title=              {showChat ? t("chat.hide") : t("chat.show")}
           >
             <MessageCircle className="w-4 h-4" />
             {chatMessages.length > 0 && (
@@ -290,10 +285,10 @@ export default function Game() {
       {showChat && (
         <div className="absolute top-14 right-4 z-30 w-72 h-[calc(100vh-7rem)] flex flex-col bg-[#0d1a0d]/95 backdrop-blur-xl border border-amber-900/30 rounded-2xl shadow-2xl shadow-black/60 overflow-hidden animate-in slide-in-from-right-2 duration-200">
           <div className="p-3 pb-1 border-b border-amber-900/20">
-            <h3 className="text-white text-sm font-bold flex items-center gap-2">
-              <MessageCircle className="w-4 h-4 text-amber-400" />
-              Chat
-            </h3>
+              <h3 className="text-white text-sm font-bold flex items-center gap-2">
+                <MessageCircle className="w-4 h-4 text-amber-400" />
+                {t("room.chat")}
+              </h3>
           </div>
           <div className="flex-1 flex flex-col p-3 gap-2 min-h-0">
             <div className="flex-1 overflow-y-auto space-y-1.5">
@@ -304,14 +299,14 @@ export default function Game() {
                 </div>
               ))}
               {chatMessages.length === 0 && (
-                <p className="text-amber-200/30 text-xs text-center mt-8">No messages yet</p>
+                <p className="text-amber-200/30 text-xs text-center mt-8">{t("room.no_messages")}</p>
               )}
             </div>
             <form onSubmit={handleSendChat} className="flex gap-2 shrink-0">
               <input
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
-                placeholder="Type a message..."
+                placeholder={t("room.type_message")}
                 maxLength={200}
                 className="flex-1 px-2.5 py-2 rounded-lg bg-[#2a1515] border border-amber-900/40 text-white placeholder:text-amber-200/30 text-xs focus:border-amber-500/60 focus:outline-none"
               />
@@ -347,7 +342,7 @@ export default function Game() {
                   <AlertTriangle className="w-5 h-5 text-red-400 shrink-0" />
                   <div className="flex-1">
                     <p className="text-white font-semibold">
-                      {lastPlayer?.name} claims:
+                      {lastPlayer?.name} {t("game.claims")}:
                     </p>
                     <p className="text-amber-200 text-lg font-bold font-mono">
                       {gameState.lastDeclaration
@@ -368,14 +363,14 @@ export default function Game() {
                     className="flex-1 inline-flex items-center justify-center gap-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white font-bold h-12 rounded-xl shadow-lg shadow-red-900/40 transition-all active:scale-95"
                   >
                     <ThumbsDown className="w-5 h-5" />
-                    Call Liar!
+                    {t("game.call_liar")}
                   </button>
                   <button
                     onClick={handlePlayInstead}
                     className="flex-1 inline-flex items-center justify-center gap-2 border border-amber-900/40 text-amber-200 hover:bg-amber-900/20 h-12 rounded-xl transition-all active:scale-95"
                   >
                     <Play className="w-5 h-5" />
-                    Play Cards
+                    {t("game.play_cards")}
                   </button>
                 </div>
               </div>
@@ -387,7 +382,7 @@ export default function Game() {
             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-4 w-full max-w-sm">
               <div className="bg-[#1c0d0d]/80 backdrop-blur border border-amber-900/30 rounded-xl p-3 text-center mx-4">
                 <p className="text-amber-200/60 text-sm">
-                  {lastPlayer.name} claims{" "}
+                  {lastPlayer.name} {t("game.claims")}{" "}
                   <span className="text-amber-400 font-bold font-mono">
                     {gameState.lastDeclaration
                       ? declarationToString(gameState.lastDeclaration, gameState.claimType)
@@ -395,7 +390,7 @@ export default function Game() {
                   </span>
                 </p>
                 <p className="text-amber-200/30 text-xs mt-1">
-                  Waiting for someone to challenge...
+                  {t("game.waiting_challenge")}
                 </p>
               </div>
             </div>
@@ -408,10 +403,10 @@ export default function Game() {
                 <div className="text-center mb-4">
                   <Eye className="w-8 h-8 text-red-400 mx-auto mb-2" />
                   <p className="text-white font-bold text-lg">
-                    {challengeAction?.playerName ?? "Someone"} called Liar on {lastPlayer?.name ?? "unknown"}!
+                    {challengeAction?.playerName ?? "Someone"} {t("game.revealing_title")} {lastPlayer?.name ?? "unknown"}!
                   </p>
                   <p className="text-amber-200/60 text-xs mt-1">
-                    {lastPlayer?.name} claimed{" "}
+                    {lastPlayer?.name} {t("game.revealing_claimed")}{" "}
                     <span className="text-amber-400 font-mono">
                       {gameState.lastDeclaration
                         ? declarationToString(gameState.lastDeclaration, gameState.claimType)
@@ -450,7 +445,7 @@ export default function Game() {
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-amber-900/40 text-amber-200/80 hover:bg-[#2a1515] hover:text-white transition-all text-sm"
               >
                 <SkipForward className="w-4 h-4" />
-                Skip / Pass
+                {t("game.skip_pass")}
               </button>
             </div>
           )}

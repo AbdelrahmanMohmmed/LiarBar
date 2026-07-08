@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo, memo } from "react";
 import type { Card, CardDeclaration, GameVariant, ClaimType, Suit, Rank } from "@/lib/types";
 import { SUIT_SYMBOLS, SUIT_COLORS, declarationToString } from "@/lib/types";
+import { useLanguage } from "@/lib/languageContext";
 import { X, Check, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -46,6 +47,7 @@ export const DeclarationModal = memo(function DeclarationModal({
   claimType,
   currentRequiredClaim,
 }: DeclarationModalProps) {
+  const { t } = useLanguage();
   const forcedSuit = currentRequiredClaim?.type === "playing-card" ? currentRequiredClaim.suit : undefined;
   const forcedRank = currentRequiredClaim?.type === "playing-card" ? currentRequiredClaim.rank : undefined;
   const forcedDominoValue = currentRequiredClaim?.type === "dominoe" ? currentRequiredClaim.value : undefined;
@@ -123,7 +125,7 @@ export const DeclarationModal = memo(function DeclarationModal({
 
       <div className="relative z-10 w-full max-w-sm bg-[#1c0d0d]/95 backdrop-blur-xl border border-amber-900/40 rounded-2xl shadow-2xl shadow-black/50 overflow-hidden animate-in zoom-in-95 duration-200">
         <div className="flex items-center justify-between p-4 border-b border-amber-900/20">
-          <h3 className="text-white font-bold text-lg">Make Your Claim</h3>
+          <h3 className="text-white font-bold text-lg">{t("claim.title")}</h3>
           <button onClick={onClose} className="text-amber-200/40 hover:text-white p-1 rounded">
             <X className="w-4 h-4" />
           </button>
@@ -132,7 +134,7 @@ export const DeclarationModal = memo(function DeclarationModal({
         <div className="p-4 space-y-4">
           <div>
             <p className="text-amber-200/60 text-xs mb-2">
-              Playing {count} card{count !== 1 ? "s" : ""}:
+              {t("claim.playing")} {count} {count === 1 ? t("claim.card") : t("claim.cards")}:
             </p>
             <div className="flex gap-1 justify-center flex-wrap">
               {selectedCards.map((card, i) => (
@@ -153,7 +155,7 @@ export const DeclarationModal = memo(function DeclarationModal({
 
           <div>
             <p className="text-amber-200/60 text-xs mb-2">
-              Declare {count} card{count !== 1 ? "s" : ""} as:
+              {t("claim.declare_as")} {count} {count === 1 ? t("claim.card") : t("claim.cards")}:
             </p>
 
             {isLocked ? (
@@ -161,25 +163,25 @@ export const DeclarationModal = memo(function DeclarationModal({
               <div className="bg-gradient-to-r from-amber-900/40 to-amber-800/20 border border-amber-600/40 rounded-xl p-4 text-center space-y-2">
                 <div className="flex items-center justify-center gap-2 text-amber-400 text-xs">
                   <Lock className="w-3.5 h-3.5" />
-                  <span>Claim locked — must match current claim</span>
+                  <span>{t("claim.locked")}</span>
                 </div>
                 <p className="text-white font-bold text-lg">
                   {previewClaim}
                 </p>
                 {currentRequiredClaim && (
                   <p className="text-amber-200/40 text-[10px]">
-                    Required: {declarationToString(currentRequiredClaim, claimType)}
+                    {t("claim.required")} {declarationToString(currentRequiredClaim, claimType)}
                   </p>
                 )}
                 <p className="text-amber-200/30 text-[10px]">
-                  Actually playing: {truthPreview}
+                  {t("claim.actually_playing")} {truthPreview}
                 </p>
               </div>
             ) : variant === "cards" && claimType === "suit" ? (
               // SUIT-ONLY mode
               <div className="space-y-3">
                 <div>
-                  <p className="text-amber-200/40 text-[10px] mb-1.5">Suit</p>
+                  <p className="text-amber-200/40 text-[10px] mb-1.5">{t("claim.suit")}</p>
                   <div className="flex gap-2">
                     {SUITS.map((suit) => (
                       <button
@@ -201,12 +203,12 @@ export const DeclarationModal = memo(function DeclarationModal({
                 </div>
 
                 <div className="bg-[#2a1515] rounded-lg p-3 text-center">
-                  <p className="text-amber-200/40 text-[10px] mb-1">Your claim:</p>
+                  <p className="text-amber-200/40 text-[10px] mb-1">{t("claim.your_claim")}</p>
                   <p className="text-white font-bold text-lg">
                     {count}x <span style={{ color: SUIT_COLORS[effectiveSuit] }}>{SUIT_SYMBOLS[effectiveSuit]} {effectiveSuit}</span>
                   </p>
                   <p className="text-amber-200/30 text-[10px] mt-1">
-                    Actually playing: {truthPreview}
+                    {t("claim.actually_playing")} {truthPreview}
                   </p>
                 </div>
               </div>
@@ -214,7 +216,7 @@ export const DeclarationModal = memo(function DeclarationModal({
               // RANK-ONLY mode
               <div className="space-y-3">
                 <div>
-                  <p className="text-amber-200/40 text-[10px] mb-1.5">Rank</p>
+                  <p className="text-amber-200/40 text-[10px] mb-1.5">{t("claim.rank")}</p>
                   <div className="grid grid-cols-7 gap-1">
                     {RANKS.map((rank) => (
                       <button
@@ -234,12 +236,12 @@ export const DeclarationModal = memo(function DeclarationModal({
                 </div>
 
                 <div className="bg-[#2a1515] rounded-lg p-3 text-center">
-                  <p className="text-amber-200/40 text-[10px] mb-1">Your claim:</p>
+                  <p className="text-amber-200/40 text-[10px] mb-1">{t("claim.your_claim")}</p>
                   <p className="text-white font-bold text-lg">
                     {count}x {effectiveRank}
                   </p>
                   <p className="text-amber-200/30 text-[10px] mt-1">
-                    Actually playing: {truthPreview}
+                    {t("claim.actually_playing")} {truthPreview}
                   </p>
                 </div>
               </div>
@@ -247,7 +249,7 @@ export const DeclarationModal = memo(function DeclarationModal({
               // BOTH rank AND suit mode
               <div className="space-y-3">
                 <div>
-                  <p className="text-amber-200/40 text-[10px] mb-1.5">Rank</p>
+                  <p className="text-amber-200/40 text-[10px] mb-1.5">{t("claim.rank")}</p>
                   <div className="grid grid-cols-7 gap-1">
                     {RANKS.map((rank) => (
                       <button
@@ -267,7 +269,7 @@ export const DeclarationModal = memo(function DeclarationModal({
                 </div>
 
                 <div>
-                  <p className="text-amber-200/40 text-[10px] mb-1.5">Suit</p>
+                  <p className="text-amber-200/40 text-[10px] mb-1.5">{t("claim.suit")}</p>
                   <div className="flex gap-2">
                     {SUITS.map((suit) => (
                       <button
@@ -289,7 +291,7 @@ export const DeclarationModal = memo(function DeclarationModal({
                 </div>
 
                 <div className="bg-[#2a1515] rounded-lg p-3 text-center">
-                  <p className="text-amber-200/40 text-[10px] mb-1">Your claim:</p>
+                  <p className="text-amber-200/40 text-[10px] mb-1">{t("claim.your_claim")}</p>
                   <p className="text-white font-bold text-lg">
                     {count}x{" "}
                     <span style={{ color: SUIT_COLORS[effectiveSuit] }}>
@@ -297,7 +299,7 @@ export const DeclarationModal = memo(function DeclarationModal({
                     </span>
                   </p>
                   <p className="text-amber-200/30 text-[10px] mt-1">
-                    Actually playing: {truthPreview}
+                    {t("claim.actually_playing")} {truthPreview}
                   </p>
                 </div>
               </div>
@@ -305,7 +307,7 @@ export const DeclarationModal = memo(function DeclarationModal({
               // DOMINOES mode – single number claim
               <div className="space-y-3">
                 <div>
-                  <p className="text-amber-200/40 text-[10px] mb-1.5">Number</p>
+                  <p className="text-amber-200/40 text-[10px] mb-1.5">{t("claim.number")}</p>
                   <div className="flex gap-1">
                     {DOMINO_VALUES.map((n) => (
                       <button
@@ -325,12 +327,12 @@ export const DeclarationModal = memo(function DeclarationModal({
                 </div>
 
                 <div className="bg-[#2a1515] rounded-lg p-3 text-center">
-                  <p className="text-amber-200/40 text-[10px] mb-1">Your claim:</p>
+                  <p className="text-amber-200/40 text-[10px] mb-1">{t("claim.your_claim")}</p>
                   <p className="text-white font-bold text-lg font-mono">
                     {count}x number {effectiveDominoValue}
                   </p>
                   <p className="text-amber-200/30 text-[10px] mt-1">
-                    Actually playing: {truthPreview}
+                    {t("claim.actually_playing")} {truthPreview}
                   </p>
                 </div>
               </div>
@@ -344,10 +346,10 @@ export const DeclarationModal = memo(function DeclarationModal({
             className="w-full inline-flex items-center justify-center gap-2 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white font-bold py-3 rounded-xl shadow-lg shadow-amber-900/30 transition-all active:scale-95"
           >
             <Check className="w-4 h-4" />
-            Confirm Claim ({previewClaim})
+            {t("claim.confirm")} ({previewClaim})
           </button>
           <p className="text-amber-200/20 text-[10px] text-center mt-2">
-            You can lie &mdash; but be careful, you might be challenged!
+            {t("claim.you_can_lie")}
           </p>
         </div>
       </div>

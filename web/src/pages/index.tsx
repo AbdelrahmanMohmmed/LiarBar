@@ -1,15 +1,20 @@
 import { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useGame } from "@/lib/gameContext";
-import { Swords, Users, Gamepad2, Dice1, LogIn } from "lucide-react";
+import { useLanguage } from "@/lib/languageContext";
+import { LangToggle } from "@/components/LangToggle";
+import { GuideModal } from "@/components/GuideModal";
+import { Swords, Users, Gamepad2, Dice1, LogIn, HelpCircle } from "lucide-react";
 import type { GameVariant, ClaimType } from "@/lib/types";
 import { isFirebaseConfigured, signInWithGoogle, onAuthChange } from "@/lib/firebase";
 
 export default function Index() {
   const navigate = useNavigate();
   const { createRoom, joinRoom, addToast } = useGame();
+  const { t } = useLanguage();
 
   const [playerName, setPlayerName] = useState("");
+  const [showGuide, setShowGuide] = useState(false);
   const [maxPlayers, setMaxPlayers] = useState("4");
   const [variant, setVariant] = useState<GameVariant>("cards");
   const [claimType, setClaimType] = useState<ClaimType>("suit");
@@ -101,26 +106,38 @@ export default function Index() {
             <Swords className="w-7 h-7 text-white" />
           </div>
           <h1 className="text-4xl font-bold text-white tracking-tight">
-            Liar's Bar
+            {t("index.title")}
           </h1>
         </div>
         <p className="text-amber-200/60 text-sm mt-1">
-          A game of deception, risk, and nerve
+          {t("index.subtitle")}
         </p>
       </div>
 
       <div className="w-full max-w-md bg-[#1c0d0d]/90 backdrop-blur-xl border border-amber-900/30 shadow-2xl shadow-black/50 rounded-2xl relative z-10">
-        <div className="p-6 pb-2">
-          <h2 className="text-white text-xl font-bold">Join the Table</h2>
-          <p className="text-amber-200/50 text-sm">Enter your display name to get started</p>
+        <div className="p-6 pb-2 flex items-start justify-between">
+          <div>
+            <h2 className="text-white text-xl font-bold">{t("index.join_table")}</h2>
+            <p className="text-amber-200/50 text-sm">{t("index.enter_name_hint")}</p>
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setShowGuide(true)}
+              className="p-2 rounded-lg text-amber-200/60 hover:text-white hover:bg-[#2a1515] transition-all"
+              title={t("guide.title")}
+            >
+              <HelpCircle className="w-4 h-4" />
+            </button>
+            <LangToggle />
+          </div>
         </div>
         <div className="p-6 pt-2 space-y-4">
           <div className="space-y-2">
-            <label htmlFor="name" className="text-amber-200/80 text-sm block">Your Name</label>
+            <label htmlFor="name" className="text-amber-200/80 text-sm block">{t("index.your_name")}</label>
             <div className="flex gap-2">
               <input
                 id="name"
-                placeholder="Enter your name..."
+                placeholder={t("index.name_placeholder")}
                 value={playerName}
                 onChange={(e) => setPlayerName(e.target.value)}
                 maxLength={16}
@@ -138,7 +155,7 @@ export default function Index() {
             </div>
             {googleUser && (
               <p className="text-emerald-400/60 text-xs">
-                Signed in as {googleUser.name}
+                {t("index.signed_in_as")} {googleUser.name}
               </p>
             )}
           </div>
@@ -153,7 +170,7 @@ export default function Index() {
               }`}
             >
               <Gamepad2 className="w-4 h-4" />
-              Create Room
+              {t("index.create_room_tab")}
             </button>
             <button
               onClick={() => setTab("join")}
@@ -164,7 +181,7 @@ export default function Index() {
               }`}
             >
               <Users className="w-4 h-4" />
-              Join Room
+              {t("index.join_room_tab")}
             </button>
           </div>
 
@@ -172,60 +189,60 @@ export default function Index() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <label className="text-amber-200/80 text-xs block">Max Players</label>
+                  <label className="text-amber-200/80 text-xs block">{t("index.max_players")}</label>
                   <select
                     value={maxPlayers}
                     onChange={(e) => setMaxPlayers(e.target.value)}
                     className="w-full px-3 py-2.5 rounded-lg bg-[#2a1515] border border-amber-900/40 text-white text-sm focus:border-amber-500/60 focus:outline-none"
                   >
                     {[2, 3, 4, 5, 6].map((n) => (
-                      <option key={n} value={String(n)}>{n} Players</option>
+                      <option key={n} value={String(n)}>{n} {t("index.n_players")}</option>
                     ))}
                   </select>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-amber-200/80 text-xs block">Game Type</label>
+                  <label className="text-amber-200/80 text-xs block">{t("index.game_type")}</label>
                   <select
                     value={variant}
                     onChange={(e) => setVariant(e.target.value as GameVariant)}
                     className="w-full px-3 py-2.5 rounded-lg bg-[#2a1515] border border-amber-900/40 text-white text-sm focus:border-amber-500/60 focus:outline-none"
                   >
-                    <option value="cards">Cards</option>
-                    <option value="dominoes">Dominoes</option>
+                    <option value="cards">{t("index.cards")}</option>
+                    <option value="dominoes">{t("index.dominoes")}</option>
                   </select>
                 </div>
               </div>
 
               {variant === "cards" && (
                 <div className="space-y-2">
-                  <label className="text-amber-200/80 text-xs block">Claim Type</label>
+                  <label className="text-amber-200/80 text-xs block">{t("index.claim_type")}</label>
                   <select
                     value={claimType}
                     onChange={(e) => setClaimType(e.target.value as ClaimType)}
                     className="w-full px-3 py-2.5 rounded-lg bg-[#2a1515] border border-amber-900/40 text-white text-sm focus:border-amber-500/60 focus:outline-none"
                   >
-                    <option value="suit">Suit-only (e.g. "2x Hearts")</option>
-                    <option value="rank">Rank-only (e.g. "2x A")</option>
+                    <option value="suit">{t("index.suit_only")}</option>
+                    <option value="rank">{t("index.rank_only")}</option>
                   </select>
                 </div>
               )}
 
               <div className="space-y-2">
-                <label className="text-amber-200/80 text-xs block">Number of Decks</label>
+                <label className="text-amber-200/80 text-xs block">{t("index.num_decks")}</label>
                 <select
                   value={deckCount}
                   onChange={(e) => setDeckCount(e.target.value)}
                   className="w-full px-3 py-2.5 rounded-lg bg-[#2a1515] border border-amber-900/40 text-white text-sm focus:border-amber-500/60 focus:outline-none"
                 >
                   {[1, 2, 3, 4].map((n) => (
-                    <option key={n} value={String(n)}>{n} Deck{n > 1 ? "s" : ""}</option>
+                    <option key={n} value={String(n)}>{n} {n === 1 ? "Deck" : "Decks"}</option>
                   ))}
                 </select>
               </div>
 
               <div className="space-y-2">
                 <label className="text-amber-200/80 text-xs block">
-                  Reveal Duration: <span className="text-amber-400 font-mono">{revealTime}s</span>
+                  {t("index.reveal_duration")}: <span className="text-amber-400 font-mono">{revealTime}s</span>
                 </label>
                 <input
                   type="range"
@@ -249,12 +266,12 @@ export default function Index() {
                 {isLoading ? (
                   <span className="flex items-center gap-2">
                     <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Creating...
+                    {t("index.creating")}
                   </span>
                 ) : (
                   <>
                     <Dice1 className="w-4 h-4" />
-                    Create Room
+                    {t("index.create_room")}
                   </>
                 )}
               </button>
@@ -262,9 +279,9 @@ export default function Index() {
           ) : (
             <div className="space-y-4">
               <div className="space-y-2">
-                <label className="text-amber-200/80 text-xs block">Room Code</label>
+                <label className="text-amber-200/80 text-xs block">{t("index.room_code")}</label>
                 <input
-                  placeholder="e.g. ABC123"
+                  placeholder={t("index.room_code_placeholder")}
                   value={joinRoomId}
                   onChange={(e) => setJoinRoomId(e.target.value.toUpperCase())}
                   maxLength={6}
@@ -280,12 +297,12 @@ export default function Index() {
                 {isLoading ? (
                   <span className="flex items-center gap-2">
                     <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Joining...
+                    {t("index.joining")}
                   </span>
                 ) : (
                   <>
                     <Users className="w-4 h-4" />
-                    Join Room
+                    {t("index.join_room")}
                   </>
                 )}
               </button>
@@ -295,8 +312,13 @@ export default function Index() {
       </div>
 
       <p className="text-amber-200/20 text-xs mt-6 relative z-10">
-        Liar's Bar &mdash; A game of bluff and nerve
+        {t("index.footer")}
       </p>
+
+      <GuideModal
+        open={showGuide}
+        onClose={() => setShowGuide(false)}
+      />
     </div>
   );
 }

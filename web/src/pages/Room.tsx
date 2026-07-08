@@ -1,8 +1,11 @@
 import { useState, useCallback, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useGame } from "@/lib/gameContext";
+import { useLanguage } from "@/lib/languageContext";
+import { LangToggle } from "@/components/LangToggle";
+import { GuideModal } from "@/components/GuideModal";
 import {
-  Copy, User, Bot, Play, X, Loader2, ArrowLeft, Crown, MessageCircle, LogIn,
+  Copy, User, Bot, Play, X, Loader2, ArrowLeft, Crown, MessageCircle, LogIn, HelpCircle,
 } from "lucide-react";
 import type { BotDifficulty } from "@/lib/types";
 
@@ -15,10 +18,12 @@ export default function Room() {
     gameState, myPlayerId, myRoomId, joinRoom, startGame, addBot, removeBot,
     addToast, reconnectRoom, sendChat, chatMessages,
   } = useGame();
+  const { t } = useLanguage();
 
   const [chatInput, setChatInput] = useState("");
   const [starting, setStarting] = useState(false);
   const [reconnected, setReconnected] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
   const [joinName, setJoinName] = useState("");
   const [isJoining, setIsJoining] = useState(false);
   // Track pending difficulty for the "Add Bot" button
@@ -118,7 +123,7 @@ export default function Room() {
       <div className="min-h-screen bg-gradient-to-b from-[#1a0a0a] via-[#2d1111] to-[#1a0a0a] flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-8 h-8 text-amber-500 animate-spin mx-auto mb-4" />
-          <p className="text-amber-200/60">Joining room...</p>
+          <p className="text-amber-200/60">{t("room.joining_room")}</p>
         </div>
       </div>
     );
@@ -133,17 +138,17 @@ export default function Room() {
 
         <div className="w-full max-w-md bg-[#1c0d0d]/90 backdrop-blur-xl border border-amber-900/30 shadow-2xl shadow-black/50 rounded-2xl relative z-10">
           <div className="p-6 pb-2">
-            <h2 className="text-white text-xl font-bold">Join Room</h2>
+            <h2 className="text-white text-xl font-bold">{t("room.join_title")}</h2>
             <p className="text-amber-200/50 text-sm">
-              Enter your name to join <span className="text-amber-400 font-mono">{paramRoomId}</span>
+              {t("room.join_desc")} <span className="text-amber-400 font-mono">{paramRoomId}</span>
             </p>
           </div>
           <div className="p-6 pt-2 space-y-4">
             <div className="space-y-2">
-              <label htmlFor="joinName" className="text-amber-200/80 text-sm block">Your Name</label>
+              <label htmlFor="joinName" className="text-amber-200/80 text-sm block">{t("room.your_name")}</label>
               <input
                 id="joinName"
-                placeholder="Enter your name..."
+                placeholder={t("room.name_placeholder")}
                 value={joinName}
                 onChange={(e) => setJoinName(e.target.value)}
                 maxLength={16}
@@ -157,13 +162,13 @@ export default function Room() {
               className="w-full inline-flex items-center justify-center gap-2 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white font-semibold py-3 rounded-xl shadow-lg shadow-amber-900/30 transition-all active:scale-95 disabled:opacity-50"
             >
               <LogIn className="w-4 h-4" />
-              {isJoining ? "Joining..." : "Join Room"}
+              {isJoining ? t("room.joining") : t("room.join_room_btn")}
             </button>
             <button
               onClick={() => navigate("/")}
               className="w-full text-amber-200/40 hover:text-amber-200/60 text-sm py-2 transition-all"
             >
-              Back to Home
+              {t("room.back_home")}
             </button>
           </div>
         </div>
@@ -189,32 +194,42 @@ export default function Room() {
             className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-amber-200/60 hover:text-white hover:bg-[#2a1515] transition-all text-sm"
           >
             <ArrowLeft className="w-4 h-4" />
-            Leave
+            {t("room.leave")}
           </button>
 
           <div className="text-center">
             <h1 className="text-2xl font-bold text-white">
-              Room{" "}
+              {t("room.room_title")}{" "}
               <span className="text-amber-400 font-mono tracking-widest">
                 {gameState.roomId}
               </span>
             </h1>
             <p className="text-amber-200/40 text-sm">
-              {gameState.variant === "cards" ? "Playing Cards" : "Dominoes"} &mdash;{" "}
-              {gameState.deckCount} deck{gameState.deckCount > 1 ? "s" : ""}
+              {gameState.variant === "cards" ? t("room.playing_cards") : t("room.dominoes")} &mdash;{" "}
+              {gameState.deckCount} {gameState.deckCount === 1 ? "deck" : "decks"}
               {gameState.claimType && gameState.variant === "cards" && (
-                <> &mdash; <span className="text-amber-400/60">{gameState.claimType === "suit" ? "Suit Claim" : "Rank Claim"}</span></>
+                <> &mdash; <span className="text-amber-400/60">{gameState.claimType === "suit" ? t("room.suit_claim") : t("room.rank_claim")}</span></>
               )}
             </p>
           </div>
 
-          <button
-            onClick={copyInviteLink}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-amber-900/40 text-amber-200/80 hover:bg-[#2a1515] hover:text-white transition-all text-sm"
-          >
-            <Copy className="w-4 h-4" />
-            Copy Invite Link
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowGuide(true)}
+              className="p-2 rounded-lg text-amber-200/60 hover:text-white hover:bg-[#2a1515] transition-all"
+              title={t("guide.title")}
+            >
+              <HelpCircle className="w-4 h-4" />
+            </button>
+            <LangToggle />
+            <button
+              onClick={copyInviteLink}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-amber-900/40 text-amber-200/80 hover:bg-[#2a1515] hover:text-white transition-all text-sm"
+            >
+              <Copy className="w-4 h-4" />
+              {t("room.copy_invite")}
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -224,7 +239,7 @@ export default function Room() {
               <div className="p-6 pb-2">
                 <div className="flex items-center justify-between">
                   <h2 className="text-white text-lg font-bold">
-                    Players ({gameState.players.length}/{gameState.maxPlayers})
+                    {t("room.players")} ({gameState.players.length}/{gameState.maxPlayers})
                   </h2>
                   {isHost && (
                     <div className="flex gap-2 items-center">
@@ -233,9 +248,9 @@ export default function Room() {
                         onChange={(e) => setPendingDifficulty(e.target.value as BotDifficulty)}
                         className="px-2 py-1.5 rounded-lg bg-[#2a1515] border border-amber-900/40 text-white text-xs focus:border-amber-500/60 focus:outline-none"
                       >
-                        <option value="easy">Easy</option>
-                        <option value="medium">Medium</option>
-                        <option value="hard">Hard</option>
+                        <option value="easy">{t("room.easy")}</option>
+                        <option value="medium">{t("room.medium")}</option>
+                        <option value="hard">{t("room.hard")}</option>
                       </select>
                       <button
                         onClick={handleAddBot}
@@ -243,7 +258,7 @@ export default function Room() {
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-amber-900/40 text-amber-200/80 hover:bg-[#2a1515] disabled:opacity-30 text-sm transition-all"
                       >
                         <Bot className="w-4 h-4" />
-                        Add Bot
+                        {t("room.add_bot")}
                       </button>
                       <button
                         onClick={handleStart}
@@ -255,15 +270,15 @@ export default function Room() {
                         ) : (
                           <Play className="w-4 h-4" />
                         )}
-                        Start
+                        {starting ? t("room.starting") : t("room.start")}
                       </button>
                     </div>
                   )}
                 </div>
                 <p className="text-amber-200/50 text-xs mt-1">
                   {gameState.players.length < 2
-                    ? "Need at least 2 players. Add bots to fill slots."
-                    : "Ready to play!"}
+                    ? t("room.need_players")
+                    : t("room.ready")}
                 </p>
               </div>
 
@@ -282,12 +297,12 @@ export default function Room() {
                           {player.name}
                           {player.isHost && <Crown className="w-3.5 h-3.5 text-amber-400" />}
                           {player.id === myPlayerId && (
-                            <span className="text-xs text-amber-400/60">(you)</span>
+                            <span className="text-xs text-amber-400/60">({t("room.you")})</span>
                           )}
                         </p>
                         <p className="text-amber-200/40 text-xs">
-                          {player.isBot ? "Bot" : "Human"}
-                          {!player.isConnected && " \u2022 Disconnected"}
+                          {player.isBot ? t("room.bot") : t("room.human")}
+                          {!player.isConnected && ` \u2022 ${t("room.disconnected")}`}
                         </p>
                       </div>
                     </div>
@@ -312,7 +327,7 @@ export default function Room() {
                     <div className="w-10 h-10 rounded-full bg-[#2a1515] flex items-center justify-center">
                       <User className="w-5 h-5 text-amber-200/30" />
                     </div>
-                    <p className="text-amber-200/30 text-sm">Waiting for player...</p>
+                    <p className="text-amber-200/30 text-sm">{t("room.waiting")}</p>
                   </div>
                 ))}
               </div>
@@ -325,7 +340,7 @@ export default function Room() {
               <div className="p-4 pb-2">
                 <h2 className="text-white text-lg font-bold flex items-center gap-2">
                   <MessageCircle className="w-4 h-4 text-amber-400" />
-                  Chat
+                  {t("room.chat")}
                 </h2>
               </div>
 
@@ -338,7 +353,7 @@ export default function Room() {
                     </div>
                   ))}
                   {chatMessages.length === 0 && (
-                    <p className="text-amber-200/30 text-xs text-center mt-8">No messages yet</p>
+                    <p className="text-amber-200/30 text-xs text-center mt-8">{t("room.no_messages")}</p>
                   )}
                 </div>
 
@@ -346,7 +361,7 @@ export default function Room() {
                   <input
                     value={chatInput}
                     onChange={(e) => setChatInput(e.target.value)}
-                    placeholder="Type a message..."
+                    placeholder={t("room.type_message")}
                     maxLength={200}
                     className="flex-1 px-3 py-2 rounded-lg bg-[#2a1515] border border-amber-900/40 text-white placeholder:text-amber-200/30 text-sm focus:border-amber-500/60 focus:outline-none"
                   />
@@ -362,6 +377,11 @@ export default function Room() {
           </div>
         </div>
       </div>
+
+      <GuideModal
+        open={showGuide}
+        onClose={() => setShowGuide(false)}
+      />
     </div>
   );
 }
