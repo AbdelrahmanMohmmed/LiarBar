@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo, memo } from "react";
 import type { Card, CardDeclaration, GameVariant, ClaimType, Suit, Rank } from "@/lib/types";
-import { SUIT_SYMBOLS, SUIT_COLORS } from "@/lib/types";
-import { X, Check } from "lucide-react";
+import { SUIT_SYMBOLS, SUIT_COLORS, declarationToString } from "@/lib/types";
+import { X, Check, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const SUITS: Suit[] = ["hearts", "diamonds", "clubs", "spades"];
@@ -17,6 +17,7 @@ interface DeclarationModalProps {
   selectedCards: Card[];
   variant: GameVariant;
   claimType?: ClaimType;
+  currentRequiredClaim?: CardDeclaration | null;
 }
 
 /** Find numbers that all selected dominoes have in common (truthful options) */
@@ -43,21 +44,31 @@ export const DeclarationModal = memo(function DeclarationModal({
   selectedCards,
   variant,
   claimType,
+  currentRequiredClaim,
 }: DeclarationModalProps) {
-  const [declaredRank, setDeclaredRank] = useState<Rank>("A");
-  const [declaredSuit, setDeclaredSuit] = useState<Suit>("hearts");
-  const [dominoValue, setDominoValue] = useState(0);
+  const forcedSuit = currentRequiredClaim?.type === "playing-card" ? currentRequiredClaim.suit : undefined;
+  const forcedRank = currentRequiredClaim?.type === "playing-card" ? currentRequiredClaim.rank : undefined;
+  const forcedDominoValue = currentRequiredClaim?.type === "dominoe" ? currentRequiredClaim.value : undefined;
+  const isLocked = !!currentRequiredClaim;
+
+  const [declaredRank, setDeclaredRank] = useState<Rank>(forcedRank ?? "A");
+  const [declaredSuit, setDeclaredSuit] = useState<Suit>(forcedSuit ?? "hearts");
+  const [dominoValue, setDominoValue] = useState(forcedDominoValue ?? 0);
 
   const count = selectedCards.length;
+
+  const effectiveRank = isLocked ? forcedRank! : declaredRank;
+  const effectiveSuit = isLocked ? forcedSuit! : declaredSuit;
+  const effectiveDominoValue = isLocked ? forcedDominoValue! : dominoValue;
 
   const handleSubmit = useCallback(() => {
     if (count < 1) return;
     if (variant === "cards") {
-      onSubmit({ type: "playing-card", rank: declaredRank, suit: declaredSuit, count });
+      onSubmit({ type: "playing-card", rank: effectiveRank, suit: effectiveSuit, count });
     } else {
-      onSubmit({ type: "dominoe", value: dominoValue, count });
+      onSubmit({ type: "dominoe", value: effectiveDominoValue, count });
     }
-  }, [variant, declaredRank, declaredSuit, dominoValue, count, onSubmit]);
+  }, [variant, effectiveRank, effectiveSuit, effectiveDominoValue, count, onSubmit]);
 
   const truthPreview = useMemo(() => {
     if (selectedCards.length === 0) return "nothing";
@@ -94,15 +105,15 @@ export const DeclarationModal = memo(function DeclarationModal({
   const previewClaim = useMemo(() => {
     if (variant === "cards") {
       if (claimType === "suit") {
-        return `${count}x ${SUIT_SYMBOLS[declaredSuit]} ${declaredSuit}`;
+        return `${count}x ${SUIT_SYMBOLS[effectiveSuit]} ${effectiveSuit}`;
       }
       if (claimType === "rank") {
-        return `${count}x ${declaredRank}`;
+        return `${count}x ${effectiveRank}`;
       }
-      return `${count}x ${declaredRank}${SUIT_SYMBOLS[declaredSuit]}`;
+      return `${count}x ${effectiveRank}${SUIT_SYMBOLS[effectiveSuit]}`;
     }
-    return `${count}x number ${dominoValue}`;
-  }, [variant, claimType, declaredRank, declaredSuit, dominoValue, count]);
+    return `${count}x number ${effectiveDominoValue}`;
+  }, [variant, claimType, effectiveRank, effectiveSuit, effectiveDominoValue, count]);
 
   if (!open) return null;
 
@@ -145,7 +156,26 @@ export const DeclarationModal = memo(function DeclarationModal({
               Declare {count} card{count !== 1 ? "s" : ""} as:
             </p>
 
-            {variant === "cards" && claimType === "suit" ? (
+            {isLocked ? (
+              // LOCKED claim — must match currentRequiredClaim
+              <div className="bg-gradient-to-r from-amber-900/40 to-amber-800/20 border border-amber-600/40 rounded-xl p-4 text-center space-y-2">
+                <div className="flex items-center justify-center gap-2 text-amber-400 text-xs">
+                  <Lock className="w-3.5 h-3.5" />
+                  <span>Claim locked — must match current claim</span>
+                </div>
+                <p className="text-white font-bold text-lg">
+                  {previewClaim}
+                </p>
+                {currentRequiredClaim && (
+                  <p className="text-amber-200/40 text-[10px]">
+                    Required: {declarationToString(currentRequiredClaim, claimType)}
+                  </p>
+                )}
+                <p className="text-amber-200/30 text-[10px]">
+                  Actually playing: {truthPreview}
+                </p>
+              </div>
+            ) : variant === "cards" && claimType === "suit" ? (
               // SUIT-ONLY mode
               <div className="space-y-3">
                 <div>
@@ -173,7 +203,7 @@ export const DeclarationModal = memo(function DeclarationModal({
                 <div className="bg-[#2a1515] rounded-lg p-3 text-center">
                   <p className="text-amber-200/40 text-[10px] mb-1">Your claim:</p>
                   <p className="text-white font-bold text-lg">
-                    {count}x <span style={{ color: SUIT_COLORS[declaredSuit] }}>{SUIT_SYMBOLS[declaredSuit]} {declaredSuit}</span>
+                    {count}x <span style={{ color: SUIT_COLORS[effectiveSuit] }}>{SUIT_SYMBOLS[effectiveSuit]} {effectiveSuit}</span>
                   </p>
                   <p className="text-amber-200/30 text-[10px] mt-1">
                     Actually playing: {truthPreview}
@@ -206,7 +236,7 @@ export const DeclarationModal = memo(function DeclarationModal({
                 <div className="bg-[#2a1515] rounded-lg p-3 text-center">
                   <p className="text-amber-200/40 text-[10px] mb-1">Your claim:</p>
                   <p className="text-white font-bold text-lg">
-                    {count}x {declaredRank}
+                    {count}x {effectiveRank}
                   </p>
                   <p className="text-amber-200/30 text-[10px] mt-1">
                     Actually playing: {truthPreview}
@@ -262,8 +292,8 @@ export const DeclarationModal = memo(function DeclarationModal({
                   <p className="text-amber-200/40 text-[10px] mb-1">Your claim:</p>
                   <p className="text-white font-bold text-lg">
                     {count}x{" "}
-                    <span style={{ color: SUIT_COLORS[declaredSuit] }}>
-                      {declaredRank}{SUIT_SYMBOLS[declaredSuit]}
+                    <span style={{ color: SUIT_COLORS[effectiveSuit] }}>
+                      {effectiveRank}{SUIT_SYMBOLS[effectiveSuit]}
                     </span>
                   </p>
                   <p className="text-amber-200/30 text-[10px] mt-1">
@@ -297,7 +327,7 @@ export const DeclarationModal = memo(function DeclarationModal({
                 <div className="bg-[#2a1515] rounded-lg p-3 text-center">
                   <p className="text-amber-200/40 text-[10px] mb-1">Your claim:</p>
                   <p className="text-white font-bold text-lg font-mono">
-                    {count}x number {dominoValue}
+                    {count}x number {effectiveDominoValue}
                   </p>
                   <p className="text-amber-200/30 text-[10px] mt-1">
                     Actually playing: {truthPreview}

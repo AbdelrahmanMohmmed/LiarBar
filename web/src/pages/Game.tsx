@@ -457,6 +457,7 @@ export default function Game() {
         selectedCards={selectedCards.map((i) => myHand[i]).filter(Boolean)}
         variant={gameState.variant}
         claimType={gameState.claimType}
+        currentRequiredClaim={gameState.currentRequiredClaim}
       />
 
       {/* Game over overlay */}
