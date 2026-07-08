@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { GameProvider, useGame } from "@/lib/gameContext";
+import { LanguageProvider } from "@/lib/languageContext";
 import { toast } from "sonner";
 import Index from "./pages/index";
 import Room from "./pages/Room";
@@ -45,19 +46,21 @@ function ToastRenderer() {
 }
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <GameProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/room/:roomId" element={<Room />} />
-          <Route path="/game/:roomId" element={<Game />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-      <ToastRenderer />
-    </GameProvider>
-  </QueryClientProvider>
+  <LanguageProvider>
+    <QueryClientProvider client={queryClient}>
+      <GameProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/room/:roomId" element={<Room />} />
+            <Route path="/game/:roomId" element={<Game />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+        <ToastRenderer />
+      </GameProvider>
+    </QueryClientProvider>
+  </LanguageProvider>
 );
 
 export default App;

@@ -7,9 +7,11 @@ import { DeclarationModal } from "@/components/DeclarationModal";
 import { Card } from "@/components/Card";
 import { VoiceControls } from "@/components/VoiceControls";
 import { GameOver } from "@/components/GameOver";
+import { GuideModal } from "@/components/GuideModal";
+import { useLanguage } from "@/lib/languageContext";
 import type { CardDeclaration } from "@/lib/types";
 import { declarationToString } from "@/lib/types";
-import { AlertTriangle, ThumbsDown, Play, Clock, Eye, SkipForward, MessageCircle } from "lucide-react";
+import { AlertTriangle, ThumbsDown, Play, Clock, Eye, SkipForward, MessageCircle, Globe, HelpCircle } from "lucide-react";
 
 export default function Game() {
   const { roomId: paramRoomId } = useParams<{ roomId: string }>();
@@ -27,11 +29,14 @@ export default function Game() {
     reconnectRoom,
   } = useGame();
 
+  const { lang, toggleLang, t } = useLanguage();
+
   const [selectedCards, setSelectedCards] = useState<number[]>([]);
   const [showDeclaration, setShowDeclaration] = useState(false);
   const [reconnected, setReconnected] = useState(false);
   const [chatInput, setChatInput] = useState("");
   const [showChat, setShowChat] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
   const [challengeCountdown, setChallengeCountdown] = useState<number | null>(null);
   const [revealCountdown, setRevealCountdown] = useState<number | null>(null);
 
@@ -252,6 +257,20 @@ export default function Game() {
             </span>
           )}
           <button
+            onClick={toggleLang}
+            className="p-2 rounded-lg text-amber-200/60 hover:text-white hover:bg-[#2a1515] transition-all"
+            title={t("lang.switch_to")}
+          >
+            <Globe className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setShowGuide(true)}
+            className="p-2 rounded-lg text-amber-200/60 hover:text-white hover:bg-[#2a1515] transition-all"
+            title="How to play"
+          >
+            <HelpCircle className="w-4 h-4" />
+          </button>
+          <button
             onClick={() => setShowChat(!showChat)}
             className="relative p-2 rounded-lg text-amber-200/60 hover:text-white hover:bg-[#2a1515] transition-all"
             title={showChat ? "Hide Chat" : "Show Chat"}
@@ -448,6 +467,12 @@ export default function Game() {
           )}
         </div>
       </div>
+
+      {/* Guide modal */}
+      <GuideModal
+        open={showGuide}
+        onClose={() => setShowGuide(false)}
+      />
 
       {/* Declaration modal */}
       <DeclarationModal
