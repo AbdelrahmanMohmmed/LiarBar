@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { GameProvider, useGame } from "@/lib/gameContext";
 import { LanguageProvider } from "@/lib/languageContext";
+import { ThemeProvider } from "@/lib/themeContext";
 import { toast } from "sonner";
 import Index from "./pages/index";
 import Room from "./pages/Room";
@@ -47,6 +48,7 @@ function ToastRenderer() {
 
 const App = () => (
   <LanguageProvider>
+    <ThemeProvider>
     <QueryClientProvider client={queryClient}>
       <GameProvider>
         <BrowserRouter>
@@ -58,8 +60,9 @@ const App = () => (
           </Routes>
         </BrowserRouter>
         <ToastRenderer />
-      </GameProvider>
-    </QueryClientProvider>
+    </GameProvider>
+  </QueryClientProvider>
+  </ThemeProvider>
   </LanguageProvider>
 );
 

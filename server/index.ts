@@ -3,7 +3,7 @@ import { createServer } from "node:http";
 import { Server, type Socket } from "socket.io";
 import cors from "cors";
 import { nanoid } from "nanoid";
-import { GameManager, type GamePhase } from "./GameManager.js";
+import { GameManager, type GamePhase, type GameTheme } from "./GameManager.js";
 import type { CardDeclaration, GameVariant, ClaimType } from "./Deck.js";
 import type { BotDifficulty } from "./BotAI.js";
 import type { Player } from "./Player.js";
@@ -74,11 +74,12 @@ io.on("connection", (socket: Socket) => {
         deckCount: number;
         claimType?: ClaimType;
         revealTime?: number;
+        theme?: GameTheme;
       },
       callback,
     ) => {
       try {
-        const { playerName, maxPlayers, variant, deckCount, claimType, revealTime } = data;
+        const { playerName, maxPlayers, variant, deckCount, claimType, revealTime, theme } = data;
 
         if (!playerName || playerName.trim().length === 0) {
           callback({ error: "Player name is required" });
@@ -106,6 +107,7 @@ io.on("connection", (socket: Socket) => {
           maxPlayers,
           variant === "cards" ? (claimType || "suit") : "suit",
           revealSec,
+          theme || "standard",
           (state) => {
             io.to(roomId).emit("game_state", state);
           },

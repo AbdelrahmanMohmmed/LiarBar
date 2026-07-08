@@ -4,6 +4,8 @@ import { useGame } from "@/lib/gameContext";
 import { useLanguage } from "@/lib/languageContext";
 import { LangToggle } from "@/components/LangToggle";
 import { GuideModal } from "@/components/GuideModal";
+import { ThemeSelector } from "@/components/ThemeSelector";
+import { useTheme } from "@/lib/themeContext";
 import { Swords, Users, Gamepad2, Dice1, LogIn, HelpCircle } from "lucide-react";
 import type { GameVariant, ClaimType } from "@/lib/types";
 import { isFirebaseConfigured, signInWithGoogle, onAuthChange } from "@/lib/firebase";
@@ -12,6 +14,7 @@ export default function Index() {
   const navigate = useNavigate();
   const { createRoom, joinRoom, addToast } = useGame();
   const { t } = useLanguage();
+  const { theme } = useTheme();
 
   const [playerName, setPlayerName] = useState("");
   const [showGuide, setShowGuide] = useState(false);
@@ -64,6 +67,7 @@ export default function Index() {
         parseInt(deckCount),
         variant === "cards" ? claimType : undefined,
         parseInt(revealTime),
+        theme,
       );
       navigate(`/room/${roomId}`);
     } catch (err) {
@@ -257,6 +261,8 @@ export default function Index() {
                   <span>10s</span>
                 </div>
               </div>
+
+              <ThemeSelector />
 
               <button
                 onClick={handleCreate}

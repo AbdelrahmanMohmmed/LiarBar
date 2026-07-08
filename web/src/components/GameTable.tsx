@@ -2,6 +2,7 @@ import { memo, useMemo, useState, useEffect } from "react";
 import type { GameState, Card, Suit } from "@/lib/types";
 import { SUIT_SYMBOLS, SUIT_COLORS, declarationToString } from "@/lib/types";
 import { Card as CardView } from "@/components/Card";
+import { useTheme } from "@/lib/themeContext";
 import { cn } from "@/lib/utils";
 import { Crown, Bot, User, Zap, Clock, Eye } from "lucide-react";
 
@@ -11,9 +12,6 @@ interface GameTableProps {
   selectedCards: number[];
   onCardSelect: (index: number) => void;
 }
-
-const CARD_BACK =
-  "bg-gradient-to-br from-red-800 to-red-950 border border-red-700/60";
 
 function getPlayerPositions(count: number, radius: number = 200) {
   const positions: { x: number; y: number; rotate: number; scale: number }[] = [];
@@ -37,16 +35,19 @@ const MiniCard = memo(function MiniCard({
   card,
   small = false,
   faceDown = false,
+  cardBackClass,
 }: {
   card: Card;
   small?: boolean;
   faceDown?: boolean;
+  cardBackClass?: string;
 }) {
   if (faceDown) {
     return (
       <div
         className={cn(
-          `${CARD_BACK} rounded shadow flex items-center justify-center`,
+          "rounded shadow flex items-center justify-center bg-gradient-to-br border",
+          cardBackClass ?? "from-red-800 to-red-950 border-red-700/60",
           small ? "w-5 h-7" : "w-8 h-12",
         )}
       >
@@ -90,12 +91,12 @@ const MiniCard = memo(function MiniCard({
   );
 });
 
-function CardFan({ cards, max = 5 }: { cards: Card[]; max?: number }) {
+function CardFan({ cards, max = 5, cardBackClass }: { cards: Card[]; max?: number; cardBackClass?: string }) {
   const display = cards.slice(-max);
   return (
     <div className="flex -space-x-2">
       {display.map((card, i) => (
-        <MiniCard key={i} card={card} small faceDown />
+        <MiniCard key={i} card={card} small faceDown cardBackClass={cardBackClass} />
       ))}
       {cards.length > max && (
         <div className="w-5 h-7 bg-amber-900/50 rounded flex items-center justify-center text-[8px] text-amber-200 font-bold">
@@ -106,8 +107,7 @@ function CardFan({ cards, max = 5 }: { cards: Card[]; max?: number }) {
   );
 }
 
-/** Pile of face-down cards in center */
-function CardPile({ count }: { count: number }) {
+function CardPile({ count, cardBackClass }: { count: number; cardBackClass?: string }) {
   if (count === 0) {
     return (
       <div className="flex flex-col items-center justify-center">
@@ -125,7 +125,10 @@ function CardPile({ count }: { count: number }) {
         {Array.from({ length: Math.min(count, 5) }).map((_, i) => (
           <div
             key={i}
-            className="absolute w-10 h-14 rounded-lg bg-gradient-to-br from-red-800 to-red-950 border border-red-700/60 shadow-lg"
+            className={cn(
+              "absolute w-10 h-14 rounded-lg bg-gradient-to-br border shadow-lg",
+              cardBackClass ?? "from-red-800 to-red-950 border-red-700/60",
+            )}
             style={{
               left: `${i * 1.5}px`,
               top: `${i * 0.8}px`,
@@ -135,7 +138,10 @@ function CardPile({ count }: { count: number }) {
           />
         ))}
         <div
-          className="absolute w-10 h-14 rounded-lg bg-gradient-to-br from-red-800 to-red-950 border border-red-700/60 shadow-lg flex items-center justify-center"
+          className={cn(
+            "absolute w-10 h-14 rounded-lg bg-gradient-to-br border shadow-lg flex items-center justify-center",
+            cardBackClass ?? "from-red-800 to-red-950 border-red-700/60",
+          )}
           style={{ left: 0, top: 0, zIndex: 10 }}
         >
           <div className="w-6 h-6 rounded border border-red-600/40 flex items-center justify-center">
@@ -156,6 +162,7 @@ export const GameTable = memo(function GameTable({
   selectedCards,
   onCardSelect,
 }: GameTableProps) {
+  const { assets } = useTheme();
   const positions = useMemo(
     () => getPlayerPositions(gameState.players.length),
     [gameState.players.length],
@@ -187,15 +194,26 @@ export const GameTable = memo(function GameTable({
       {/* 3D Table surface with perspective */}
       <div className="absolute inset-[12%] rounded-full preserve-3d" style={{ transform: "rotateX(15deg)" }}>
         {/* Table base */}
-        <div className="absolute inset-0 rounded-full bg-gradient-to-br from-[#1a3a1a] via-[#0f2a0f] to-[#0a1f0a] border-[8px] border-amber-900/40 shadow-2xl shadow-black/60">
-          <div className="absolute inset-0 rounded-full bg-[radial-gradient(ellipse_at_center,_#1a4a1a_0%,_#0f2a0f_50%,_#0a1a0a_100%)]" />
+        <div
+          className="absolute inset-0 rounded-full border-[8px] shadow-2xl shadow-black/60"
+          style={{
+            background: `linear-gradient(to bottom right, ${assets.tableBg}, #000000)`,
+            borderColor: assets.tableBorder,
+          }}
+        >
+          <div
+            className="absolute inset-0 rounded-full"
+            style={{
+              background: `radial-gradient(ellipse at center, ${assets.tableBg}88 0%, ${assets.tableBg} 50%, #000000 100%)`,
+            }}
+          />
           <div className="absolute inset-[10%] rounded-full border border-amber-700/20" />
           <div className="absolute inset-[22%] rounded-full border border-amber-700/15" />
 
           {/* Center pile */}
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="text-center">
-              <CardPile count={gameState.pileCount} />
+              <CardPile count={gameState.pileCount} cardBackClass={assets.cardBackClass} />
 
               {gameState.lastDeclaration && (
                 <p className="text-amber-400/60 text-[10px] mt-1 animate-in fade-in font-mono">
@@ -257,12 +275,15 @@ export const GameTable = memo(function GameTable({
               className={cn(
                 "flex flex-col items-center gap-1.5 p-2.5 rounded-xl min-w-[90px] transition-all duration-300",
                 isCurrent &&
-                  "bg-amber-500/15 ring-2 ring-amber-400/50 shadow-lg shadow-amber-500/20 scale-110",
+                  "ring-2 shadow-lg scale-110",
+                isCurrent &&
+                  `bg-amber-500/15 shadow-amber-500/20`,
                 isLastPlayer &&
                   gameState.phase === "waiting_for_challenge" &&
                   "bg-red-500/10 ring-2 ring-red-400/40",
                 !isCurrent && !isLastPlayer && "bg-black/30 backdrop-blur-sm",
               )}
+              style={isCurrent ? { boxShadow: `0 0 15px ${assets.accentColor}33` } : undefined}
             >
               {/* Avatar */}
               <div
@@ -325,7 +346,7 @@ export const GameTable = memo(function GameTable({
 
               {/* Card fan (face-down cards) */}
               {player.cardCount > 0 && (
-                <CardFan cards={Array(player.cardCount).fill(null)} max={4} />
+                <CardFan cards={Array(player.cardCount).fill(null)} max={4} cardBackClass={assets.cardBackClass} />
               )}
             </div>
           </div>

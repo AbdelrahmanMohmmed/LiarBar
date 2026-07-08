@@ -7,6 +7,7 @@ import type {
   CardDeclaration,
   GameVariant,
   ClaimType,
+  GameTheme,
   BotDifficulty,
   ChatMessage,
   ToastNotification,
@@ -21,6 +22,7 @@ interface GameActions {
     deckCount: number,
     claimType?: ClaimType,
     revealTime?: number,
+    theme?: GameTheme,
   ) => Promise<{ roomId: string; playerId: string }>;
   joinRoom: (
     roomId: string,
@@ -196,6 +198,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
       deckCount: number,
       claimType?: ClaimType,
       revealTime?: number,
+      theme?: GameTheme,
     ): Promise<{ roomId: string; playerId: string }> => {
       connectSocket();
       const res = await emitWithAck<{
@@ -203,7 +206,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
         roomId: string;
         playerId: string;
         state: GameState;
-      }>("create_room", { playerName, maxPlayers, variant, deckCount, claimType, revealTime });
+      }>("create_room", { playerName, maxPlayers, variant, deckCount, claimType, revealTime, theme });
 
       setMyRoomId(res.roomId);
       setMyPlayerId(res.playerId);

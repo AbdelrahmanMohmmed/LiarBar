@@ -32,6 +32,7 @@ export type Card = PlayingCard | Dominoe;
 export type GameVariant = "cards" | "dominoes";
 
 export type ClaimType = "suit" | "rank";
+export type GameTheme = "standard" | "classic" | "vip";
 
 export type BotDifficulty = "easy" | "medium" | "hard";
 
@@ -100,6 +101,7 @@ export interface GameState {
   revealedCards: string[];
   revealTime: number;
   revealDeadline: number | null;
+  theme?: GameTheme;
 }
 
 export interface ChatMessage {

@@ -32,6 +32,8 @@ export interface GameAction {
   timestamp: number;
 }
 
+export type GameTheme = "standard" | "classic" | "vip";
+
 export interface GameState {
   roomId: string;
   phase: GamePhase;
@@ -51,6 +53,7 @@ export interface GameState {
   revealedCards: string[];
   revealTime: number;
   revealDeadline: number | null;
+  theme: GameTheme;
 }
 
 const CHALLENGE_WINDOW_MS = 7000;
@@ -70,6 +73,7 @@ export class GameManager {
   deckCount: number;
   maxPlayers: number;
   claimType: ClaimType;
+  theme: GameTheme;
   challengeDeadline: number | null;
   revealedCards: string[];
   revealTime: number;
@@ -91,6 +95,7 @@ export class GameManager {
     maxPlayers: number,
     claimType: ClaimType,
     revealTime: number,
+    theme: GameTheme,
     broadcast: (state: GameState) => void,
     onGameEnd: (roomId: string, winnerId: string) => void,
     onChallengeResolved?: (roomId: string) => void,
@@ -109,6 +114,7 @@ export class GameManager {
     this.deckCount = deckCount;
     this.maxPlayers = maxPlayers;
     this.claimType = claimType;
+    this.theme = theme;
     this.challengeDeadline = null;
     this.revealedCards = [];
     this.revealTime = revealTime;
@@ -768,6 +774,7 @@ export class GameManager {
       revealedCards: this.revealedCards,
       revealTime: this.revealTime,
       revealDeadline: this.revealDeadline,
+      theme: this.theme,
     };
   }
 
