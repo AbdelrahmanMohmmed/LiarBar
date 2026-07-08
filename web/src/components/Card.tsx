@@ -1,6 +1,6 @@
 import { memo, useMemo } from "react";
 import type { Card as CardType } from "@/lib/types";
-import { SUIT_SYMBOLS, parseCardString } from "@/lib/types";
+import { SUIT_SYMBOLS, SUIT_COLORS, parseCardString } from "@/lib/types";
 import { useTheme } from "@/lib/themeContext";
 import { getDominoImagePath } from "@/lib/theme";
 import { cn } from "@/lib/utils";
@@ -13,7 +13,7 @@ interface CardProps {
 }
 
 export const Card = memo(function Card({ card: cardProp, cardStr, faceDown = false, small = false }: CardProps) {
-  const { assets } = useTheme();
+  const { assets, theme } = useTheme();
 
   const card = useMemo(() => {
     if (cardProp) return cardProp;
@@ -51,21 +51,37 @@ export const Card = memo(function Card({ card: cardProp, cardStr, faceDown = fal
   }
 
   if (card.type === "dominoe") {
+    if (theme === "standard") {
+      const size = small ? "w-8 h-12" : "w-14 h-20";
+      const textSize = small ? "text-[10px]" : "text-sm";
+      return (
+        <div
+          className={cn(
+            "relative rounded-lg border-2 border-amber-900/40 bg-gradient-to-b from-[#faf3e0] to-[#e8d5b0] shadow-lg flex flex-col items-center justify-center gap-1 select-none overflow-hidden flex-shrink-0",
+            size,
+          )}
+        >
+          <div className="w-full h-px bg-gray-400 absolute top-1/2" />
+          <span className={cn("text-gray-900 font-mono font-bold z-10", textSize)}>{card.left}</span>
+          <span className={cn("text-gray-900 font-mono font-bold z-10", textSize)}>{card.right}</span>
+        </div>
+      );
+    }
+
     const size = small ? "w-8 h-12" : "w-14 h-20";
-    const imgPath = getDominoImagePath(card.left, card.right, assets.name === "VIP" ? "vip" : assets.name === "Classic" ? "classic" : "standard");
+    const imgPath = getDominoImagePath(card.left, card.right, theme);
 
     return (
       <div
         className={cn(
-          "relative rounded-lg border-2 overflow-hidden flex-shrink-0 select-none",
+          "relative rounded-lg overflow-hidden flex-shrink-0 select-none",
           size,
-          "border-amber-900/40 bg-gradient-to-b from-[#faf3e0] to-[#e8d5b0]",
         )}
       >
         <img
           src={imgPath}
           alt={`${card.left}|${card.right}`}
-          className="w-full h-full object-contain"
+          className="w-full h-full object-cover"
           onError={(e) => {
             const el = e.currentTarget;
             el.style.display = "none";
@@ -85,7 +101,7 @@ export const Card = memo(function Card({ card: cardProp, cardStr, faceDown = fal
     );
   }
 
-  const color = assets.cardSuitColors[card.suit] ?? "#e74c3c";
+  const color = SUIT_COLORS[card.suit];
   const size = small ? "w-8 h-12" : "w-14 h-20";
   const rankSize = small ? "text-[9px]" : "text-xs";
   const symSize = small ? "text-[8px]" : "text-[10px]";
@@ -94,9 +110,8 @@ export const Card = memo(function Card({ card: cardProp, cardStr, faceDown = fal
   return (
     <div
       className={cn(
-        "relative rounded-lg border-2 bg-white shadow-lg flex flex-col items-center justify-center select-none overflow-hidden flex-shrink-0",
+        "relative rounded-lg border-2 border-gray-300/80 bg-white shadow-lg flex flex-col items-center justify-center select-none overflow-hidden flex-shrink-0",
         size,
-        "border-gray-300/80",
       )}
     >
       <span className={cn("absolute top-1 left-1.5 font-bold leading-none", rankSize)} style={{ color }}>
