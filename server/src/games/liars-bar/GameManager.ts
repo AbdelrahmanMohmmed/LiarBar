@@ -5,11 +5,11 @@ import {
   type ClaimType,
   cardToString,
   createGameDeck,
-  validateDeclaration,
 } from "./Deck.js";
 import { validateDeclarationByType } from "./Validation.js";
 import { BotAI, type BotDifficulty } from "./BotAI.js";
 import { Player, type PlayerData } from "./Player.js";
+import type { GameRoom } from "../types.js";
 import { nanoid } from "nanoid";
 
 export type GamePhase =
@@ -69,7 +69,10 @@ export interface GameState {
 const CHALLENGE_DURATION_OPTIONS = [5, 10] as const;
 const MIN_CHALLENGE_TIME_BEFORE_VOTE_MS = 3000; // 3 seconds minimum before votes count
 
-export class GameManager {
+export class GameManager implements GameRoom {
+  readonly gameId = "liars-bar";
+  /** Updated on every state change; the room sweeper uses it to expire idle rooms. */
+  lastActivityAt: number;
   roomId: string;
   players: Player[];
   phase: GamePhase;
@@ -142,12 +145,17 @@ export class GameManager {
     this.botTimers = new Map();
     this.challengeTimer = null;
     this.revealTimer = null;
-    this.broadcast = broadcast;
+    this.lastActivityAt = Date.now();
+    // Every broadcast marks the room as active for the stale-room sweeper
+    this.broadcast = (state) => {
+      this.lastActivityAt = Date.now();
+      broadcast(state);
+    };
     this.onGameEnd = onGameEnd;
     this.onChallengeResolved = onChallengeResolved || (() => {});
     // Challenge mode
     this.challengeMode = challengeMode;
-    this.challengeDuration = CHALLENGE_DURATION_OPTIONS.includes(challengeDuration as any) ? challengeDuration : 5;
+    this.challengeDuration = (CHALLENGE_DURATION_OPTIONS as readonly number[]).includes(challengeDuration) ? challengeDuration : 5;
     this.skipVotes = new Set();
     this.challengeStartedAt = null;
   }
@@ -158,6 +166,7 @@ export class GameManager {
     player.socketId = socketId;
     player.isConnected = true;
     this.players.push(player);
+    this.lastActivityAt = Date.now();
     return player;
   }
 
@@ -166,6 +175,7 @@ export class GameManager {
     const player = new Player(id, name, true, false);
     this.players.push(player);
     this.botAIs.set(id, new BotAI(id, difficulty, this.deckCount));
+    this.lastActivityAt = Date.now();
     return player;
   }
 
@@ -203,6 +213,7 @@ export class GameManager {
     if (!player) return null;
     player.isConnected = true;
     player.socketId = socketId;
+    this.lastActivityAt = Date.now();
     return player;
   }
 
