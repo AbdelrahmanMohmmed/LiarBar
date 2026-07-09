@@ -7,7 +7,7 @@ import { GuideModal } from "@/components/GuideModal";
 import { ThemeSelector } from "@/components/ThemeSelector";
 import { useTheme } from "@/lib/themeContext";
 import { Swords, Users, Gamepad2, Dice1, LogIn, HelpCircle } from "lucide-react";
-import type { GameVariant, ClaimType } from "@/lib/types";
+import type { GameVariant, ClaimType, ChallengeMode } from "@/lib/types";
 import { isFirebaseConfigured, signInWithGoogle, onAuthChange } from "@/lib/firebase";
 
 export default function Index() {
@@ -23,6 +23,8 @@ export default function Index() {
   const [claimType, setClaimType] = useState<ClaimType>("suit");
   const [revealTime, setRevealTime] = useState("5");
   const [deckCount, setDeckCount] = useState("2");
+  const [challengeMode, setChallengeMode] = useState<ChallengeMode>("timer");
+  const [challengeDuration, setChallengeDuration] = useState("5");
   const [joinRoomId, setJoinRoomId] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [googleUser, setGoogleUser] = useState<{ name: string; photo?: string } | null>(null);
@@ -68,6 +70,8 @@ export default function Index() {
         variant === "cards" ? claimType : undefined,
         parseInt(revealTime),
         theme,
+        challengeMode,
+        parseInt(challengeDuration),
       );
       navigate(`/room/${roomId}`);
     } catch (err) {
@@ -260,6 +264,70 @@ export default function Index() {
                   <span>3s</span>
                   <span>10s</span>
                 </div>
+              </div>
+
+              {/* Challenge Mode */}
+              <div className="space-y-2">
+                <label className="text-amber-200/80 text-xs block">{t("index.challenge_mode")}</label>
+                <div className="flex rounded-lg bg-[#2a1515] p-0.5">
+                  <button
+                    onClick={() => setChallengeMode("timer")}
+                    className={`flex-1 px-3 py-2 rounded-md text-xs font-medium transition-all ${
+                      challengeMode === "timer"
+                        ? "bg-amber-900/60 text-white shadow-sm"
+                        : "text-amber-200/60 hover:text-amber-200/80"
+                    }`}
+                  >
+                    {t("index.timer_mode")}
+                  </button>
+                  <button
+                    onClick={() => setChallengeMode("vote")}
+                    className={`flex-1 px-3 py-2 rounded-md text-xs font-medium transition-all ${
+                      challengeMode === "vote"
+                        ? "bg-amber-900/60 text-white shadow-sm"
+                        : "text-amber-200/60 hover:text-amber-200/80"
+                    }`}
+                  >
+                    {t("index.vote_mode")}
+                  </button>
+                </div>
+                <p className="text-amber-200/30 text-[10px]">
+                  {challengeMode === "timer"
+                    ? t("index.timer_mode_desc")
+                    : t("index.vote_mode_desc")}
+                </p>
+              </div>
+
+              {/* Challenge Duration */}
+              <div className="space-y-2">
+                <label className="text-amber-200/80 text-xs block">{t("index.challenge_duration")}</label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setChallengeDuration("5")}
+                    className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all ${
+                      challengeDuration === "5"
+                        ? "bg-amber-600 text-white shadow shadow-amber-900/50"
+                        : "bg-[#2a1515] text-amber-200/70 hover:bg-[#3a1f1f]"
+                    }`}
+                  >
+                    5s
+                  </button>
+                  <button
+                    onClick={() => setChallengeDuration("10")}
+                    className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all ${
+                      challengeDuration === "10"
+                        ? "bg-amber-600 text-white shadow shadow-amber-900/50"
+                        : "bg-[#2a1515] text-amber-200/70 hover:bg-[#3a1f1f]"
+                    }`}
+                  >
+                    10s
+                  </button>
+                </div>
+                <p className="text-amber-200/30 text-[10px]">
+                  {challengeMode === "timer"
+                    ? t("index.challenge_duration_timer_desc")
+                    : t("index.challenge_duration_vote_desc")}
+                </p>
               </div>
 
               <ThemeSelector />

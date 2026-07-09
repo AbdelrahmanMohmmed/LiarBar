@@ -47,6 +47,9 @@ export type GamePhase =
   | "revealing"
   | "game_over";
 
+/** Challenge mode: "timer" = fixed duration, "vote" = majority vote to skip */
+export type ChallengeMode = "timer" | "vote";
+
 export interface PlayerStats {
   gamesPlayed: number;
   gamesWon: number;
@@ -102,6 +105,13 @@ export interface GameState {
   revealTime: number;
   revealDeadline: number | null;
   theme?: GameTheme;
+  // Challenge mode settings
+  challengeMode: ChallengeMode;
+  challengeDuration: number; // in seconds (5 or 10)
+  // Vote system state
+  skipVotes: string[]; // playerIds who voted to skip
+  skipVotesNeeded: number; // how many votes needed to skip
+  challengeStartedAt: number | null; // timestamp when challenge window opened
 }
 
 export interface ChatMessage {

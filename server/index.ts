@@ -3,7 +3,7 @@ import { createServer } from "node:http";
 import { Server, type Socket } from "socket.io";
 import cors from "cors";
 import { nanoid } from "nanoid";
-import { GameManager, type GamePhase, type GameTheme } from "./GameManager.js";
+import { GameManager, type GamePhase, type GameTheme, type ChallengeMode } from "./GameManager.js";
 import type { CardDeclaration, GameVariant, ClaimType } from "./Deck.js";
 import type { BotDifficulty } from "./BotAI.js";
 import type { Player } from "./Player.js";
@@ -75,11 +75,13 @@ io.on("connection", (socket: Socket) => {
         claimType?: ClaimType;
         revealTime?: number;
         theme?: GameTheme;
+        challengeMode?: ChallengeMode;
+        challengeDuration?: number;
       },
       callback,
     ) => {
       try {
-        const { playerName, maxPlayers, variant, deckCount, claimType, revealTime, theme } = data;
+        const { playerName, maxPlayers, variant, deckCount, claimType, revealTime, theme, challengeMode, challengeDuration } = data;
 
         if (!playerName || playerName.trim().length === 0) {
           callback({ error: "Player name is required" });
@@ -99,6 +101,9 @@ io.on("connection", (socket: Socket) => {
         const roomId = generateRoomCode();
 
         const revealSec = Math.max(3, Math.min(10, revealTime || 5));
+
+        const validChallengeMode: ChallengeMode = (challengeMode === "timer" || challengeMode === "vote") ? challengeMode : "timer";
+        const validChallengeDuration = (challengeDuration === 5 || challengeDuration === 10) ? challengeDuration : 5;
 
         const room = new GameManager(
           roomId,
@@ -127,6 +132,8 @@ io.on("connection", (socket: Socket) => {
               }
             }
           },
+          validChallengeMode,
+          validChallengeDuration,
         );
 
         const player = room.addPlayer(playerName.trim(), socket.id, true);
@@ -136,7 +143,7 @@ io.on("connection", (socket: Socket) => {
         socketToPlayer.set(socket.id, { roomId, playerId: player.id });
 
         console.log(
-          `Room ${roomId} created by ${playerName} (maxPlayers: ${maxPlayers}, variant: ${variant}, decks: ${deckCount})`,
+          `Room ${roomId} created by ${playerName} (maxPlayers: ${maxPlayers}, variant: ${variant}, decks: ${deckCount}, challengeMode: ${validChallengeMode}, challengeDuration: ${validChallengeDuration}s)`,
         );
 
         callback({
@@ -411,6 +418,31 @@ io.on("connection", (socket: Socket) => {
     // via the onChallengeResolved callback
 
     callback?.({ success: true });
+  });
+
+  // ===== VOTE SKIP (for vote challenge mode) =====
+
+  socket.on("vote_skip", (data: { roomId: string }, callback) => {
+    const room = getRoom(data.roomId);
+    if (!room) {
+      callback?.({ error: "Room not found" });
+      return;
+    }
+
+    const playerInfo = socketToPlayer.get(socket.id);
+    if (!playerInfo) {
+      callback?.({ error: "Not in a room" });
+      return;
+    }
+
+    const result = room.voteSkipChallenge(playerInfo.playerId);
+
+    if (!result.success) {
+      callback?.({ error: result.error });
+      return;
+    }
+
+    callback?.({ success: true, votesNow: result.votesNow, votesNeeded: result.votesNeeded });
   });
 
   socket.on("pass_turn", (data: { roomId: string }, callback) => {

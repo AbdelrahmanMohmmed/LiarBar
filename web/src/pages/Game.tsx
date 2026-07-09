@@ -25,6 +25,7 @@ export default function Game() {
     playCards,
     callLiar,
     passTurn,
+    voteSkip,
     sendChat,
     addToast,
     reconnectRoom,
@@ -40,6 +41,8 @@ export default function Game() {
   const [showGuide, setShowGuide] = useState(false);
   const [challengeCountdown, setChallengeCountdown] = useState<number | null>(null);
   const [revealCountdown, setRevealCountdown] = useState<number | null>(null);
+  const [hasVoted, setHasVoted] = useState(false);
+  const [canVoteYet, setCanVoteYet] = useState(false);
 
   useEffect(() => {
     if (reconnected) return;
@@ -97,14 +100,31 @@ export default function Game() {
     return () => clearInterval(interval);
   }, [gameState?.revealDeadline, gameState?.phase]);
 
-  // Auto-pass when challenge window expires
+  // Reset vote state when challenge window changes
   useEffect(() => {
-    if (!gameState?.challengeDeadline || gameState.phase !== "waiting_for_challenge") return;
-    const remaining = gameState.challengeDeadline - Date.now();
-    if (remaining <= 0) {
-      passTurn().catch(() => {});
+    if (gameState?.phase !== "waiting_for_challenge") {
+      setHasVoted(false);
+      setCanVoteYet(false);
+      return;
     }
-  }, [gameState?.challengeDeadline, gameState?.phase, passTurn]);
+
+    // Check if we already voted (from server state)
+    if (gameState?.skipVotes && myPlayerId && gameState.skipVotes.includes(myPlayerId)) {
+      setHasVoted(true);
+    }
+
+    // For vote mode: enable voting after 3 seconds
+    if (gameState?.challengeMode === "vote" && gameState?.challengeStartedAt) {
+      const elapsed = Date.now() - gameState.challengeStartedAt;
+      if (elapsed >= 3000) {
+        setCanVoteYet(true);
+      } else {
+        setCanVoteYet(false);
+        const timer = setTimeout(() => setCanVoteYet(true), 3000 - elapsed);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [gameState?.phase, gameState?.skipVotes, gameState?.challengeMode, gameState?.challengeStartedAt, myPlayerId]);
 
   const myPlayer = gameState?.players.find((p) => p.id === myPlayerId);
   const isMyTurn =
@@ -177,18 +197,21 @@ export default function Game() {
     setChatInput("");
   }, [chatInput, sendChat]);
 
-  const handlePlayInstead = useCallback(async () => {
+  const handleVoteSkip = useCallback(async () => {
     try {
-      await passTurn();
-      setSelectedCards([]);
-      addToast("It's your turn to play! Select cards and make a claim.", "info");
+      const result = await voteSkip();
+      setHasVoted(true);
+      addToast(
+        `Vote recorded (${result.votesNow}/${result.votesNeeded} needed)`,
+        "info",
+      );
     } catch (err) {
       addToast(
-        err instanceof Error ? err.message : "Failed to pass",
+        err instanceof Error ? err.message : "Failed to vote",
         "error",
       );
     }
-  }, [passTurn, addToast]);
+  }, [voteSkip, addToast]);
 
   const lastPlayer = gameState?.lastPlayerId
     ? gameState.players.find((p) => p.id === gameState.lastPlayerId)
@@ -365,14 +388,43 @@ export default function Game() {
                     <ThumbsDown className="w-5 h-5" />
                     {t("game.call_liar")}
                   </button>
-                  <button
-                    onClick={handlePlayInstead}
-                    className="flex-1 inline-flex items-center justify-center gap-2 border border-amber-900/40 text-amber-200 hover:bg-amber-900/20 h-12 rounded-xl transition-all active:scale-95"
-                  >
-                    <Play className="w-5 h-5" />
-                    {t("game.play_cards")}
-                  </button>
+                  {gameState?.challengeMode === "vote" && (
+                    <button
+                      onClick={handleVoteSkip}
+                      disabled={hasVoted || !canVoteYet}
+                      className="flex-1 inline-flex items-center justify-center gap-2 border border-amber-900/40 text-amber-200 hover:bg-amber-900/20 h-12 rounded-xl transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <Play className="w-5 h-5" />
+                      {hasVoted
+                        ? `${t("game.voted")} (${gameState.skipVotes?.length || 0}/${gameState.skipVotesNeeded || 0})`
+                        : !canVoteYet
+                          ? t("game.wait_to_vote")
+                          : t("game.vote_skip")}
+                    </button>
+                  )}
+                  {gameState?.challengeMode === "timer" && (
+                    <div className="flex-1 inline-flex items-center justify-center gap-2 border border-amber-900/20 text-amber-200/40 h-12 rounded-xl">
+                      <Clock className="w-4 h-4" />
+                      {t("game.waiting_timer")}
+                    </div>
+                  )}
                 </div>
+
+                {/* Vote progress bar for vote mode */}
+                {gameState?.challengeMode === "vote" && gameState.skipVotes && gameState.skipVotesNeeded > 0 && (
+                  <div className="mt-2">
+                    <div className="flex items-center justify-between text-[10px] text-amber-200/40 mb-1">
+                      <span>{t("game.votes")}: {gameState.skipVotes.length}/{gameState.skipVotesNeeded}</span>
+                      <span>{Math.round((gameState.skipVotes.length / gameState.skipVotesNeeded) * 100)}%</span>
+                    </div>
+                    <div className="w-full bg-amber-900/30 rounded-full h-1.5 overflow-hidden">
+                      <div
+                        className="bg-amber-500 h-full rounded-full transition-all duration-300"
+                        style={{ width: `${Math.min(100, (gameState.skipVotes.length / gameState.skipVotesNeeded) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

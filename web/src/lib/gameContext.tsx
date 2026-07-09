@@ -8,6 +8,7 @@ import type {
   GameVariant,
   ClaimType,
   GameTheme,
+  ChallengeMode,
   BotDifficulty,
   ChatMessage,
   ToastNotification,
@@ -23,6 +24,8 @@ interface GameActions {
     claimType?: ClaimType,
     revealTime?: number,
     theme?: GameTheme,
+    challengeMode?: ChallengeMode,
+    challengeDuration?: number,
   ) => Promise<{ roomId: string; playerId: string }>;
   joinRoom: (
     roomId: string,
@@ -35,12 +38,13 @@ interface GameActions {
   startGame: () => Promise<void>;
   addBot: (botName?: string, difficulty?: BotDifficulty) => Promise<void>;
   removeBot: (botId: string) => Promise<void>;
-  playCards: (
+    playCards: (
     cardIndices: number[],
     declaration: CardDeclaration,
   ) => Promise<void>;
   callLiar: () => Promise<void>;
   passTurn: () => Promise<void>;
+  voteSkip: () => Promise<{ votesNow?: number; votesNeeded?: number }>;
   sendChat: (message: string) => void;
   sendWebRTCSignal: (targetId: string, signal: unknown) => void;
   addToast: (
@@ -190,7 +194,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
     [],
   );
 
-  const createRoom = useCallback(
+    const createRoom = useCallback(
     async (
       playerName: string,
       maxPlayers: number,
@@ -199,6 +203,8 @@ export const [GameProvider, useGame] = createContextHook(() => {
       claimType?: ClaimType,
       revealTime?: number,
       theme?: GameTheme,
+      challengeMode?: ChallengeMode,
+      challengeDuration?: number,
     ): Promise<{ roomId: string; playerId: string }> => {
       connectSocket();
       const res = await emitWithAck<{
@@ -206,7 +212,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
         roomId: string;
         playerId: string;
         state: GameState;
-      }>("create_room", { playerName, maxPlayers, variant, deckCount, claimType, revealTime, theme });
+      }>("create_room", { playerName, maxPlayers, variant, deckCount, claimType, revealTime, theme, challengeMode, challengeDuration });
 
       setMyRoomId(res.roomId);
       setMyPlayerId(res.playerId);
@@ -290,9 +296,19 @@ export const [GameProvider, useGame] = createContextHook(() => {
     await emitWithAck("call_liar", { roomId: myRoomId });
   }, [myRoomId, emitWithAck]);
 
-  const passTurn = useCallback(async () => {
+    const passTurn = useCallback(async () => {
     if (!myRoomId) throw new Error("Not in a room");
     await emitWithAck("pass_turn", { roomId: myRoomId });
+  }, [myRoomId, emitWithAck]);
+
+  const voteSkip = useCallback(async (): Promise<{ votesNow?: number; votesNeeded?: number }> => {
+    if (!myRoomId) throw new Error("Not in a room");
+    const res = await emitWithAck<{
+      success: boolean;
+      votesNow?: number;
+      votesNeeded?: number;
+    }>("vote_skip", { roomId: myRoomId });
+    return { votesNow: res.votesNow, votesNeeded: res.votesNeeded };
   }, [myRoomId, emitWithAck]);
 
   const sendChat = useCallback(
@@ -371,9 +387,10 @@ export const [GameProvider, useGame] = createContextHook(() => {
     startGame,
     addBot,
     removeBot,
-    playCards,
+        playCards,
     callLiar,
     passTurn,
+    voteSkip,
     sendChat,
     sendWebRTCSignal,
     addToast,

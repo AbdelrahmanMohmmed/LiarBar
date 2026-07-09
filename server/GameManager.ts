@@ -19,6 +19,9 @@ export type GamePhase =
   | "revealing"
   | "game_over";
 
+/** Challenge mode: "timer" = fixed duration, "vote" = majority vote to skip */
+export type ChallengeMode = "timer" | "vote";
+
 export interface GameAction {
   type:
     | "play"
@@ -54,9 +57,17 @@ export interface GameState {
   revealTime: number;
   revealDeadline: number | null;
   theme: GameTheme;
+  // Challenge mode settings
+  challengeMode: ChallengeMode;
+  challengeDuration: number; // in seconds (5 or 10)
+  // Vote system state
+  skipVotes: string[]; // playerIds who voted to skip
+  skipVotesNeeded: number; // how many votes needed to skip
+  challengeStartedAt: number | null; // timestamp when challenge window opened
 }
 
-const CHALLENGE_WINDOW_MS = 7000;
+const CHALLENGE_DURATION_OPTIONS = [5, 10] as const;
+const MIN_CHALLENGE_TIME_BEFORE_VOTE_MS = 3000; // 3 seconds minimum before votes count
 
 export class GameManager {
   roomId: string;
@@ -83,6 +94,12 @@ export class GameManager {
   private challengeTimer: NodeJS.Timeout | null;
   private revealTimer: NodeJS.Timeout | null;
   private destroyed: boolean = false;
+  // Challenge mode settings
+  challengeMode: ChallengeMode;
+  challengeDuration: number; // in seconds
+  // Vote system state
+  skipVotes: Set<string>;
+  challengeStartedAt: number | null;
 
   private broadcast: (state: GameState) => void;
   private onGameEnd: (roomId: string, winnerId: string) => void;
@@ -99,6 +116,8 @@ export class GameManager {
     broadcast: (state: GameState) => void,
     onGameEnd: (roomId: string, winnerId: string) => void,
     onChallengeResolved?: (roomId: string) => void,
+    challengeMode: ChallengeMode = "timer",
+    challengeDuration: number = 5,
   ) {
     this.roomId = roomId;
     this.players = [];
@@ -126,6 +145,11 @@ export class GameManager {
     this.broadcast = broadcast;
     this.onGameEnd = onGameEnd;
     this.onChallengeResolved = onChallengeResolved || (() => {});
+    // Challenge mode
+    this.challengeMode = challengeMode;
+    this.challengeDuration = CHALLENGE_DURATION_OPTIONS.includes(challengeDuration as any) ? challengeDuration : 5;
+    this.skipVotes = new Set();
+    this.challengeStartedAt = null;
   }
 
   addPlayer(name: string, socketId: string, isHost: boolean = false): Player {
@@ -321,16 +345,20 @@ export class GameManager {
     // Open challenge window for ALL other players
     this.phase = "waiting_for_challenge";
     this.revealedCards = [];
-    this.challengeDeadline = Date.now() + CHALLENGE_WINDOW_MS;
+    this.skipVotes = new Set();
+    this.challengeStartedAt = Date.now();
+
+    const challengeMs = this.challengeDuration * 1000;
+    this.challengeDeadline = Date.now() + challengeMs;
 
     const state = this.toState();
     this.broadcast(state);
 
-    // Start challenge timer
+    // Start challenge timer (always runs as a hard deadline)
     this.clearChallengeTimer();
     this.challengeTimer = setTimeout(() => {
       this.onChallengeWindowEnd();
-    }, CHALLENGE_WINDOW_MS);
+    }, challengeMs);
 
     // Trigger ALL bots to make a challenge decision (except the one who played)
     this.triggerBotChallenges();
@@ -472,6 +500,8 @@ export class GameManager {
     this.skipCount = 0;
     this.revealedCards = [];
     this.challengeDeadline = null;
+    this.skipVotes = new Set();
+    this.challengeStartedAt = null;
 
     // Winner starts the new round
     this.currentTurn = this.players.findIndex((p) => p.id === winner.id);
@@ -501,6 +531,8 @@ export class GameManager {
 
     this.challengeDeadline = null;
     this.challengeTimer = null;
+    this.skipVotes = new Set();
+    this.challengeStartedAt = null;
 
     // Check if the last player emptied their hand - they win!
     if (this.lastPlayerId) {
@@ -534,14 +566,82 @@ export class GameManager {
    * Any non-lastPlayer can call this during the challenge window.
    * Also called during playing phase to skip your turn to play.
    */
+  /**
+   * Vote to skip the challenge window (vote mode).
+   * Returns success if the vote was counted.
+   */
+  voteSkipChallenge(playerId: string): { success: boolean; error?: string; votesNow?: number; votesNeeded?: number } {
+    if (this.destroyed) {
+      return { success: false, error: "Game destroyed" };
+    }
+
+    if (this.phase !== "waiting_for_challenge") {
+      return { success: false, error: "No challenge window active" };
+    }
+
+    if (this.challengeMode !== "vote") {
+      return { success: false, error: "Voting is not enabled for this room" };
+    }
+
+    if (playerId === this.lastPlayerId) {
+      return { success: false, error: "The player who just played cannot vote" };
+    }
+
+    const player = this.getPlayer(playerId);
+    if (!player) {
+      return { success: false, error: "Player not found" };
+    }
+
+    // Check minimum time has passed
+    if (this.challengeStartedAt && (Date.now() - this.challengeStartedAt) < MIN_CHALLENGE_TIME_BEFORE_VOTE_MS) {
+      return { success: false, error: "Please wait before voting — others need time to decide" };
+    }
+
+    // Already voted
+    if (this.skipVotes.has(playerId)) {
+      return { success: false, error: "You already voted to skip" };
+    }
+
+    this.skipVotes.add(playerId);
+
+    // Calculate votes needed: more than 50% of eligible voters (all players minus lastPlayer)
+    const eligibleVoters = this.players.filter((p) => p.id !== this.lastPlayerId).length;
+    const votesNeeded = Math.ceil(eligibleVoters / 2);
+    const currentVotes = this.skipVotes.size;
+
+    // Broadcast updated vote state
+    const state = this.toState();
+    this.broadcast(state);
+
+    // Check if majority reached
+    if (currentVotes >= votesNeeded) {
+      this.onChallengeWindowEnd();
+    }
+
+    return { success: true, votesNow: currentVotes, votesNeeded };
+  }
+
   passTurn(playerId: string): { success: true } | { success: false; error: string } {
     if (this.phase === "waiting_for_challenge") {
       if (playerId === this.lastPlayerId) {
         return { success: false, error: "You can't pass on your own claim" };
       }
-      // First caller wins - effectively advance turn immediately
-      this.onChallengeWindowEnd();
-      return { success: true };
+
+      // In timer mode: can't skip early, must wait for the full duration
+      if (this.challengeMode === "timer") {
+        return { success: false, error: "Cannot skip — wait for the timer to expire or call Liar" };
+      }
+
+      // In vote mode: use voting system instead of instant skip
+      if (this.challengeMode === "vote") {
+        const result = this.voteSkipChallenge(playerId);
+        if (!result.success) {
+          return { success: false, error: result.error || "Vote failed" };
+        }
+        return { success: true };
+      }
+
+      return { success: false, error: "Cannot pass at this time" };
     }
 
     if (this.phase === "playing") {
@@ -752,6 +852,9 @@ export class GameManager {
 
   /** Serialize to GameState */
   toState(): GameState {
+    const eligibleVoters = this.players.filter((p) => p.id !== this.lastPlayerId).length;
+    const votesNeeded = Math.ceil(eligibleVoters / 2);
+
     return {
       roomId: this.roomId,
       phase: this.phase,
@@ -775,6 +878,12 @@ export class GameManager {
       revealTime: this.revealTime,
       revealDeadline: this.revealDeadline,
       theme: this.theme,
+      // Challenge mode
+      challengeMode: this.challengeMode,
+      challengeDuration: this.challengeDuration,
+      skipVotes: [...this.skipVotes],
+      skipVotesNeeded: votesNeeded,
+      challengeStartedAt: this.challengeStartedAt,
     };
   }
 
