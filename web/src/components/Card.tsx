@@ -74,14 +74,14 @@ export const Card = memo(function Card({ card: cardProp, cardStr, faceDown = fal
     return (
       <div
         className={cn(
-          "relative rounded-lg overflow-hidden flex-shrink-0 select-none",
+          "relative rounded-lg overflow-hidden flex-shrink-0 select-none flex items-center justify-center",
           size,
         )}
       >
         <img
           src={imgPath}
           alt={`${card.left}|${card.right}`}
-          className="w-full h-full object-cover"
+          className="w-full h-full object-contain"
           onError={(e) => {
             const el = e.currentTarget;
             el.style.display = "none";

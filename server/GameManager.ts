@@ -604,9 +604,9 @@ export class GameManager {
 
     this.skipVotes.add(playerId);
 
-    // Calculate votes needed: more than 50% of eligible voters (all players minus lastPlayer)
+    // Calculate votes needed: strict majority (> 50%) of eligible voters (all players minus lastPlayer)
     const eligibleVoters = this.players.filter((p) => p.id !== this.lastPlayerId).length;
-    const votesNeeded = Math.ceil(eligibleVoters / 2);
+    const votesNeeded = Math.floor(eligibleVoters / 2) + 1;
     const currentVotes = this.skipVotes.size;
 
     // Broadcast updated vote state
@@ -814,8 +814,22 @@ export class GameManager {
 
     if (shouldCall) {
       this.callLiar(botId);
+    } else if (this.challengeMode === "vote") {
+      // If bot decides not to call liar, and we are in vote mode, the bot should vote to skip.
+      // We must wait until the 3-second MIN_CHALLENGE_TIME_BEFORE_VOTE_MS has passed.
+      const elapsedSinceStart = Date.now() - (this.challengeStartedAt || Date.now());
+      const waitTimeRemaining = Math.max(0, MIN_CHALLENGE_TIME_BEFORE_VOTE_MS - elapsedSinceStart);
+      
+      // Add a slight random delay (500-1500ms) after the lock expires so bots don't vote instantly
+      const botVoteDelay = waitTimeRemaining + 500 + Math.random() * 1000;
+
+      const timer = setTimeout(() => {
+        if (!this.destroyed && this.phase === "waiting_for_challenge") {
+          this.voteSkipChallenge(botId);
+        }
+      }, botVoteDelay);
+      this.botTimers.set(`${botId}_vote`, timer);
     }
-    // If bot chooses not to call liar, it simply waits for the window to expire
   }
 
   /** Clear the challenge timer */
@@ -853,7 +867,7 @@ export class GameManager {
   /** Serialize to GameState */
   toState(): GameState {
     const eligibleVoters = this.players.filter((p) => p.id !== this.lastPlayerId).length;
-    const votesNeeded = Math.ceil(eligibleVoters / 2);
+    const votesNeeded = Math.floor(eligibleVoters / 2) + 1;
 
     return {
       roomId: this.roomId,
