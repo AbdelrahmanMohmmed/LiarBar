@@ -27,7 +27,7 @@ export const THEMES: Record<GameTheme, ThemeAssets> = {
   },
   classic: {
     name: "Classic",
-    dominoFolder: "Dark Theme",
+    dominoFolder: "Light theme",
     cardBackClass: "from-blue-900 to-blue-950 border-blue-700/60",
     cardSuitColors: {
       hearts: "#991B1B",

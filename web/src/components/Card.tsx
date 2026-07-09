@@ -74,6 +74,7 @@ export const Card = memo(function Card({ card: cardProp, cardStr, faceDown = fal
     return (
       <div
         className={cn(
+
           "relative rounded-lg overflow-hidden flex-shrink-0 select-none flex items-center justify-center",
           size,
         )}
@@ -81,6 +82,7 @@ export const Card = memo(function Card({ card: cardProp, cardStr, faceDown = fal
         <img
           src={imgPath}
           alt={`${card.left}|${card.right}`}
+
           className="w-full h-full object-contain"
           onError={(e) => {
             const el = e.currentTarget;
@@ -101,8 +103,73 @@ export const Card = memo(function Card({ card: cardProp, cardStr, faceDown = fal
     );
   }
 
-  const color = SUIT_COLORS[card.suit];
   const size = small ? "w-8 h-12" : "w-14 h-20";
+  
+  if (theme === "classic") {
+    // Map rank to the filename suffix
+    let rankFile = card.rank;
+    if (card.rank !== "A" && card.rank !== "J" && card.rank !== "Q" && card.rank !== "K" && card.rank !== "10") {
+      rankFile = `0${card.rank}` as any;
+    }
+    const imgPath = `/Cards/card_${card.suit}_${rankFile}.png`;
+
+    return (
+      <div
+        className={cn(
+          "relative rounded-lg overflow-hidden flex-shrink-0 select-none flex items-center justify-center",
+          size,
+        )}
+        style={{ backgroundColor: "#fff" }}
+      >
+        <img
+          src={imgPath}
+          alt={`${card.rank} of ${card.suit}`}
+          className="w-full h-full object-contain"
+        />
+      </div>
+    );
+  }
+
+  if (theme === "vip") {
+    // Map suit to the correct spritesheet file
+    const suitFileMap: Record<string, string> = {
+      hearts: "Hearts-88x124.png",
+      diamonds: "Diamonds-88x124.png",
+      clubs: "Clubs-88x124.png",
+      spades: "Spades-88x124.png",
+    };
+    
+    // Assume standard 13 rank order: A(0), 2(1), ... 10(9), J(10), Q(11), K(12)
+    const rankIndex = {
+      "A": 0, "2": 1, "3": 2, "4": 3, "5": 4, "6": 5, "7": 6, "8": 7, "9": 8, "10": 9, "J": 10, "Q": 11, "K": 12,
+    }[card.rank] ?? 0;
+
+    const imgPath = `/Cards_VIP/${suitFileMap[card.suit]}`;
+    
+    // Using CSS background to crop the spritesheet
+    // Assuming standard layout: 13 columns of 88px width
+    return (
+      <div
+        className={cn(
+          "relative rounded-lg flex-shrink-0 select-none overflow-hidden",
+          size,
+        )}
+      >
+        <div 
+          className="w-full h-full"
+          style={{
+            backgroundImage: `url('${imgPath}')`,
+            backgroundSize: `auto 100%`,
+            backgroundPosition: `${(rankIndex / (13 - 1)) * 100}% 0%`,
+            backgroundRepeat: "no-repeat",
+          }}
+        />
+      </div>
+    );
+  }
+
+  // Standard theme (CSS text based)
+  const color = SUIT_COLORS[card.suit];
   const rankSize = small ? "text-[9px]" : "text-xs";
   const symSize = small ? "text-[8px]" : "text-[10px]";
   const centerSym = small ? "text-sm" : "text-xl";
