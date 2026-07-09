@@ -1,0 +1,436 @@
+import type { Server, Socket } from "socket.io";
+import { config } from "../config.js";
+import { RoomRegistry } from "../core/RoomRegistry.js";
+import { RateLimiter } from "./rateLimit.js";
+import { sendPrivateHands, broadcastState } from "./emitters.js";
+import {
+  createGameRoom,
+  DEFAULT_GAME_ID,
+  type CreateRoomOptions,
+} from "../games/registry.js";
+import type { GameRoom } from "../games/types.js";
+import { GameManager } from "../games/liars-bar/GameManager.js";
+import type { CardDeclaration } from "../games/liars-bar/Deck.js";
+import type { BotDifficulty } from "../games/liars-bar/BotAI.js";
+import type { Player } from "../games/liars-bar/Player.js";
+
+type Ack = ((response: unknown) => void) | undefined;
+
+function reply(callback: Ack, response: unknown): void {
+  if (typeof callback === "function") callback(response);
+}
+
+function fail(callback: Ack, error: string): void {
+  reply(callback, { error });
+}
+
+/** Validate and normalize a player-provided display name. */
+function cleanName(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const name = raw.trim().slice(0, config.maxNameLength);
+  return name.length > 0 ? name : null;
+}
+
+export function registerSocketHandlers(
+  io: Server,
+  registry: RoomRegistry,
+): void {
+  const limiter = new RateLimiter();
+
+  io.on("connection", (socket: Socket) => {
+    /**
+     * Resolve the caller's room + player from the server-side session,
+     * never trusting a client-sent roomId for authorization.
+     */
+    function membership(): { room: GameRoom; player: Player } | null {
+      const session = registry.getSession(socket.id);
+      if (!session) return null;
+      const room = registry.get(session.roomId);
+      if (!room) return null;
+      const player = room.getPlayer(session.playerId);
+      if (!player) return null;
+      return { room, player };
+    }
+
+    /** Membership + host check for lobby-management actions. */
+    function hostMembership(callback: Ack) {
+      const m = membership();
+      if (!m) {
+        fail(callback, "Not in a room");
+        return null;
+      }
+      if (!m.player.isHost) {
+        fail(callback, "Only the host can do that");
+        return null;
+      }
+      return m;
+    }
+
+    /** Narrow a generic room to the Liar's Bar engine for game actions. */
+    function liarsBarMembership(callback: Ack) {
+      const m = membership();
+      if (!m) {
+        fail(callback, "Not in a room");
+        return null;
+      }
+      if (!(m.room instanceof GameManager)) {
+        fail(callback, "Action not supported by this game");
+        return null;
+      }
+      return { room: m.room, player: m.player };
+    }
+
+    // ===== ROOM LIFECYCLE =====
+
+    socket.on(
+      "create_room",
+      (data: { playerName: string; gameId?: string } & CreateRoomOptions, callback: Ack) => {
+        try {
+          if (!limiter.allow(`${socket.id}:create`, 5, 60_000)) {
+            fail(callback, "Too many rooms created, slow down");
+            return;
+          }
+
+          const playerName = cleanName(data?.playerName);
+          if (!playerName) {
+            fail(callback, "Player name is required");
+            return;
+          }
+          if (registry.getSession(socket.id)) {
+            fail(callback, "Already in a room");
+            return;
+          }
+
+          const maxPlayers = Number(data.maxPlayers);
+          const deckCount = Number(data.deckCount);
+          if (!Number.isInteger(maxPlayers) || maxPlayers < 2 || maxPlayers > 6) {
+            fail(callback, "Players must be between 2 and 6");
+            return;
+          }
+          if (!Number.isInteger(deckCount) || deckCount < 1 || deckCount > 4) {
+            fail(callback, "Deck count must be between 1 and 4");
+            return;
+          }
+          if (data.variant !== "cards" && data.variant !== "dominoes") {
+            fail(callback, "Unknown game variant");
+            return;
+          }
+
+          const gameId = data.gameId || DEFAULT_GAME_ID;
+          const roomId = registry.generateRoomCode();
+
+          const room = createGameRoom(gameId, roomId, data, {
+            broadcast: (state) => io.to(roomId).emit("game_state", state),
+            onGameEnd: (rid, winnerId) => {
+              console.log(`Game over in room ${rid}, winner: ${winnerId}`);
+            },
+            onHandsChanged: (rid) => {
+              const r = registry.get(rid);
+              if (r) sendPrivateHands(io, r);
+            },
+          });
+
+          if (!room) {
+            fail(callback, `Unknown game: ${gameId}`);
+            return;
+          }
+
+          const player = room.addPlayer(playerName, socket.id, true);
+          registry.add(room);
+          socket.join(roomId);
+          registry.bindSocket(socket.id, { roomId, playerId: player.id });
+
+          console.log(`Room ${roomId} created by ${playerName} (game: ${gameId})`);
+
+          reply(callback, {
+            success: true,
+            roomId,
+            playerId: player.id,
+            state: room.toPlayerState(player.id),
+          });
+        } catch (err) {
+          console.error("Error creating room:", err);
+          fail(callback, "Failed to create room");
+        }
+      },
+    );
+
+    socket.on(
+      "join_room",
+      (data: { roomId: string; playerName: string }, callback: Ack) => {
+        try {
+          const playerName = cleanName(data?.playerName);
+          if (!playerName) {
+            fail(callback, "Player name is required");
+            return;
+          }
+
+          const room = registry.get(String(data?.roomId ?? "").trim().toUpperCase());
+          if (!room) {
+            fail(callback, "Room not found");
+            return;
+          }
+          if (room.phase !== "lobby") {
+            fail(callback, "Game already in progress");
+            return;
+          }
+          if (room.players.length >= room.maxPlayers) {
+            fail(callback, "Room is full");
+            return;
+          }
+          if (room.players.some((p) => p.name === playerName)) {
+            fail(callback, "Name already taken in this room");
+            return;
+          }
+
+          const player = room.addPlayer(playerName, socket.id);
+          socket.join(room.roomId);
+          registry.bindSocket(socket.id, { roomId: room.roomId, playerId: player.id });
+
+          broadcastState(io, room);
+          console.log(`${playerName} joined room ${room.roomId}`);
+
+          reply(callback, {
+            success: true,
+            playerId: player.id,
+            state: room.toPlayerState(player.id),
+          });
+        } catch (err) {
+          console.error("Error joining room:", err);
+          fail(callback, "Failed to join room");
+        }
+      },
+    );
+
+    socket.on(
+      "reconnect_room",
+      (data: { roomId: string; playerId: string }, callback: Ack) => {
+        try {
+          const room = registry.get(String(data?.roomId ?? ""));
+          if (!room) {
+            fail(callback, "Room not found");
+            return;
+          }
+
+          const player = room.handleReconnect(String(data?.playerId ?? ""), socket.id);
+          if (!player) {
+            fail(callback, "Player not found in room");
+            return;
+          }
+
+          socket.join(room.roomId);
+          registry.bindSocket(socket.id, { roomId: room.roomId, playerId: player.id });
+
+          console.log(`Player ${player.name} reconnected to room ${room.roomId}`);
+
+          reply(callback, {
+            success: true,
+            state: room.toPlayerState(player.id),
+          });
+        } catch (err) {
+          console.error("Error reconnecting:", err);
+          fail(callback, "Failed to reconnect");
+        }
+      },
+    );
+
+    // ===== LOBBY ACTIONS (host only) =====
+
+    socket.on(
+      "add_bot",
+      (data: { botName?: string; difficulty?: BotDifficulty }, callback: Ack) => {
+        const m = hostMembership(callback);
+        if (!m) return;
+        const { room } = m;
+
+        if (room.phase !== "lobby") {
+          fail(callback, "Game already started");
+          return;
+        }
+        if (room.players.length >= room.maxPlayers) {
+          fail(callback, "Room is full");
+          return;
+        }
+
+        const botName =
+          cleanName(data?.botName) || `Bot ${room.players.length + 1}`;
+        room.addBot(botName, data?.difficulty || "medium");
+
+        broadcastState(io, room);
+        reply(callback, { success: true });
+      },
+    );
+
+    socket.on("remove_bot", (data: { botId: string }, callback: Ack) => {
+      const m = hostMembership(callback);
+      if (!m) return;
+      const { room } = m;
+
+      if (room.phase !== "lobby") {
+        fail(callback, "Game already started");
+        return;
+      }
+      if (!room.removeBot(String(data?.botId ?? ""))) {
+        fail(callback, "Bot not found");
+        return;
+      }
+
+      broadcastState(io, room);
+      reply(callback, { success: true });
+    });
+
+    socket.on("start_game", (_data: unknown, callback: Ack) => {
+      const m = hostMembership(callback);
+      if (!m) return;
+      const { room } = m;
+
+      if (!room.canStart()) {
+        fail(callback, "Need at least 2 players (including bots) to start");
+        return;
+      }
+      if (!room.startGame()) {
+        fail(callback, "Failed to start game");
+        return;
+      }
+
+      sendPrivateHands(io, room);
+      reply(callback, { success: true });
+    });
+
+    // ===== GAMEPLAY (Liar's Bar) =====
+
+    socket.on(
+      "play_cards",
+      (data: { cardIndices: number[]; declaration: CardDeclaration }, callback: Ack) => {
+        const m = liarsBarMembership(callback);
+        if (!m) return;
+
+        const result = m.room.playCards(
+          m.player.id,
+          Array.isArray(data?.cardIndices) ? data.cardIndices : [],
+          data?.declaration,
+        );
+        if (!result.success) {
+          fail(callback, result.error ?? "Invalid play");
+          return;
+        }
+
+        sendPrivateHands(io, m.room);
+        reply(callback, { success: true });
+      },
+    );
+
+    socket.on("call_liar", (_data: unknown, callback: Ack) => {
+      const m = liarsBarMembership(callback);
+      if (!m) return;
+
+      const result = m.room.callLiar(m.player.id);
+      if (!result.success) {
+        fail(callback, result.error ?? "Cannot call liar");
+        return;
+      }
+      // Hands are re-sent after the reveal timer via onHandsChanged
+      reply(callback, { success: true });
+    });
+
+    socket.on("vote_skip", (_data: unknown, callback: Ack) => {
+      const m = liarsBarMembership(callback);
+      if (!m) return;
+
+      const result = m.room.voteSkipChallenge(m.player.id);
+      if (!result.success) {
+        fail(callback, result.error ?? "Cannot vote");
+        return;
+      }
+      reply(callback, {
+        success: true,
+        votesNow: result.votesNow,
+        votesNeeded: result.votesNeeded,
+      });
+    });
+
+    socket.on("pass_turn", (_data: unknown, callback: Ack) => {
+      const m = liarsBarMembership(callback);
+      if (!m) return;
+
+      const result = m.room.passTurn(m.player.id);
+      if (!result.success) {
+        fail(callback, result.error ?? "Cannot pass");
+        return;
+      }
+
+      sendPrivateHands(io, m.room);
+      reply(callback, { success: true });
+    });
+
+    socket.on("get_state", (_data: unknown, callback: Ack) => {
+      const m = membership();
+      if (!m) {
+        fail(callback, "Not in a room");
+        return;
+      }
+      reply(callback, {
+        success: true,
+        state: m.room.toPlayerState(m.player.id),
+      });
+    });
+
+    // ===== CHAT =====
+
+    socket.on("send_chat", (data: { message: string }) => {
+      const m = membership();
+      if (!m) return;
+      if (!limiter.allow(`${socket.id}:chat`, 8, 5_000)) return;
+
+      const message =
+        typeof data?.message === "string"
+          ? data.message.trim().slice(0, config.maxChatLength)
+          : "";
+      if (!message) return;
+
+      io.to(m.room.roomId).emit("chat_message", {
+        playerId: m.player.id,
+        playerName: m.player.name,
+        message,
+        timestamp: Date.now(),
+      });
+    });
+
+    // ===== WebRTC SIGNALING (voice chat) =====
+
+    socket.on(
+      "webrtc_signal",
+      (data: { targetId: string; signal: unknown }) => {
+        const m = membership();
+        if (!m) return;
+
+        const target = m.room.getPlayer(String(data?.targetId ?? ""));
+        if (!target?.socketId) return;
+
+        io.to(target.socketId).emit("webrtc_signal", {
+          fromId: m.player.id,
+          signal: data.signal,
+        });
+      },
+    );
+
+    // ===== DISCONNECT =====
+
+    socket.on("disconnect", () => {
+      limiter.clearPrefix(socket.id);
+
+      const session = registry.getSession(socket.id);
+      registry.unbindSocket(socket.id);
+      if (!session) return;
+
+      const room = registry.get(session.roomId);
+      if (!room) return;
+
+      room.handleDisconnect(socket.id);
+      // The room is NOT destroyed here even if it's now empty — the
+      // registry sweeper removes it after a grace period, so a page
+      // refresh or brief network drop doesn't kill the game.
+      broadcastState(io, room);
+    });
+  });
+}
