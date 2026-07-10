@@ -23,8 +23,8 @@ const COPY = {
     playLabel: "العب الآن",
     game2Title: "كودنيمز",
     game2Subtitle: "Codenames",
-    game2Desc: "لعبة تخمين الكلمات بالفرق، قريباً على ألعاب سفريات.",
-    notifyLabel: "قريباً",
+    game2Desc: "لعبة تخمين الكلمات بالفرق، العبها الآن مع أصدقائك!",
+    notifyLabel: "العب الآن",
     footerText: "© 2026 ألعاب سفريات — العب في أي وقت، في أي مكان.",
   },
   en: {
@@ -40,8 +40,8 @@ const COPY = {
     playLabel: "Play now",
     game2Title: "Codenames",
     game2Subtitle: "كودنيمز",
-    game2Desc: "The classic team word-guessing game, coming soon to Safariyat Games.",
-    notifyLabel: "Coming soon",
+    game2Desc: "The classic team word-guessing game — play it now with your friends!",
+    notifyLabel: "Play now",
     footerText: "© 2026 Safariyat Games — play anytime, anywhere.",
   },
 } as const;
@@ -61,6 +61,7 @@ export default function Landing() {
   const font = isAr ? "'Tajawal', sans-serif" : "'Baloo 2', sans-serif";
 
   const goToPlay = useCallback(() => navigate("/play"), [navigate]);
+  const goToCodenames = useCallback(() => navigate("/codenames"), [navigate]);
 
   return (
     <div
@@ -301,7 +302,7 @@ export default function Landing() {
             </div>
           </article>
 
-          {/* Codenames — coming soon */}
+          {/* Codenames — available */}
           <article
             style={{
               animation: "dc-pop-in 0.5s ease 0.1s both",
@@ -309,7 +310,6 @@ export default function Landing() {
               borderRadius: 24,
               border: "3px solid #2B2420",
               overflow: "hidden",
-              opacity: 0.75,
               boxShadow: "6px 6px 0 #2B2420",
             }}
           >
@@ -340,16 +340,17 @@ export default function Landing() {
                   position: "absolute",
                   top: 10,
                   [badgeSide]: 10,
-                  background: "#2B2420",
+                  background: "#3AA6A6",
                   color: "#FDF6EC",
                   fontFamily: BUTTON_FONT,
                   fontWeight: 700,
                   fontSize: 12,
                   padding: "5px 12px",
                   borderRadius: 999,
+                  animation: "dc-float-badge 2.4s ease-in-out infinite",
                 }}
               >
-                {c.comingSoonLabel}
+                {c.availableLabel}
               </span>
             </div>
             <div
@@ -373,19 +374,20 @@ export default function Landing() {
                 {c.game2Desc}
               </p>
               <button
-                disabled
+                onClick={goToCodenames}
+                className="dc-play-btn"
                 style={{
                   alignSelf: buttonAlign,
                   marginTop: 4,
-                  background: "#E7E1D8",
-                  color: "#A79C8E",
+                  background: "#3AA6A6",
+                  color: "#FDF6EC",
                   border: "none",
                   fontFamily: BUTTON_FONT,
                   fontWeight: 700,
                   fontSize: 15,
                   padding: "10px 22px",
                   borderRadius: 999,
-                  cursor: "not-allowed",
+                  cursor: "pointer",
                 }}
               >
                 {c.notifyLabel}

@@ -9,6 +9,9 @@ import Landing from "./pages/Landing";
 import Index from "./pages/index";
 import Room from "./pages/Room";
 import Game from "./pages/Game";
+import CodenamesHome from "./pages/codenames/CodenamesHome";
+import CodenamesRoom from "./pages/codenames/CodenamesRoom";
+import CodenamesGame from "./pages/codenames/CodenamesGame";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -58,6 +61,9 @@ const App = () => (
             <Route path="/play" element={<Index />} />
             <Route path="/room/:roomId" element={<Room />} />
             <Route path="/game/:roomId" element={<Game />} />
+            <Route path="/codenames" element={<CodenamesHome />} />
+            <Route path="/codenames/room/:roomId" element={<CodenamesRoom />} />
+            <Route path="/codenames/game/:roomId" element={<CodenamesGame />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
