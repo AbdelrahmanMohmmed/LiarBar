@@ -5,6 +5,8 @@ import {
   type ChallengeMode,
 } from "./liars-bar/GameManager.js";
 import type { GameVariant, ClaimType } from "./liars-bar/Deck.js";
+import { CodenamesGame } from "./codenames/CodenamesGame.js";
+import type { Lang } from "./codenames/board.js";
 
 /**
  * Options sent by the client when creating a room. Each game validates
@@ -19,6 +21,7 @@ export interface CreateRoomOptions {
   theme?: GameTheme;
   challengeMode?: ChallengeMode;
   challengeDuration?: number;
+  language?: Lang;
 }
 
 export type GameFactory = (
@@ -72,5 +75,14 @@ registerGame(DEFAULT_GAME_ID, (roomId, options, callbacks) => {
     (rid) => callbacks.onHandsChanged(rid),
     challengeMode,
     challengeDuration,
+  );
+});
+
+registerGame("codenames", (roomId, options, callbacks) => {
+  return new CodenamesGame(
+    roomId,
+    options.maxPlayers,
+    options.language ?? "ar",
+    callbacks,
   );
 });
