@@ -6,7 +6,7 @@ import { LangToggle } from "@/components/LangToggle";
 import { GuideModal } from "@/components/GuideModal";
 import { ThemeSelector } from "@/components/ThemeSelector";
 import { useTheme } from "@/lib/themeContext";
-import { Swords, Users, Gamepad2, Dice1, LogIn, HelpCircle } from "lucide-react";
+import { Swords, Users, Gamepad2, Dice1, LogIn, HelpCircle, ArrowLeft, ChevronDown, SlidersHorizontal } from "lucide-react";
 import type { GameVariant, ClaimType, ChallengeMode } from "@/lib/types";
 import { isFirebaseConfigured, signInWithGoogle, onAuthChange } from "@/lib/firebase";
 
@@ -26,6 +26,7 @@ export default function Index() {
   const [challengeMode, setChallengeMode] = useState<ChallengeMode>("timer");
   const [challengeDuration, setChallengeDuration] = useState("5");
   const [joinRoomId, setJoinRoomId] = useState("");
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [googleUser, setGoogleUser] = useState<{ name: string; photo?: string } | null>(null);
   const [tab, setTab] = useState<"create" | "join">("create");
@@ -102,18 +103,26 @@ export default function Index() {
   }, [playerName, joinRoomId, joinRoom, navigate, addToast]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#1a0a0a] via-[#2d1111] to-[#1a0a0a] flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-b from-[#1a0a0a] via-[#2d1111] to-[#1a0a0a] flex flex-col items-center justify-center p-4 py-8">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-amber-600/5 rounded-full blur-3xl" />
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-red-800/5 rounded-full blur-3xl" />
       </div>
 
-      <div className="mb-8 text-center relative z-10">
+      <button
+        onClick={() => navigate("/")}
+        className="absolute top-4 left-4 z-20 inline-flex items-center gap-1.5 text-amber-200/50 hover:text-white text-sm px-3 py-2 rounded-lg hover:bg-[#2a1515] transition-all"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        {t("index.back_to_arcade")}
+      </button>
+
+      <div className="mb-6 text-center relative z-10">
         <div className="inline-flex items-center gap-3 mb-2">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center shadow-lg shadow-amber-900/50">
-            <Swords className="w-7 h-7 text-white" />
+          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center shadow-lg shadow-amber-900/50">
+            <Swords className="w-6 h-6 text-white" />
           </div>
-          <h1 className="text-4xl font-bold text-white tracking-tight">
+          <h1 className="text-3xl font-bold text-white tracking-tight">
             {t("index.title")}
           </h1>
         </div>
@@ -235,6 +244,20 @@ export default function Index() {
                 </div>
               )}
 
+              <button
+                type="button"
+                onClick={() => setShowAdvanced((v) => !v)}
+                className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg bg-[#2a1515]/60 border border-amber-900/30 text-amber-200/80 hover:bg-[#2a1515] transition-all"
+              >
+                <span className="inline-flex items-center gap-2 text-sm">
+                  <SlidersHorizontal className="w-4 h-4" />
+                  {t("index.advanced")}
+                </span>
+                <ChevronDown className={`w-4 h-4 transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
+              </button>
+
+              {showAdvanced && (
+              <div className="space-y-4 border-l-2 border-amber-900/30 pl-3 animate-in fade-in">
               <div className="space-y-2">
                 <label className="text-amber-200/80 text-xs block">{t("index.num_decks")}</label>
                 <select
@@ -331,6 +354,8 @@ export default function Index() {
               </div>
 
               <ThemeSelector />
+              </div>
+              )}
 
               <button
                 onClick={handleCreate}

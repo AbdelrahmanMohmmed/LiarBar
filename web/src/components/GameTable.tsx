@@ -13,8 +13,15 @@ interface GameTableProps {
   onCardSelect: (index: number) => void;
 }
 
-function getPlayerPositions(count: number, radius: number = 200) {
-  const positions: { x: number; y: number; rotate: number; scale: number }[] = [];
+/**
+ * Seat positions as fractions of the board's half-size (-1..1), so they scale
+ * with the container instead of using fixed pixels — essential for mobile.
+ * Multiply by RADIUS_PCT when placing to keep seats just outside the table.
+ */
+const RADIUS_PCT = 41;
+
+function getPlayerPositions(count: number) {
+  const positions: { nx: number; ny: number; rotate: number; scale: number }[] = [];
   const startAngle = -90;
   for (let i = 0; i < count; i++) {
     const angle = startAngle + (360 / count) * i;
@@ -22,8 +29,8 @@ function getPlayerPositions(count: number, radius: number = 200) {
     const dist = Math.abs(Math.sin(rad));
     const scale = 0.85 + dist * 0.15;
     positions.push({
-      x: Math.cos(rad) * radius,
-      y: Math.sin(rad) * radius,
+      nx: Math.cos(rad),
+      ny: Math.sin(rad),
       rotate: angle + 90,
       scale,
     });
@@ -62,7 +69,7 @@ const MiniCard = memo(function MiniCard({
     return (
       <div
         className={cn(
-          "bg-ivory-100 text-gray-900 rounded font-mono font-bold flex flex-col items-center justify-center border border-gray-300 shadow",
+          "bg-[#faf3e0] text-gray-900 rounded font-mono font-bold flex flex-col items-center justify-center border border-gray-300 shadow",
           small ? "w-5 h-7 text-[7px]" : "w-8 h-12 text-[10px]",
         )}
       >
@@ -265,15 +272,15 @@ export const GameTable = memo(function GameTable({
             key={player.id}
             className="absolute transition-all duration-500"
             style={{
-              left: `calc(50% + ${pos.x}px)`,
-              top: `calc(50% + ${pos.y}px)`,
+              left: `calc(50% + ${(pos.nx * RADIUS_PCT).toFixed(2)}%)`,
+              top: `calc(50% + ${(pos.ny * RADIUS_PCT).toFixed(2)}%)`,
               transform: `translate(-50%, -50%) scale(${pos.scale})`,
               zIndex: isCurrent ? 20 : 10,
             }}
           >
             <div
               className={cn(
-                "flex flex-col items-center gap-1.5 p-2.5 rounded-xl min-w-[90px] transition-all duration-300",
+                "flex flex-col items-center gap-1 sm:gap-1.5 p-1.5 sm:p-2.5 rounded-xl min-w-[60px] sm:min-w-[90px] transition-all duration-300",
                 isCurrent &&
                   "ring-2 shadow-lg scale-110",
                 isCurrent &&
@@ -288,7 +295,7 @@ export const GameTable = memo(function GameTable({
               {/* Avatar */}
               <div
                 className={cn(
-                  "w-11 h-11 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-inner transition-all relative",
+                  "w-8 h-8 sm:w-11 sm:h-11 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-inner transition-all relative",
                   isMe
                     ? "bg-gradient-to-br from-amber-500 to-amber-700 ring-2 ring-amber-300/50"
                     : player.isBot
@@ -297,11 +304,11 @@ export const GameTable = memo(function GameTable({
                 )}
               >
                 {player.isBot ? (
-                  <Bot className="w-5 h-5" />
+                  <Bot className="w-4 h-4 sm:w-5 sm:h-5" />
                 ) : player.isHost ? (
-                  <Crown className="w-5 h-5" />
+                  <Crown className="w-4 h-4 sm:w-5 sm:h-5" />
                 ) : (
-                  <User className="w-5 h-5" />
+                  <User className="w-4 h-4 sm:w-5 sm:h-5" />
                 )}
 
                 {/* Connection indicator */}
@@ -316,7 +323,7 @@ export const GameTable = memo(function GameTable({
               {/* Name */}
               <p
                 className={cn(
-                  "text-xs font-medium text-center max-w-[90px] truncate",
+                  "text-xs font-medium text-center max-w-[64px] sm:max-w-[90px] truncate",
                   isCurrent ? "text-amber-200" : "text-amber-100/70",
                 )}
               >

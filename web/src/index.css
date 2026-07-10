@@ -180,3 +180,18 @@ select {
     perspective: 700px;
   }
 }
+
+/* ===== Safariyat Games landing (imported design) ===== */
+@keyframes dc-pop-in {
+  0% { opacity: 0; transform: translateY(14px) scale(0.98); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes dc-float-badge {
+  0%, 100% { transform: translateY(0) rotate(-4deg); }
+  50% { transform: translateY(-4px) rotate(-4deg); }
+}
+.dc-lang-btn { transition: background 0.15s ease, color 0.15s ease; }
+.dc-lang-btn:hover { background: #2B2420 !important; color: #FDF6EC !important; }
+.dc-play-btn { transition: background 0.15s ease, transform 0.1s ease; }
+.dc-play-btn:hover { background: #d1483c !important; }
+.dc-play-btn:active { transform: scale(0.96); }

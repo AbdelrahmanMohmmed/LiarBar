@@ -4,6 +4,7 @@ import { SUIT_SYMBOLS, SUIT_COLORS, declarationToString } from "@/lib/types";
 import { useLanguage } from "@/lib/languageContext";
 import { X, Check, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Card as CardView } from "@/components/Card";
 
 const SUITS: Suit[] = ["hearts", "diamonds", "clubs", "spades"];
 const RANKS: Rank[] = [
@@ -136,19 +137,9 @@ export const DeclarationModal = memo(function DeclarationModal({
             <p className="text-amber-200/60 text-xs mb-2">
               {t("claim.playing")} {count} {count === 1 ? t("claim.card") : t("claim.cards")}:
             </p>
-            <div className="flex gap-1 justify-center flex-wrap">
+            <div className="flex gap-1.5 justify-center flex-wrap">
               {selectedCards.map((card, i) => (
-                <div key={i} className="w-10 h-14 rounded border border-amber-900/40 bg-gradient-to-b from-[#faf3e0] to-[#e8d5b0] flex items-center justify-center">
-                  {card.type === "playing-card" ? (
-                    <span className="text-lg font-bold" style={{ color: SUIT_COLORS[card.suit] }}>
-                      {SUIT_SYMBOLS[card.suit]}
-                    </span>
-                  ) : (
-                    <span className="text-gray-900 font-mono text-xs font-bold">
-                      {card.left}|{card.right}
-                    </span>
-                  )}
-                </div>
+                <CardView key={i} card={card} small />
               ))}
             </div>
           </div>

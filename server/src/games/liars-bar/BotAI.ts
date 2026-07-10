@@ -140,8 +140,11 @@ export class BotAI {
     myHand: Card[],
     claimType?: ClaimType,
   ): boolean {
+    // Cards the claimant held right before this play (they still hold
+    // `lastPlayerCardCount`, and just played `count` cards).
+    const claimantHandBefore = lastPlayerCardCount + lastDeclaration.count;
     const lieProb = this.estimateLieProbability(
-      lastDeclaration, myHand, claimType,
+      lastDeclaration, myHand, claimantHandBefore, claimType,
     );
 
     if (this.difficulty === "easy") {
@@ -183,87 +186,122 @@ export class BotAI {
 
   /**
    * Estimate probability the declaration is a lie.
+   *
+   * `claimantHandBefore` is how many cards the claimant held right before
+   * playing (so we can gauge how plausible it is that they actually held
+   * `count` cards of the claimed category).
    */
   private estimateLieProbability(
     declaration: CardDeclaration,
     myHand: Card[],
+    claimantHandBefore: number,
     claimType?: ClaimType,
   ): number {
     if (declaration.type === "playing-card") {
-      return this.estimateCardLieProb(declaration, myHand, claimType);
+      return this.estimateCardLieProb(declaration, myHand, claimantHandBefore, claimType);
     }
-    return this.estimateDominoLieProb(declaration, myHand);
+    return this.estimateDominoLieProb(declaration, myHand, claimantHandBefore);
+  }
+
+  /**
+   * Core heuristic shared by cards and dominoes.
+   *
+   * The key insight the old model got wrong: for broad categories (suit, rank,
+   * domino value) there are MANY matching cards in the deck, so the bot merely
+   * owning a few says almost nothing about whether the claimant is lying. We
+   * instead reason about how many matching cards can plausibly sit in the
+   * claimant's hand, given how many exist outside the bot's own hand.
+   */
+  private categoryLieProb(
+    count: number,
+    owned: number,
+    totalCategory: number,
+    myHandSize: number,
+    totalDeckSize: number,
+    claimantHandBefore: number,
+  ): number {
+    // Matching cards that exist somewhere the bot can't see (other hands + pile).
+    const categoryOutside = totalCategory - owned;
+
+    // Not enough matching cards exist outside the bot's hand for the claim to be
+    // fully truthful → almost certainly a lie.
+    if (categoryOutside < count) return 0.97;
+
+    const unknown = Math.max(1, totalDeckSize - myHandSize);
+    // Density of matching cards among the cards the bot cannot see.
+    const density = categoryOutside / unknown;
+    // Expected number of matching cards a hand of `claimantHandBefore` would hold.
+    const expected = Math.max(0.0001, claimantHandBefore * density);
+
+    // ratio >= 1 → the claim is statistically plausible; < 1 → suspicious.
+    const ratio = expected / count;
+
+    let suspicion: number;
+    if (ratio >= 1) {
+      // Plausible holding — low suspicion that fades as it becomes more plausible.
+      suspicion = 0.2 / ratio;
+    } else {
+      // Claimant would need more matches than they'd typically hold.
+      suspicion = 0.2 + (1 - ratio) * 0.75;
+    }
+
+    // Single-card claims are cheap to make and rarely worth challenging.
+    if (count <= 1) suspicion *= 0.5;
+
+    return Math.max(0.02, Math.min(0.97, suspicion));
   }
 
   private estimateCardLieProb(
     declaration: CardDeclaration & { type: "playing-card" },
     myHand: Card[],
+    claimantHandBefore: number,
     claimType?: ClaimType,
   ): number {
-    const declaredCount = declaration.count;
     const myHandCards = myHand.filter((c) => c.type === "playing-card") as PlayingCard[];
 
     let owned: number;
-    let totalAvailable: number;
-    let suitInfo: string;
+    let totalCategory: number;
 
     if (claimType === "suit") {
       owned = myHandCards.filter((c) => c.suit === declaration.suit).length;
-      totalAvailable = 13 * this.deckCount;
+      totalCategory = 13 * this.deckCount;
     } else if (claimType === "rank") {
       owned = myHandCards.filter((c) => c.rank === declaration.rank).length;
-      totalAvailable = 4 * this.deckCount;
+      totalCategory = 4 * this.deckCount;
     } else {
       owned = myHandCards.filter(
         (c) => c.rank === declaration.rank && c.suit === declaration.suit,
       ).length;
-      totalAvailable = this.deckCount;
+      totalCategory = this.deckCount;
     }
 
-    // If the bot owns a large share of the total available, it's unlikely the claimant has enough
-    const remainingOutsideHand = totalAvailable - owned;
-    const claimedOutsideHand = declaredCount - owned;
-
-    if (claimedOutsideHand <= 0) return 0.95; // Bot has enough of these cards, claim is almost certainly a lie
-    if (remainingOutsideHand <= 0) return 0.99; // No such cards exist outside bot's hand
-
-    // Probability that claimant actually has `claimedOutsideHand` copies given remaining distribution
-    // Simplified: the higher the proportion needed, the more suspicious
-    const proportionNeeded = claimedOutsideHand / remainingOutsideHand;
-    const suspicion = Math.min(proportionNeeded * 1.5, 0.95);
-
-    // Low card count play is less suspicious
-    if (declaredCount <= 1) {
-      return suspicion * 0.6;
-    }
-
-    return suspicion;
+    return this.categoryLieProb(
+      declaration.count,
+      owned,
+      totalCategory,
+      myHand.length,
+      52 * this.deckCount,
+      claimantHandBefore,
+    );
   }
 
   private estimateDominoLieProb(
     declaration: CardDeclaration & { type: "dominoe" },
     myHand: Card[],
+    claimantHandBefore: number,
   ): number {
-    const value = declaration.value;
-    const declaredCount = declaration.count;
+    const owned = countDominoesWithValue(myHand, declaration.value);
+    // Each value 0..6 appears in 7 dominoes of a double-six set.
+    const totalCategory = 7 * this.deckCount;
 
-    const owned = countDominoesWithValue(myHand, value);
-    const totalAvailable = 7 * this.deckCount;
-
-    const remainingOutsideHand = totalAvailable - owned;
-    const claimedOutsideHand = declaredCount - owned;
-
-    if (claimedOutsideHand <= 0) return 0.95;
-    if (remainingOutsideHand <= 0) return 0.99;
-
-    const proportionNeeded = claimedOutsideHand / remainingOutsideHand;
-    const suspicion = Math.min(proportionNeeded * 1.5, 0.95);
-
-    if (declaredCount <= 1) {
-      return suspicion * 0.6;
-    }
-
-    return suspicion;
+    return this.categoryLieProb(
+      declaration.count,
+      owned,
+      totalCategory,
+      myHand.length,
+      28 * this.deckCount,
+      claimantHandBefore,
+    );
   }
 
   /**
