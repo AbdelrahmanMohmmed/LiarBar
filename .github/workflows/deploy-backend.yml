@@ -1,0 +1,27 @@
+name: Deploy backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "server/**"
+  workflow_dispatch: {}
+
+# Never run two deploys at once; queue instead
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to Azure VM over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          # The CI key on the VM is restricted with a forced command, so this
+          # always runs ~/deploy-liarbar.sh regardless of the script below.
+          script: bash ~/deploy-liarbar.sh

@@ -1,4 +1,42 @@
-# Deploying the backend to DigitalOcean
+# Deploying the backend
+
+## Current production setup (Azure VM)
+
+The backend runs live at **https://liarbar.safariyat.live** on an Azure VM
+(shared with another app), as a Docker container behind the existing Caddy
+reverse proxy which terminates TLS. The frontend is on Vercel at
+https://games.safariyat.live (and https://liar-bar.vercel.app).
+
+- Container: `liarbar`, image `liarbar-server`, joined to the Caddy compose
+  network, published on `127.0.0.1:3001` only (Caddy is the public entry).
+- Env lives in `~/liarbar.env` on the VM (`ALLOWED_ORIGINS=...`).
+- Deploys run `~/deploy-liarbar.sh` on the VM (reference copy:
+  [deploy/deploy-liarbar.sh](deploy/deploy-liarbar.sh)): pull main → docker
+  build → replace container → health check.
+
+### Continuous deployment
+
+[.github/workflows/deploy-backend.yml](.github/workflows/deploy-backend.yml)
+runs the VM deploy script over SSH on every push to `main` that touches
+`server/**` (or manually via *Actions → Deploy backend → Run workflow*).
+
+It needs three **repository secrets** (Settings → Secrets and variables →
+Actions — requires repo admin):
+
+| Secret | Value |
+|---|---|
+| `VM_HOST` | the VM's public IP |
+| `VM_USER` | the SSH user (e.g. `azureuser`) |
+| `VM_SSH_KEY` | a dedicated private key whose public half is in the VM's `~/.ssh/authorized_keys` |
+
+Security: the CI key's `authorized_keys` entry uses a forced command
+(`command="bash ~/deploy-liarbar.sh",no-pty,no-port-forwarding,...`), so even
+if the secret leaks, the key can only trigger a deploy — it cannot open a
+shell on the VM.
+
+---
+
+# Alternative: DigitalOcean
 
 Two supported paths. **App Platform is the recommended one** — no server
 administration, automatic HTTPS, deploy on every push.
