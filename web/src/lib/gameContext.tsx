@@ -13,6 +13,10 @@ import type {
   ChatMessage,
   ToastNotification,
   PlayerData,
+  CodenamesState,
+  CodenamesTeam,
+  CodenamesRole,
+  CodenamesLang,
 } from "./types";
 
 interface GameActions {
@@ -26,6 +30,8 @@ interface GameActions {
     theme?: GameTheme,
     challengeMode?: ChallengeMode,
     challengeDuration?: number,
+    gameId?: string,
+    language?: CodenamesLang,
   ) => Promise<{ roomId: string; playerId: string }>;
   joinRoom: (
     roomId: string,
@@ -53,11 +59,17 @@ interface GameActions {
   ) => void;
   clearToasts: () => void;
   resetGame: () => void;
+  codenamesJoinTeam: (team: CodenamesTeam, role: CodenamesRole) => Promise<void>;
+  codenamesGiveClue: (word: string, count: number) => Promise<void>;
+  codenamesGuess: (cardIndex: number) => Promise<void>;
+  codenamesEndTurn: () => Promise<void>;
+  codenamesRematch: () => Promise<void>;
 }
 
 interface GameContextValue extends GameActions {
   // State
   gameState: GameState | null;
+  codenamesState: CodenamesState | null;
   myHand: Card[];
   isConnected: boolean;
   myPlayerId: string | null;
@@ -73,6 +85,7 @@ const LS_PLAYER_ID = "liarsbar_playerId";
 
 export const [GameProvider, useGame] = createContextHook(() => {
   const [gameState, setGameState] = useState<GameState | null>(null);
+  const [codenamesState, setCodenamesState] = useState<CodenamesState | null>(null);
   const [myHand, setMyHand] = useState<Card[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [myPlayerId, setMyPlayerId] = useState<string | null>(null);
@@ -103,6 +116,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
 
   const resetGame = useCallback(() => {
     setGameState(null);
+    setCodenamesState(null);
     setMyHand([]);
     setChatMessages([]);
     setToasts([]);
@@ -121,12 +135,21 @@ export const [GameProvider, useGame] = createContextHook(() => {
       setIsConnected(false);
     };
 
-    const onGameState = (state: GameState) => {
-      setGameState(state);
+    const onGameState = (state: GameState | CodenamesState) => {
+      if ((state as CodenamesState).gameId === "codenames") {
+        const next = state as CodenamesState;
+        setCodenamesState((prev) => ({ ...next, you: prev?.you, key: prev?.key }));
+      } else {
+        setGameState(state as GameState);
+      }
     };
 
     const onYourHand = (data: { hand: Card[] }) => {
       setMyHand(data.hand);
+    };
+
+    const onCodenamesPrivate = (state: CodenamesState) => {
+      setCodenamesState(state);
     };
 
     const onChatMessage = (msg: ChatMessage) => {
@@ -154,6 +177,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
     socket.on("disconnect", onDisconnect);
     socket.on("game_state", onGameState);
     socket.on("your_hand", onYourHand);
+    socket.on("codenames_private", onCodenamesPrivate);
     socket.on("chat_message", onChatMessage);
     socket.on("webrtc_signal", onWebRTCSignal);
     socket.on("error", onError);
@@ -172,6 +196,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
       socket.off("disconnect", onDisconnect);
       socket.off("game_state", onGameState);
       socket.off("your_hand", onYourHand);
+      socket.off("codenames_private", onCodenamesPrivate);
       socket.off("chat_message", onChatMessage);
       socket.off("webrtc_signal", onWebRTCSignal);
       socket.off("error", onError);
@@ -194,6 +219,14 @@ export const [GameProvider, useGame] = createContextHook(() => {
     [],
   );
 
+  const applyRoomState = useCallback((state: GameState | CodenamesState) => {
+    if ((state as CodenamesState).gameId === "codenames") {
+      setCodenamesState(state as CodenamesState);
+    } else {
+      setGameState(state as GameState);
+    }
+  }, []);
+
     const createRoom = useCallback(
     async (
       playerName: string,
@@ -205,23 +238,25 @@ export const [GameProvider, useGame] = createContextHook(() => {
       theme?: GameTheme,
       challengeMode?: ChallengeMode,
       challengeDuration?: number,
+      gameId?: string,
+      language?: CodenamesLang,
     ): Promise<{ roomId: string; playerId: string }> => {
       connectSocket();
       const res = await emitWithAck<{
         success: boolean;
         roomId: string;
         playerId: string;
-        state: GameState;
-      }>("create_room", { playerName, maxPlayers, variant, deckCount, claimType, revealTime, theme, challengeMode, challengeDuration });
+        state: GameState | CodenamesState;
+      }>("create_room", { playerName, maxPlayers, variant, deckCount, claimType, revealTime, theme, challengeMode, challengeDuration, gameId, language });
 
       setMyRoomId(res.roomId);
       setMyPlayerId(res.playerId);
-      setGameState(res.state);
+      applyRoomState(res.state);
       localStorage.setItem(LS_ROOM_ID, res.roomId);
       localStorage.setItem(LS_PLAYER_ID, res.playerId);
       return { roomId: res.roomId, playerId: res.playerId };
     },
-    [emitWithAck],
+    [emitWithAck, applyRoomState],
   );
 
   const joinRoom = useCallback(
@@ -233,17 +268,17 @@ export const [GameProvider, useGame] = createContextHook(() => {
       const res = await emitWithAck<{
         success: boolean;
         playerId: string;
-        state: GameState;
+        state: GameState | CodenamesState;
       }>("join_room", { roomId: roomId.toUpperCase(), playerName });
 
       setMyRoomId(roomId.toUpperCase());
       setMyPlayerId(res.playerId);
-      setGameState(res.state);
+      applyRoomState(res.state);
       localStorage.setItem(LS_ROOM_ID, roomId.toUpperCase());
       localStorage.setItem(LS_PLAYER_ID, res.playerId);
       return { playerId: res.playerId };
     },
-    [emitWithAck],
+    [emitWithAck, applyRoomState],
   );
 
   const reconnectRoom = useCallback(
@@ -251,11 +286,11 @@ export const [GameProvider, useGame] = createContextHook(() => {
       connectSocket();
       const res = await emitWithAck<{
         success: boolean;
-        state: GameState;
+        state: GameState | CodenamesState;
       }>("reconnect_room", { roomId, playerId });
-      setGameState(res.state);
+      applyRoomState(res.state);
     },
-    [emitWithAck],
+    [emitWithAck, applyRoomState],
   );
 
   const startGame = useCallback(async () => {
@@ -320,6 +355,40 @@ export const [GameProvider, useGame] = createContextHook(() => {
     [myRoomId],
   );
 
+  const codenamesJoinTeam = useCallback(
+    async (team: CodenamesTeam, role: CodenamesRole) => {
+      if (!myRoomId) throw new Error("Not in a room");
+      await emitWithAck("codenames_join_team", { team, role });
+    },
+    [myRoomId, emitWithAck],
+  );
+
+  const codenamesGiveClue = useCallback(
+    async (word: string, count: number) => {
+      if (!myRoomId) throw new Error("Not in a room");
+      await emitWithAck("codenames_give_clue", { word, count });
+    },
+    [myRoomId, emitWithAck],
+  );
+
+  const codenamesGuess = useCallback(
+    async (cardIndex: number) => {
+      if (!myRoomId) throw new Error("Not in a room");
+      await emitWithAck("codenames_guess", { cardIndex });
+    },
+    [myRoomId, emitWithAck],
+  );
+
+  const codenamesEndTurn = useCallback(async () => {
+    if (!myRoomId) throw new Error("Not in a room");
+    await emitWithAck("codenames_end_turn", {});
+  }, [myRoomId, emitWithAck]);
+
+  const codenamesRematch = useCallback(async () => {
+    if (!myRoomId) throw new Error("Not in a room");
+    await emitWithAck("codenames_rematch", {});
+  }, [myRoomId, emitWithAck]);
+
   const sendWebRTCSignal = useCallback(
     (targetId: string, signal: unknown) => {
       if (!myRoomId) return;
@@ -374,6 +443,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
 
   return {
     gameState,
+    codenamesState,
     myHand,
     isConnected,
     myPlayerId,
@@ -396,5 +466,10 @@ export const [GameProvider, useGame] = createContextHook(() => {
     addToast,
     clearToasts,
     resetGame,
+    codenamesJoinTeam,
+    codenamesGiveClue,
+    codenamesGuess,
+    codenamesEndTurn,
+    codenamesRematch,
   };
 });

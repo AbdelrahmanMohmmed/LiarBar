@@ -10,6 +10,10 @@ export function sendPrivateHands(io: Server, room: GameRoom): void {
     if (!player.isBot && player.socketId) {
       const state = room.toPlayerState(player.id) as { hand?: unknown };
       io.to(player.socketId).emit("your_hand", { hand: state.hand ?? [] });
+
+      if (room.gameId === "codenames") {
+        io.to(player.socketId).emit("codenames_private", room.toPlayerState(player.id));
+      }
     }
   }
 }

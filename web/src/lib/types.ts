@@ -174,6 +174,44 @@ const SYMBOL_TO_SUIT: Record<string, Suit> = {
   "\u2660": "spades",
 };
 
+// ===== Codenames =====
+
+export type CodenamesTeam = "red" | "teal";
+export type CodenamesRole = "spymaster" | "operative";
+export type CodenamesLang = "ar" | "en";
+export type CodenamesCardType = "red" | "teal" | "neutral" | "assassin";
+
+export interface CodenamesBoardCard {
+  word: string;
+  revealed: boolean;
+  type?: CodenamesCardType;
+}
+
+export type CodenamesLogEntry =
+  | { kind: "clue"; team: CodenamesTeam; player: string; word: string; count: number }
+  | { kind: "guess"; team: CodenamesTeam; player: string; word: string; result: CodenamesCardType }
+  | { kind: "pass"; team: CodenamesTeam; player: string };
+
+export interface CodenamesState {
+  roomId: string;
+  gameId: "codenames";
+  phase: "lobby" | "playing" | "finished";
+  language: CodenamesLang;
+  maxPlayers: number;
+  players: PlayerData[];
+  assignments: Record<string, { team: CodenamesTeam | null; role: CodenamesRole | null }>;
+  board: CodenamesBoardCard[];
+  startingTeam: CodenamesTeam | null;
+  remaining: { red: number; teal: number };
+  turn: { team: CodenamesTeam; phase: "clue" | "guess" } | null;
+  clue: { word: string; count: number; guessesRemaining: number } | null;
+  log: CodenamesLogEntry[];
+  winner: CodenamesTeam | null;
+  winReason: "all_revealed" | "assassin" | null;
+  you?: { playerId: string; team: CodenamesTeam | null; role: CodenamesRole | null };
+  key?: CodenamesCardType[];
+}
+
 export function parseCardString(cardStr: string): Card | null {
   // Try symbol format: "5♥", "K♠"
   const symbol = cardStr.slice(-1);

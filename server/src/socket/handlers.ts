@@ -13,6 +13,7 @@ import { GameManager } from "../games/liars-bar/GameManager.js";
 import type { CardDeclaration } from "../games/liars-bar/Deck.js";
 import type { BotDifficulty } from "../games/liars-bar/BotAI.js";
 import type { Player } from "../games/liars-bar/Player.js";
+import { CodenamesGame } from "../games/codenames/CodenamesGame.js";
 
 type Ack = ((response: unknown) => void) | undefined;
 
@@ -80,6 +81,20 @@ export function registerSocketHandlers(
       return { room: m.room, player: m.player };
     }
 
+    /** Narrow a generic room to the Codenames engine for game actions. */
+    function codenamesMembership(callback: Ack) {
+      const m = membership();
+      if (!m) {
+        fail(callback, "Not in a room");
+        return null;
+      }
+      if (!(m.room instanceof CodenamesGame)) {
+        fail(callback, "Action not supported by this game");
+        return null;
+      }
+      return { room: m.room, player: m.player };
+    }
+
     // ===== ROOM LIFECYCLE =====
 
     socket.on(
@@ -101,22 +116,37 @@ export function registerSocketHandlers(
             return;
           }
 
+          const gameId = data.gameId || DEFAULT_GAME_ID;
           const maxPlayers = Number(data.maxPlayers);
-          const deckCount = Number(data.deckCount);
-          if (!Number.isInteger(maxPlayers) || maxPlayers < 2 || maxPlayers > 6) {
-            fail(callback, "Players must be between 2 and 6");
-            return;
-          }
-          if (!Number.isInteger(deckCount) || deckCount < 1 || deckCount > 4) {
-            fail(callback, "Deck count must be between 1 and 4");
-            return;
-          }
-          if (data.variant !== "cards" && data.variant !== "dominoes") {
-            fail(callback, "Unknown game variant");
+
+          if (gameId === DEFAULT_GAME_ID) {
+            const deckCount = Number(data.deckCount);
+            if (!Number.isInteger(maxPlayers) || maxPlayers < 2 || maxPlayers > 6) {
+              fail(callback, "Players must be between 2 and 6");
+              return;
+            }
+            if (!Number.isInteger(deckCount) || deckCount < 1 || deckCount > 4) {
+              fail(callback, "Deck count must be between 1 and 4");
+              return;
+            }
+            if (data.variant !== "cards" && data.variant !== "dominoes") {
+              fail(callback, "Unknown game variant");
+              return;
+            }
+          } else if (gameId === "codenames") {
+            if (!Number.isInteger(maxPlayers) || maxPlayers < 4 || maxPlayers > 10) {
+              fail(callback, "Players must be between 4 and 10");
+              return;
+            }
+            if (data.language !== "ar" && data.language !== "en") {
+              fail(callback, "Language must be 'ar' or 'en'");
+              return;
+            }
+          } else {
+            fail(callback, `Unknown game: ${gameId}`);
             return;
           }
 
-          const gameId = data.gameId || DEFAULT_GAME_ID;
           const roomId = registry.generateRoomCode();
 
           const room = createGameRoom(gameId, roomId, data, {
@@ -373,6 +403,87 @@ export function registerSocketHandlers(
         success: true,
         state: m.room.toPlayerState(m.player.id),
       });
+    });
+
+    // ===== GAMEPLAY (Codenames) =====
+
+    socket.on(
+      "codenames_join_team",
+      (data: { team: "red" | "teal"; role: "spymaster" | "operative" }, callback: Ack) => {
+        const m = codenamesMembership(callback);
+        if (!m) return;
+
+        const result = m.room.joinTeam(m.player.id, data?.team, data?.role);
+        if (!result.success) {
+          fail(callback, result.error ?? "Cannot join team");
+          return;
+        }
+        reply(callback, { success: true });
+      },
+    );
+
+    socket.on(
+      "codenames_give_clue",
+      (data: { word: string; count: number }, callback: Ack) => {
+        const m = codenamesMembership(callback);
+        if (!m) return;
+
+        const word = typeof data?.word === "string" ? data.word.trim().slice(0, 30) : "";
+        const result = m.room.giveClue(m.player.id, word, Number(data?.count));
+        if (!result.success) {
+          fail(callback, result.error ?? "Cannot give clue");
+          return;
+        }
+        reply(callback, { success: true });
+      },
+    );
+
+    socket.on(
+      "codenames_guess",
+      (data: { cardIndex: number }, callback: Ack) => {
+        const m = codenamesMembership(callback);
+        if (!m) return;
+
+        const cardIndex = Number(data?.cardIndex);
+        if (!Number.isInteger(cardIndex) || cardIndex < 0 || cardIndex > 24) {
+          fail(callback, "Invalid card index");
+          return;
+        }
+        const result = m.room.guessCard(m.player.id, cardIndex);
+        if (!result.success) {
+          fail(callback, result.error ?? "Cannot guess");
+          return;
+        }
+        reply(callback, { success: true });
+      },
+    );
+
+    socket.on("codenames_end_turn", (_data: unknown, callback: Ack) => {
+      const m = codenamesMembership(callback);
+      if (!m) return;
+
+      const result = m.room.endTurn(m.player.id);
+      if (!result.success) {
+        fail(callback, result.error ?? "Cannot end turn");
+        return;
+      }
+      reply(callback, { success: true });
+    });
+
+    socket.on("codenames_rematch", (_data: unknown, callback: Ack) => {
+      const m = hostMembership(callback);
+      if (!m) return;
+      if (!(m.room instanceof CodenamesGame)) {
+        fail(callback, "Action not supported by this game");
+        return;
+      }
+
+      const result = m.room.rematch(m.player.id);
+      if (!result.success) {
+        fail(callback, result.error ?? "Cannot start rematch");
+        return;
+      }
+      reply(callback, { success: true });
     });
 
     // ===== CHAT =====

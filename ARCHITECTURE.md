@@ -32,6 +32,7 @@ hands are sent only to their owner via the `your_hand` event; the public
 | `games/types.ts` | `GameRoom` contract every game engine implements |
 | `games/registry.ts` | Maps `gameId` → engine factory (`create_room` picks the game) |
 | `games/liars-bar/` | The Liar's Bar engine: `GameManager` (rules + phases + timers), `Deck`, `Player`, `BotAI`, `Validation` |
+| `games/codenames/` | The Codenames engine: `CodenamesGame` (rules + phases), `board` (shuffle, generateKey, pickWords), `validation`, `words/` (bilingual static lists) |
 
 ### Key design rules
 
