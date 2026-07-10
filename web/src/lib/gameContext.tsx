@@ -234,9 +234,11 @@ export const [GameProvider, useGame] = createContextHook(() => {
     [],
   );
 
-  const applyRoomState = useCallback((state: GameState | CodenamesState) => {
+  const applyRoomState = useCallback((state: GameState | CodenamesState | HigherLowerState) => {
     if ((state as CodenamesState).gameId === "codenames") {
       setCodenamesState(state as CodenamesState);
+    } else if ((state as HigherLowerState).gameId === "higher-lower") {
+      setHigherLowerState(state as HigherLowerState);
     } else {
       setGameState(state as GameState);
     }
