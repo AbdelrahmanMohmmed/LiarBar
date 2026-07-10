@@ -55,3 +55,18 @@ httpServer.listen(config.port, "0.0.0.0", () => {
   console.log(`Liar's Bar server running on port ${config.port} (0.0.0.0)`);
   console.log(`Allowed origins: ${config.allowedOrigins.join(", ")}`);
 });
+
+// Graceful shutdown so platform restarts/redeploys (e.g. DigitalOcean)
+// close sockets cleanly instead of dropping clients mid-write.
+function shutdown(signal: string): void {
+  console.log(`${signal} received, shutting down...`);
+  registry.stopSweeper();
+  io.close(() => {
+    console.log("All connections closed");
+    process.exit(0);
+  });
+  // Force-exit if connections don't drain in time
+  setTimeout(() => process.exit(0), 5000).unref();
+}
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
