@@ -17,11 +17,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Deploy to Azure VM over SSH
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.VM_HOST }}
-          username: ${{ secrets.VM_USER }}
-          key: ${{ secrets.VM_SSH_KEY }}
-          # The CI key on the VM is restricted with a forced command, so this
-          # always runs ~/deploy-liarbar.sh regardless of the script below.
-          script: bash ~/deploy-liarbar.sh
+        env:
+          # VM_SSH_KEY is the private key encoded as base64 (single line),
+          # which survives copy-paste into the secrets UI unaltered.
+          VM_SSH_KEY_B64: ${{ secrets.VM_SSH_KEY }}
+          VM_HOST: ${{ secrets.VM_HOST }}
+          VM_USER: ${{ secrets.VM_USER }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s' "$VM_SSH_KEY_B64" | base64 -d > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          # The key is restricted on the VM with a forced command, so the
+          # remote command below is ignored and ~/deploy-liarbar.sh runs.
+          ssh -i ~/.ssh/deploy_key \
+              -o BatchMode=yes \
+              -o StrictHostKeyChecking=accept-new \
+              -o ConnectTimeout=30 \
+              "$VM_USER@$VM_HOST" deploy

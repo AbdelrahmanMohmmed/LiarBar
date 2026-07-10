@@ -27,7 +27,7 @@ Actions — requires repo admin):
 |---|---|
 | `VM_HOST` | the VM's public IP |
 | `VM_USER` | the SSH user (e.g. `azureuser`) |
-| `VM_SSH_KEY` | a dedicated private key whose public half is in the VM's `~/.ssh/authorized_keys` |
+| `VM_SSH_KEY` | a dedicated private key, **base64-encoded to a single line** (`[Convert]::ToBase64String([IO.File]::ReadAllBytes("path\to\key"))` on Windows, `base64 -w0 key` on Linux); its public half is in the VM's `~/.ssh/authorized_keys` |
 
 Security: the CI key's `authorized_keys` entry uses a forced command
 (`command="bash ~/deploy-liarbar.sh",no-pty,no-port-forwarding,...`), so even
