@@ -212,6 +212,44 @@ export interface CodenamesState {
   key?: CodenamesCardType[];
 }
 
+// ===== Higher or Lower =====
+
+export interface HigherLowerPlayerState {
+  playerId: string;
+  score: number;
+  streak: number;
+  lowerBound: number | null;
+  upperBound: number | null;
+  lastGuess: number | null;
+  lastGuessResult: "higher" | "lower" | "correct" | null;
+  isTurn: boolean;
+}
+
+export interface HigherLowerRoundRecap {
+  winnerId: string;
+  winnerName: string;
+  winnerScore: number;
+  winnerStreak: number;
+  pointsGained: number;
+  secretNumbers: Record<string, number>;
+}
+
+export interface HigherLowerState {
+  roomId: string;
+  gameId: "higher-lower";
+  phase: "lobby" | "playing" | "round_recap" | "game_over";
+  maxPlayers: number;
+  players: PlayerData[];
+  playerStates: Record<string, HigherLowerPlayerState>;
+  activePlayerId: string | null;
+  turnTimeLimit: number;
+  turnDeadline: number | null;
+  roundNumber: number;
+  winnerId: string | null;
+  recap: HigherLowerRoundRecap | null;
+  mySecretNumber?: number; // only populated for the owner
+}
+
 export function parseCardString(cardStr: string): Card | null {
   // Try symbol format: "5♥", "K♠"
   const symbol = cardStr.slice(-1);

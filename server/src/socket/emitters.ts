@@ -14,6 +14,9 @@ export function sendPrivateHands(io: Server, room: GameRoom): void {
       if (room.gameId === "codenames") {
         io.to(player.socketId).emit("codenames_private", room.toPlayerState(player.id));
       }
+      if (room.gameId === "higher-lower") {
+        io.to(player.socketId).emit("higher_lower_private", room.toPlayerState(player.id));
+      }
     }
   }
 }

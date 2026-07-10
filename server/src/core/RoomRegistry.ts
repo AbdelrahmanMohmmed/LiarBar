@@ -8,8 +8,8 @@ export interface SocketSession {
   playerId: string;
 }
 
-/** Unambiguous room codes: no 0/O, 1/I/L, or lowercase. */
-const roomCode = customAlphabet("23456789ABCDEFGHJKMNPQRSTUVWXYZ", 6);
+/** Unambiguous room codes: numbers only. */
+const roomCode = customAlphabet("0123456789", 6);
 
 /**
  * Owns all live rooms and socket sessions for this node.
