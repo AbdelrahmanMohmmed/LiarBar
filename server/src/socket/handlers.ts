@@ -14,6 +14,7 @@ import type { CardDeclaration } from "../games/liars-bar/Deck.js";
 import type { BotDifficulty } from "../games/liars-bar/BotAI.js";
 import type { Player } from "../games/liars-bar/Player.js";
 import { CodenamesGame } from "../games/codenames/CodenamesGame.js";
+import { HigherLowerGame } from "../games/higher-lower/HigherLowerGame.js";
 
 type Ack = ((response: unknown) => void) | undefined;
 
@@ -95,6 +96,20 @@ export function registerSocketHandlers(
       return { room: m.room, player: m.player };
     }
 
+    /** Narrow a generic room to the Higher or Lower engine for game actions. */
+    function higherLowerMembership(callback: Ack) {
+      const m = membership();
+      if (!m) {
+        fail(callback, "Not in a room");
+        return null;
+      }
+      if (!(m.room instanceof HigherLowerGame)) {
+        fail(callback, "Action not supported by this game");
+        return null;
+      }
+      return { room: m.room, player: m.player };
+    }
+
     // ===== ROOM LIFECYCLE =====
 
     socket.on(
@@ -140,6 +155,11 @@ export function registerSocketHandlers(
             }
             if (data.language !== "ar" && data.language !== "en") {
               fail(callback, "Language must be 'ar' or 'en'");
+              return;
+            }
+          } else if (gameId === "higher-lower") {
+            if (!Number.isInteger(maxPlayers) || maxPlayers < 2 || maxPlayers > 6) {
+              fail(callback, "Players must be between 2 and 6");
               return;
             }
           } else {
@@ -483,6 +503,38 @@ export function registerSocketHandlers(
         fail(callback, result.error ?? "Cannot start rematch");
         return;
       }
+      reply(callback, { success: true });
+    });
+
+    socket.on("higher_lower_guess", (data: { guess: number }, callback: Ack) => {
+      const m = higherLowerMembership(callback);
+      if (!m) return;
+
+      const guess = Number(data?.guess);
+      if (!Number.isInteger(guess) || guess < 1 || guess > 99) {
+        fail(callback, "Invalid guess");
+        return;
+      }
+
+      const result = m.room.submitGuess(m.player.id, guess);
+      if (!result.success) {
+        fail(callback, result.error ?? "Cannot guess");
+        return;
+      }
+
+      reply(callback, { success: true });
+    });
+
+    socket.on("higher_lower_rematch", (_data: unknown, callback: Ack) => {
+      const m = higherLowerMembership(callback);
+      if (!m) return;
+
+      const result = m.room.rematch(m.player.id);
+      if (!result.success) {
+        fail(callback, result.error ?? "Cannot start rematch");
+        return;
+      }
+
       reply(callback, { success: true });
     });
 

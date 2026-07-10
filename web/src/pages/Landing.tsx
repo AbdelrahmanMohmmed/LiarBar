@@ -24,6 +24,9 @@ const COPY = {
     game2Title: "كودنيمز",
     game2Subtitle: "Codenames",
     game2Desc: "لعبة تخمين الكلمات بالفرق، العبها الآن مع أصدقائك!",
+    game3Title: "أعلى أو أقل",
+    game3Subtitle: "Higher or Lower",
+    game3Desc: "لعبة تخمين رقمك السري، شارك تخميناتك واعرف من يقترب للرقم السري أولاً!",
     notifyLabel: "العب الآن",
     footerText: "© 2026 ألعاب سفريات — العب في أي وقت، في أي مكان.",
   },
@@ -41,6 +44,9 @@ const COPY = {
     game2Title: "Codenames",
     game2Subtitle: "كودنيمز",
     game2Desc: "The classic team word-guessing game — play it now with your friends!",
+    game3Title: "Higher or Lower",
+    game3Subtitle: "أعلى أو أقل",
+    game3Desc: "A fun number guessing game. Compare ranges with others and see who finds their secret number first!",
     notifyLabel: "Play now",
     footerText: "© 2026 Safariyat Games — play anytime, anywhere.",
   },
@@ -62,6 +68,7 @@ export default function Landing() {
 
   const goToPlay = useCallback(() => navigate("/play"), [navigate]);
   const goToCodenames = useCallback(() => navigate("/codenames"), [navigate]);
+  const goToHigherLower = useCallback(() => navigate("/higher-lower"), [navigate]);
 
   return (
     <div
@@ -391,6 +398,126 @@ export default function Landing() {
                 }}
               >
                 {c.notifyLabel}
+              </button>
+            </div>
+          </article>
+
+          {/* Higher or Lower — available */}
+          <article
+            style={{
+              animation: "dc-pop-in 0.5s ease 0.2s both",
+              background: "#FFFFFF",
+              borderRadius: 24,
+              border: "3px solid #2B2420",
+              overflow: "hidden",
+              boxShadow: "6px 6px 0 #2B2420",
+            }}
+          >
+            <div
+              style={{
+                height: 140,
+                background: "#FEF3C7", // Soft warm yellow
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 16,
+                position: "relative",
+              }}
+            >
+              <div
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: "50%",
+                  background: "#3AA6A6",
+                  color: "#FDF6EC",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 22,
+                  fontWeight: 800,
+                  border: "3.5px solid #2B2420",
+                  boxShadow: "3px 3px 0 #2B2420",
+                  transform: "rotate(-8deg)",
+                }}
+              >
+                ↑
+              </div>
+              <div
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: "50%",
+                  background: "#E8574A",
+                  color: "#FDF6EC",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 22,
+                  fontWeight: 800,
+                  border: "3.5px solid #2B2420",
+                  boxShadow: "3px 3px 0 #2B2420",
+                  transform: "rotate(8deg)",
+                }}
+              >
+                ↓
+              </div>
+              <span
+                style={{
+                  position: "absolute",
+                  top: 10,
+                  [badgeSide]: 10,
+                  background: "#3AA6A6",
+                  color: "#FDF6EC",
+                  fontFamily: BUTTON_FONT,
+                  fontWeight: 700,
+                  fontSize: 12,
+                  padding: "5px 12px",
+                  borderRadius: 999,
+                  animation: "dc-float-badge 2.4s ease-in-out infinite",
+                }}
+              >
+                {c.availableLabel}
+              </span>
+            </div>
+            <div
+              style={{
+                padding: "16px 20px 20px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 10,
+                textAlign,
+              }}
+            >
+              <div>
+                <div style={{ fontFamily: font, fontWeight: 800, fontSize: 22, color: "#2B2420" }}>
+                  {c.game3Title}
+                </div>
+                <div style={{ fontFamily: font, fontSize: 14, color: "#8A7F73", marginTop: 2 }}>
+                  {c.game3Subtitle}
+                </div>
+              </div>
+              <p style={{ fontFamily: font, fontSize: 14, lineHeight: 1.6, color: "#5B5147", margin: 0 }}>
+                {c.game3Desc}
+              </p>
+              <button
+                onClick={goToHigherLower}
+                className="dc-play-btn"
+                style={{
+                  alignSelf: buttonAlign,
+                  marginTop: 4,
+                  background: "#E8574A",
+                  color: "#FDF6EC",
+                  border: "none",
+                  fontFamily: BUTTON_FONT,
+                  fontWeight: 700,
+                  fontSize: 15,
+                  padding: "10px 22px",
+                  borderRadius: 999,
+                  cursor: "pointer",
+                }}
+              >
+                {c.playLabel}
               </button>
             </div>
           </article>

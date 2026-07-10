@@ -12,6 +12,9 @@ import Game from "./pages/Game";
 import CodenamesHome from "./pages/codenames/CodenamesHome";
 import CodenamesRoom from "./pages/codenames/CodenamesRoom";
 import CodenamesGame from "./pages/codenames/CodenamesGame";
+import HigherLowerHome from "./pages/higher-lower/HigherLowerHome";
+import HigherLowerRoom from "./pages/higher-lower/HigherLowerRoom";
+import HigherLowerGame from "./pages/higher-lower/HigherLowerGame";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -64,6 +67,9 @@ const App = () => (
             <Route path="/codenames" element={<CodenamesHome />} />
             <Route path="/codenames/room/:roomId" element={<CodenamesRoom />} />
             <Route path="/codenames/game/:roomId" element={<CodenamesGame />} />
+            <Route path="/higher-lower" element={<HigherLowerHome />} />
+            <Route path="/higher-lower/room/:roomId" element={<HigherLowerRoom />} />
+            <Route path="/higher-lower/game/:roomId" element={<HigherLowerGame />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

@@ -17,6 +17,7 @@ import type {
   CodenamesTeam,
   CodenamesRole,
   CodenamesLang,
+  HigherLowerState,
 } from "./types";
 
 interface GameActions {
@@ -64,12 +65,15 @@ interface GameActions {
   codenamesGuess: (cardIndex: number) => Promise<void>;
   codenamesEndTurn: () => Promise<void>;
   codenamesRematch: () => Promise<void>;
+  higherLowerGuess: (guess: number) => Promise<void>;
+  higherLowerRematch: () => Promise<void>;
 }
 
 interface GameContextValue extends GameActions {
   // State
   gameState: GameState | null;
   codenamesState: CodenamesState | null;
+  higherLowerState: HigherLowerState | null;
   myHand: Card[];
   isConnected: boolean;
   myPlayerId: string | null;
@@ -86,6 +90,7 @@ const LS_PLAYER_ID = "liarsbar_playerId";
 export const [GameProvider, useGame] = createContextHook(() => {
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [codenamesState, setCodenamesState] = useState<CodenamesState | null>(null);
+  const [higherLowerState, setHigherLowerState] = useState<HigherLowerState | null>(null);
   const [myHand, setMyHand] = useState<Card[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [myPlayerId, setMyPlayerId] = useState<string | null>(null);
@@ -117,6 +122,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
   const resetGame = useCallback(() => {
     setGameState(null);
     setCodenamesState(null);
+    setHigherLowerState(null);
     setMyHand([]);
     setChatMessages([]);
     setToasts([]);
@@ -135,10 +141,13 @@ export const [GameProvider, useGame] = createContextHook(() => {
       setIsConnected(false);
     };
 
-    const onGameState = (state: GameState | CodenamesState) => {
+    const onGameState = (state: GameState | CodenamesState | HigherLowerState) => {
       if ((state as CodenamesState).gameId === "codenames") {
         const next = state as CodenamesState;
         setCodenamesState((prev) => ({ ...next, you: prev?.you, key: prev?.key }));
+      } else if ((state as HigherLowerState).gameId === "higher-lower") {
+        const next = state as HigherLowerState;
+        setHigherLowerState((prev) => ({ ...next, mySecretNumber: prev?.mySecretNumber }));
       } else {
         setGameState(state as GameState);
       }
@@ -150,6 +159,10 @@ export const [GameProvider, useGame] = createContextHook(() => {
 
     const onCodenamesPrivate = (state: CodenamesState) => {
       setCodenamesState(state);
+    };
+
+    const onHigherLowerPrivate = (state: HigherLowerState) => {
+      setHigherLowerState(state);
     };
 
     const onChatMessage = (msg: ChatMessage) => {
@@ -178,6 +191,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
     socket.on("game_state", onGameState);
     socket.on("your_hand", onYourHand);
     socket.on("codenames_private", onCodenamesPrivate);
+    socket.on("higher_lower_private", onHigherLowerPrivate);
     socket.on("chat_message", onChatMessage);
     socket.on("webrtc_signal", onWebRTCSignal);
     socket.on("error", onError);
@@ -197,6 +211,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
       socket.off("game_state", onGameState);
       socket.off("your_hand", onYourHand);
       socket.off("codenames_private", onCodenamesPrivate);
+      socket.off("higher_lower_private", onHigherLowerPrivate);
       socket.off("chat_message", onChatMessage);
       socket.off("webrtc_signal", onWebRTCSignal);
       socket.off("error", onError);
@@ -389,6 +404,16 @@ export const [GameProvider, useGame] = createContextHook(() => {
     await emitWithAck("codenames_rematch", {});
   }, [myRoomId, emitWithAck]);
 
+  const higherLowerGuess = useCallback(async (guess: number) => {
+    if (!myRoomId) throw new Error("Not in a room");
+    await emitWithAck("higher_lower_guess", { guess });
+  }, [myRoomId, emitWithAck]);
+
+  const higherLowerRematch = useCallback(async () => {
+    if (!myRoomId) throw new Error("Not in a room");
+    await emitWithAck("higher_lower_rematch", {});
+  }, [myRoomId, emitWithAck]);
+
   const sendWebRTCSignal = useCallback(
     (targetId: string, signal: unknown) => {
       if (!myRoomId) return;
@@ -444,6 +469,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
   return {
     gameState,
     codenamesState,
+    higherLowerState,
     myHand,
     isConnected,
     myPlayerId,
@@ -471,5 +497,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
     codenamesGuess,
     codenamesEndTurn,
     codenamesRematch,
+    higherLowerGuess,
+    higherLowerRematch,
   };
 });
