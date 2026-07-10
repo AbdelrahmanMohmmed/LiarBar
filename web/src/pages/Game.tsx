@@ -18,6 +18,7 @@ export default function Game() {
   const { roomId: paramRoomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
   const {
+    lobbyState,
     gameState,
     myHand,
     myPlayerId,
@@ -300,7 +301,7 @@ export default function Game() {
               </span>
             )}
           </button>
-          <VoiceControls roomId={paramRoomId!} />
+          {!lobbyState && <VoiceControls roomId={paramRoomId!} />}
         </div>
       </div>
 

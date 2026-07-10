@@ -10,7 +10,11 @@ interface VoiceControlsProps {
 export const VoiceControls = memo(function VoiceControls({
   roomId,
 }: VoiceControlsProps) {
-  const { gameState, myPlayerId, sendWebRTCSignal, addToast } = useGame();
+  const { lobbyState, gameState, codenamesState, higherLowerState, myPlayerId, sendWebRTCSignal, addToast } = useGame();
+
+  const activePlayers = lobbyState
+    ? lobbyState.players
+    : (gameState || codenamesState || higherLowerState)?.players ?? [];
   const [isMuted, setIsMuted] = useState(true);
   const [isConnecting, setIsConnecting] = useState(false);
 
@@ -196,16 +200,16 @@ export const VoiceControls = memo(function VoiceControls({
 
   // Monitor room players and connect automatically
   useEffect(() => {
-    if (!gameState || !myPlayerId) return;
+    if (!myPlayerId) return;
 
-    const otherPlayers = gameState.players.filter(
+    const otherPlayers = activePlayers.filter(
       (p) => p.id !== myPlayerId && !p.isBot && p.isConnected
     );
 
     for (const player of otherPlayers) {
       connectToPeer(player.id);
     }
-  }, [gameState, myPlayerId, connectToPeer]);
+  }, [activePlayers, myPlayerId, connectToPeer]);
 
   // Handle WebRTC signals from signaling server
   useEffect(() => {
@@ -296,7 +300,7 @@ export const VoiceControls = memo(function VoiceControls({
     };
   }, [stopVoice]);
 
-  const voiceActivePlayers = gameState?.players.filter(
+  const voiceActivePlayers = activePlayers.filter(
     (p) => p.id !== myPlayerId && !p.isBot && p.isConnected
   ).length ?? 0;
 

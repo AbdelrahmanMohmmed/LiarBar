@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useGame } from "@/lib/gameContext";
 import { useLanguage } from "@/lib/languageContext";
+import { Seo } from "@/lib/seo";
 import { LangToggle } from "@/components/LangToggle";
 import { GuideModal } from "@/components/GuideModal";
 import { ThemeSelector } from "@/components/ThemeSelector";
@@ -13,7 +14,7 @@ import { isFirebaseConfigured, signInWithGoogle, onAuthChange } from "@/lib/fire
 export default function Index() {
   const navigate = useNavigate();
   const { createRoom, joinRoom, addToast } = useGame();
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const { theme } = useTheme();
 
   const [playerName, setPlayerName] = useState("");
@@ -103,6 +104,32 @@ export default function Index() {
   }, [playerName, joinRoomId, joinRoom, navigate, addToast]);
 
   return (
+    <>
+    <Seo
+      lang={lang === "ar" ? "ar" : "en"}
+      title={lang === "ar" ? "أشك (Liar's Bar) — لعبة الخداع والكذب أونلاين" : "Liar's Bar — Online multiplayer bluffing card game"}
+      description={
+        lang === "ar"
+          ? "العب أشك أونلاين مع أصدقائك — لعبة خداع وكذب بالورق. اكشف الكذابين وكن أول من يفرغ يده. مجاناً."
+          : "Play Liar's Bar online — a real-time multiplayer bluffing card game. Call out the liars and be first to empty your hand. Free, no download."
+      }
+      path="/play"
+      jsonLd={{
+        "@context": "https://schema.org",
+        "@type": "VideoGame",
+        name: "Liar's Bar",
+        alternateName: "أشك",
+        url: "https://games.safariyat.live/play",
+        description:
+          "A real-time multiplayer bluffing card game — play cards, call out liars, and be the first to empty your hand.",
+        genre: ["Party", "Bluffing", "Card game"],
+        playMode: "MultiPlayer",
+        gamePlatform: "Web browser",
+        operatingSystem: "Any",
+        applicationCategory: "Game",
+        offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+      }}
+    />
     <div className="min-h-screen bg-gradient-to-b from-[#1a0a0a] via-[#2d1111] to-[#1a0a0a] flex flex-col items-center justify-center p-4 py-8">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-amber-600/5 rounded-full blur-3xl" />
@@ -419,5 +446,6 @@ export default function Index() {
         onClose={() => setShowGuide(false)}
       />
     </div>
+    </>
   );
 }

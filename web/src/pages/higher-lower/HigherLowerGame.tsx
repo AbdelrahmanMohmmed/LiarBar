@@ -88,6 +88,7 @@ export default function HigherLowerGame() {
   const { roomId: paramRoomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
   const {
+    lobbyState,
     higherLowerState, myPlayerId, myRoomId, reconnectRoom,
     higherLowerGuess, higherLowerRematch, sendChat, chatMessages, addToast, resetGame
   } = useGame();
@@ -340,7 +341,7 @@ export default function HigherLowerGame() {
           >
             {c.howToPlay}
           </button>
-          <VoiceControls roomId={higherLowerState.roomId} />
+          {!lobbyState && <VoiceControls roomId={higherLowerState.roomId} />}
         </div>
       </div>
 
