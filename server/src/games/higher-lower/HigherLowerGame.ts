@@ -311,7 +311,7 @@ export class HigherLowerGame implements GameRoom {
       // Correct guess! Player wins the round
       state.lastGuessResult = "correct";
       state.streak += 1;
-      const pointsGained = state.streak >= 2 ? 2 : 1;
+      const pointsGained = state.streak >= 2 ? 3 : 2;
       state.score += pointsGained;
 
       // Reset streaks of all other players

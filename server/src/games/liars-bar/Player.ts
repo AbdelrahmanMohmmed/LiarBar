@@ -32,6 +32,7 @@ export class Player {
   avatarUrl?: string;
   socketId?: string;
   stats: PlayerStats;
+  consecutiveTimeouts: number;
 
   constructor(
     id: string,
@@ -43,6 +44,7 @@ export class Player {
     this.id = id;
     this.name = name;
     this.isBot = isBot;
+    this.consecutiveTimeouts = 0;
     this.isHost = isHost;
     this.hand = [];
     this.isConnected = !isBot;

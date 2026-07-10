@@ -112,6 +112,7 @@ export interface GameState {
   skipVotes: string[]; // playerIds who voted to skip
   skipVotesNeeded: number; // how many votes needed to skip
   challengeStartedAt: number | null; // timestamp when challenge window opened
+  turnDeadline: number | null; // turn limit timestamp
 }
 
 export interface ChatMessage {
