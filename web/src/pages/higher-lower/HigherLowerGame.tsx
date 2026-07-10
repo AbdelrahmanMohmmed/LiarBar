@@ -44,6 +44,7 @@ const COPY = {
     yourSecretNumber: "رقمك السري للجولة: {num}",
     streakText: "متتالي {streak}",
     you: "أنت",
+    youWonRound: "لقد فزت بالجولة! 🎉",
   },
   en: {
     back: "Leave",
@@ -78,6 +79,7 @@ const COPY = {
     yourSecretNumber: "Your secret number: {num}",
     streakText: "{streak} streak",
     you: "you",
+    youWonRound: "You won the round! 🎉",
   },
 } as const;
 
@@ -235,6 +237,10 @@ export default function HigherLowerGame() {
     ? higherLowerState.playerStates[higherLowerState.activePlayerId]
     : null;
 
+  const myPlayerState = myPlayerId
+    ? higherLowerState.playerStates[myPlayerId]
+    : null;
+
   return (
     <div
       dir={dir}
@@ -371,8 +377,8 @@ export default function HigherLowerGame() {
                 height: 60,
                 borderRadius: "50%",
                 border: `2px solid ${COLORS.ink}`,
-                background: activeState?.lowerBound ? COLORS.white : COLORS.disabledBg,
-                color: activeState?.lowerBound ? COLORS.teal : COLORS.disabledText,
+                background: myPlayerState?.lowerBound ? COLORS.white : COLORS.disabledBg,
+                color: myPlayerState?.lowerBound ? COLORS.teal : COLORS.disabledText,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -381,7 +387,7 @@ export default function HigherLowerGame() {
                 boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
               }}
             >
-              {activeState?.lowerBound ?? "--"}
+              {myPlayerState?.lowerBound ?? "--"}
             </div>
             <span style={{ color: COLORS.teal, fontWeight: 800, fontSize: 16, marginTop: 4 }}>
               ↑
@@ -396,8 +402,8 @@ export default function HigherLowerGame() {
                 height: 60,
                 borderRadius: "50%",
                 border: `2px solid ${COLORS.ink}`,
-                background: activeState?.upperBound ? COLORS.white : COLORS.disabledBg,
-                color: activeState?.upperBound ? COLORS.red : COLORS.disabledText,
+                background: myPlayerState?.upperBound ? COLORS.white : COLORS.disabledBg,
+                color: myPlayerState?.upperBound ? COLORS.red : COLORS.disabledText,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -406,7 +412,7 @@ export default function HigherLowerGame() {
                 boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
               }}
             >
-              {activeState?.upperBound ?? "--"}
+              {myPlayerState?.upperBound ?? "--"}
             </div>
             <span style={{ color: COLORS.red, fontWeight: 800, fontSize: 16, marginTop: 4 }}>
               ↓
@@ -443,13 +449,6 @@ export default function HigherLowerGame() {
           </div>
         )}
 
-        {/* Private Secret Number indicator */}
-        {higherLowerState.phase === "playing" && higherLowerState.mySecretNumber && (
-          <p style={{ margin: "12px 0 0 0", fontSize: 13, color: COLORS.textSecondary, fontWeight: 700 }}>
-            {c.yourSecretNumber.replace("{num}", String(higherLowerState.mySecretNumber))}
-          </p>
-        )}
-
         {/* Guess input form */}
         {isMyTurn && (
           <form onSubmit={handleSubmitGuess} style={{ marginTop: 20, display: "flex", flexDirection: "column", gap: 10 }}>
@@ -470,7 +469,7 @@ export default function HigherLowerGame() {
               type="number"
               pattern="[0-9]*"
               inputMode="numeric"
-              placeholder="50"
+              placeholder="(1-99)"
               min={1}
               max={99}
               value={guessInput}
@@ -618,9 +617,15 @@ export default function HigherLowerGame() {
             </h2>
 
             <div style={{ margin: "20px 0" }}>
-              <p style={{ fontSize: 18, fontWeight: 800 }}>
-                {c.winnerName.replace("{name}", higherLowerState.recap.winnerName)}
-              </p>
+              {higherLowerState.recap.winnerId === myPlayerId ? (
+                <p style={{ fontSize: 20, fontWeight: 800, color: COLORS.teal }}>
+                  {c.youWonRound}
+                </p>
+              ) : (
+                <p style={{ fontSize: 18, fontWeight: 800 }}>
+                  {c.winnerName.replace("{name}", higherLowerState.recap.winnerName)}
+                </p>
+              )}
               <p style={{ fontSize: 14, color: COLORS.teal, fontWeight: 700 }}>
                 {c.pointsGained.replace("{points}", String(higherLowerState.recap.pointsGained))}
               </p>
