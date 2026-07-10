@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useGame } from "@/lib/gameContext";
 import { useLanguage } from "@/lib/languageContext";
 import { COLORS, uiFont } from "./theme";
+import { playTickSfx, playWinSfx, playTimeoutSfx } from "@/utils/sfx";
 import { Panel, PrimaryButton, SecondaryButton } from "./ui";
 import { VoiceControls } from "@/components/VoiceControls";
 import {
@@ -141,6 +142,40 @@ export default function HigherLowerGame() {
 
     return () => clearInterval(interval);
   }, [higherLowerState]);
+
+  // Audio effects triggers
+  const prevActivePlayerRef = useRef<string | null>(null);
+  const prevTimeLeftRef = useRef<number>(15);
+
+  useEffect(() => {
+    if (!higherLowerState) return;
+
+    if (higherLowerState.phase === "round_recap" && prevActivePlayerRef.current !== "recap") {
+      const winnerId = higherLowerState.recap?.winnerId;
+      if (winnerId === myPlayerId) {
+        playWinSfx();
+      }
+      prevActivePlayerRef.current = "recap";
+    } else if (higherLowerState.phase === "playing") {
+      prevActivePlayerRef.current = higherLowerState.activePlayerId;
+    }
+  }, [higherLowerState, myPlayerId]);
+
+  useEffect(() => {
+    if (!higherLowerState || higherLowerState.phase !== "playing") return;
+
+    if (higherLowerState.activePlayerId === myPlayerId) {
+      // Play ticking sound on every second change
+      if (timeLeft > 0 && timeLeft !== prevTimeLeftRef.current) {
+        playTickSfx();
+      }
+      // Play timeout sound when timer hits 0
+      if (timeLeft === 0 && prevTimeLeftRef.current > 0) {
+        playTimeoutSfx();
+      }
+    }
+    prevTimeLeftRef.current = timeLeft;
+  }, [timeLeft, higherLowerState, myPlayerId]);
 
   // Scroll chat to bottom
   useEffect(() => {
@@ -880,8 +915,8 @@ export default function HigherLowerGame() {
                       <li>سهم أخضر لأعلى (↑) يعني أن الرقم الفعلي <b>أكبر</b> من تخمينك.</li>
                     </ul>
                   </li>
-                  <li>أول لاعب يخمّن رقمه الصحيح يفوز بالجولة ويحصل على نقطة.</li>
-                  <li>إذا فزت بجولتين متتاليتين أو أكثر، ستحصل على <b>نقطتين</b> بدلاً من واحدة!</li>
+                  <li>أول لاعب يخمّن رقمه الصحيح يفوز بالجولة ويحصل على نقطتين.</li>
+                  <li>إذا فزت بجولتين متتاليتين أو أكثر، ستحصل على <b>3 نقاط</b> بدلاً من نقطتين!</li>
                   <li>اللاعب الأول الذي يصل إلى 10 نقاط يفوز باللعبة بأكملها.</li>
                 </ol>
               ) : (
@@ -894,8 +929,8 @@ export default function HigherLowerGame() {
                       <li>A green up arrow (↑) means the secret number is <b>higher</b> than your guess.</li>
                     </ul>
                   </li>
-                  <li>The first player to guess their number wins the round (+1 point).</li>
-                  <li>Winning consecutive rounds grants a streak bonus of <b>+2 points</b> instead of 1!</li>
+                  <li>The first player to guess their number wins the round (+2 points).</li>
+                  <li>Winning consecutive rounds grants a streak bonus of <b>+3 points</b> instead of 2!</li>
                   <li>The first to reach 10 points wins the entire game.</li>
                 </ol>
               )}

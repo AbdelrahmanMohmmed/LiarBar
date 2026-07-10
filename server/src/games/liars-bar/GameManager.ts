@@ -64,6 +64,7 @@ export interface GameState {
   skipVotes: string[]; // playerIds who voted to skip
   skipVotesNeeded: number; // how many votes needed to skip
   challengeStartedAt: number | null; // timestamp when challenge window opened
+  turnDeadline: number | null; // turn limit timestamp
 }
 
 const CHALLENGE_DURATION_OPTIONS = [5, 10] as const;
@@ -94,8 +95,10 @@ export class GameManager implements GameRoom {
   revealDeadline: number | null;
   botAIs: Map<string, BotAI>;
   botTimers: Map<string, NodeJS.Timeout>;
+  turnDeadline: number | null;
   private challengeTimer: NodeJS.Timeout | null;
   private revealTimer: NodeJS.Timeout | null;
+  private turnTimer: NodeJS.Timeout | null;
   private destroyed: boolean = false;
   // Challenge mode settings
   challengeMode: ChallengeMode;
@@ -145,6 +148,8 @@ export class GameManager implements GameRoom {
     this.botTimers = new Map();
     this.challengeTimer = null;
     this.revealTimer = null;
+    this.turnTimer = null;
+    this.turnDeadline = null;
     this.lastActivityAt = Date.now();
     // Every broadcast marks the room as active for the stale-room sweeper
     this.broadcast = (state) => {
@@ -276,6 +281,7 @@ export class GameManager implements GameRoom {
     this.broadcast(state);
 
     this.triggerBotIfNeeded();
+    this.startTurnTimer();
 
     return state;
   }
@@ -300,6 +306,9 @@ export class GameManager implements GameRoom {
     if (!currentPlayer || currentPlayer.id !== playerId) {
       return { success: false, error: "Not your turn" };
     }
+
+    this.clearTurnTimer();
+    currentPlayer.consecutiveTimeouts = 0;
 
     if (cardIndices.length < 1 || cardIndices.length > currentPlayer.hand.length) {
       return { success: false, error: "Must play at least 1 card" };
@@ -400,6 +409,7 @@ export class GameManager implements GameRoom {
       return { success: false, error: "Player not found" };
     }
 
+    challenger.consecutiveTimeouts = 0;
     return this.resolveChallenge(challengerId);
   }
 
@@ -531,6 +541,7 @@ export class GameManager implements GameRoom {
     this.onChallengeResolved(this.roomId);
 
     this.triggerBotIfNeeded();
+    this.startTurnTimer();
   }
 
   /**
@@ -570,6 +581,7 @@ export class GameManager implements GameRoom {
     this.broadcast(state);
 
     this.triggerBotIfNeeded();
+    this.startTurnTimer();
   }
 
   /**
@@ -632,7 +644,7 @@ export class GameManager implements GameRoom {
     return { success: true, votesNow: currentVotes, votesNeeded };
   }
 
-  passTurn(playerId: string): { success: true } | { success: false; error: string } {
+  passTurn(playerId: string, isAuto: boolean = false): { success: true } | { success: false; error: string } {
     if (this.phase === "waiting_for_challenge") {
       if (playerId === this.lastPlayerId) {
         return { success: false, error: "You can't pass on your own claim" };
@@ -662,6 +674,11 @@ export class GameManager implements GameRoom {
         return { success: false, error: "Not your turn" };
       }
 
+      this.clearTurnTimer();
+      if (!isAuto) {
+        currentPlayer.consecutiveTimeouts = 0;
+      }
+
       this.skipCount++;
 
       if (this.skipCount >= this.players.length - 1) {
@@ -677,6 +694,7 @@ export class GameManager implements GameRoom {
         const state = this.toState();
         this.broadcast(state);
         this.triggerBotIfNeeded();
+        this.startTurnTimer();
       } else {
         this.advanceTurn();
       }
@@ -698,6 +716,7 @@ export class GameManager implements GameRoom {
     const state = this.toState();
     this.broadcast(state);
     this.triggerBotIfNeeded();
+    this.startTurnTimer();
   }
 
   /** End the game with a winner */
@@ -909,6 +928,7 @@ export class GameManager implements GameRoom {
       skipVotes: [...this.skipVotes],
       skipVotesNeeded: votesNeeded,
       challengeStartedAt: this.challengeStartedAt,
+      turnDeadline: this.turnDeadline,
     };
   }
 
@@ -949,5 +969,108 @@ export class GameManager implements GameRoom {
     this.clearChallengeTimer();
     this.clearRevealTimer();
     this.clearBotTimers();
+    this.clearTurnTimer();
+  }
+
+  private startTurnTimer(): void {
+    this.clearTurnTimer();
+    
+    if (this.phase !== "playing") return;
+
+    const currentPlayer = this.currentPlayer;
+    if (!currentPlayer || currentPlayer.isBot) return;
+
+    this.turnDeadline = Date.now() + 35000;
+    
+    this.turnTimer = setTimeout(() => {
+      this.handleTurnTimeout(currentPlayer.id);
+    }, 35000);
+  }
+
+  private clearTurnTimer(): void {
+    if (this.turnTimer) {
+      clearTimeout(this.turnTimer);
+      this.turnTimer = null;
+    }
+    this.turnDeadline = null;
+  }
+
+  private handleTurnTimeout(playerId: string): void {
+    this.clearTurnTimer();
+
+    const player = this.getPlayer(playerId);
+    if (!player) return;
+
+    player.consecutiveTimeouts = (player.consecutiveTimeouts || 0) + 1;
+
+    console.log(`Player ${player.name} (${playerId}) timed out. Consecutive timeouts: ${player.consecutiveTimeouts}`);
+
+    if (player.consecutiveTimeouts >= 2) {
+      this.kickPlayer(playerId);
+    } else {
+      this.logAction({
+        type: "play",
+        playerId: "system",
+        playerName: "Game",
+        data: { message: `${player.name} missed their turn (timeout).` },
+        timestamp: Date.now(),
+      });
+      this.passTurn(playerId, true);
+    }
+  }
+
+  kickPlayer(playerId: string): void {
+    const idx = this.players.findIndex((p) => p.id === playerId);
+    if (idx === -1) return;
+
+    const player = this.players[idx];
+    console.log(`Kicking player ${player.name} (${playerId}) from room ${this.roomId}`);
+
+    this.logAction({
+      type: "play",
+      playerId: "system",
+      playerName: "Game",
+      data: { message: `${player.name} was kicked for inactivity.` },
+      timestamp: Date.now(),
+    });
+
+    this.players.splice(idx, 1);
+
+    if (this.players.length === 0) {
+      this.phase = "game_over";
+      this.endGame("system");
+      return;
+    }
+
+    if (idx < this.currentTurn) {
+      this.currentTurn--;
+    } else if (idx === this.currentTurn) {
+      this.currentTurn = this.currentTurn % this.players.length;
+      this.phase = "playing";
+      this.lastDeclaration = null;
+      this.lastPlayerId = null;
+      this.currentRequiredClaim = null;
+      this.skipCount = 0;
+    }
+
+    const realPlayers = this.players.filter((p) => !p.isBot);
+    if (realPlayers.length === 0 || this.players.length < 2) {
+      const winner = this.players[0];
+      if (winner) {
+        this.endGame(winner.id);
+      } else {
+        this.phase = "game_over";
+        this.broadcast(this.toState());
+      }
+      return;
+    }
+
+    const state = this.toState();
+    this.broadcast(state);
+    
+    this.onChallengeResolved(this.roomId);
+
+    this.triggerBotIfNeeded();
+    this.startTurnTimer();
   }
 }

@@ -306,7 +306,7 @@ export default function Game() {
 
       {/* Chat panel */}
       {showChat && (
-        <div className="absolute top-14 right-4 z-30 w-72 h-[calc(100vh-7rem)] flex flex-col bg-[#0d1a0d]/95 backdrop-blur-xl border border-amber-900/30 rounded-2xl shadow-2xl shadow-black/60 overflow-hidden animate-in slide-in-from-right-2 duration-200">
+        <div className="absolute top-14 right-4 z-30 w-[calc(100vw-2rem)] sm:w-72 h-[calc(100vh-7rem)] flex flex-col bg-[#0d1a0d]/95 backdrop-blur-xl border border-amber-900/30 rounded-2xl shadow-2xl shadow-black/60 overflow-hidden animate-in slide-in-from-right-2 duration-200">
           <div className="p-3 pb-1 border-b border-amber-900/20">
               <h3 className="text-white text-sm font-bold flex items-center gap-2">
                 <MessageCircle className="w-4 h-4 text-amber-400" />

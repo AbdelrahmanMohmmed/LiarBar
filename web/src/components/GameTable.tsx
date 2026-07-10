@@ -1,7 +1,7 @@
 import { memo, useMemo, useState, useEffect } from "react";
 import type { GameState, Card, Suit } from "@/lib/types";
 import { SUIT_SYMBOLS, SUIT_COLORS, declarationToString } from "@/lib/types";
-import { Card as CardView } from "@/components/Card";
+import { Card as CardView, SuitIcon } from "@/components/Card";
 import { useTheme } from "@/lib/themeContext";
 import { cn } from "@/lib/utils";
 import { Crown, Bot, User, Zap, Clock, Eye } from "lucide-react";
@@ -91,9 +91,7 @@ const MiniCard = memo(function MiniCard({
       <span className={cn("font-bold leading-none", small ? "text-[8px]" : "text-xs")} style={{ color }}>
         {card.rank}
       </span>
-      <span className={cn("leading-none", small ? "text-[7px]" : "text-[10px]")} style={{ color }}>
-        {SUIT_SYMBOLS[card.suit]}
-      </span>
+      <SuitIcon suit={card.suit} className={small ? "w-2.5 h-2.5 mt-0.5" : "w-3.5 h-3.5 mt-0.5"} style={{ color }} />
     </div>
   );
 });
@@ -176,6 +174,7 @@ export const GameTable = memo(function GameTable({
   );
 
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [turnCountdown, setTurnCountdown] = useState<number | null>(null);
 
   useEffect(() => {
     if (!gameState.challengeDeadline || gameState.phase !== "waiting_for_challenge") {
@@ -195,6 +194,25 @@ export const GameTable = memo(function GameTable({
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
   }, [gameState.challengeDeadline, gameState.phase]);
+
+  useEffect(() => {
+    if (!gameState.turnDeadline || gameState.phase !== "playing") {
+      setTurnCountdown(null);
+      return;
+    }
+
+    const tick = () => {
+      const remaining = Math.max(0, Math.ceil((gameState.turnDeadline! - Date.now()) / 1000));
+      setTurnCountdown(remaining);
+      if (remaining <= 0) {
+        clearInterval(interval);
+      }
+    };
+
+    tick();
+    const interval = setInterval(tick, 500);
+    return () => clearInterval(interval);
+  }, [gameState.turnDeadline, gameState.phase]);
 
   return (
     <div className="relative w-full max-w-[650px] aspect-square mx-auto perspective-1000">
@@ -350,6 +368,14 @@ export const GameTable = memo(function GameTable({
                   <Zap className="w-3 h-3 text-amber-400 animate-pulse" />
                 )}
               </div>
+
+              {/* Turn Countdown */}
+              {isCurrent && gameState.phase === "playing" && turnCountdown !== null && (
+                <div className="flex items-center gap-0.5 text-amber-400 font-mono text-[9px] sm:text-[10px] font-bold mt-0.5 animate-pulse bg-amber-950/60 border border-amber-500/20 px-1.5 py-0.5 rounded-full shrink-0">
+                  <Clock className="w-3 h-3 text-amber-400" />
+                  <span>{turnCountdown}s</span>
+                </div>
+              )}
 
               {/* Card fan (face-down cards) */}
               {player.cardCount > 0 && (

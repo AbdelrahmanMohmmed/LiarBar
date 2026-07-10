@@ -42,13 +42,13 @@ export const ThemeSelector = memo(function ThemeSelector({ className }: ThemeSel
         <Palette className="w-3.5 h-3.5" />
         Table Theme
       </label>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
         {themeOptions.map((opt) => (
           <button
             key={opt.key}
             onClick={() => setTheme(opt.key)}
             className={cn(
-              "rounded-lg p-2.5 border-2 transition-all text-left",
+              "rounded-lg p-1.5 sm:p-2.5 border-2 transition-all text-left flex flex-col items-center sm:items-start",
               theme === opt.key
                 ? "border-amber-500 bg-amber-900/20 shadow-md"
                 : "border-transparent bg-[#2a1515] hover:bg-[#3a1f1f]",
@@ -56,22 +56,22 @@ export const ThemeSelector = memo(function ThemeSelector({ className }: ThemeSel
           >
             {/* Mini preview */}
             <div
-              className="w-full h-8 rounded-md mb-1.5 flex items-center justify-center"
+              className="w-full h-6 sm:h-8 rounded-md mb-1 sm:mb-1.5 flex items-center justify-center"
               style={{ backgroundColor: opt.previewBg }}
             >
               <div
-                className="w-5 h-3 rounded-sm flex items-center justify-center"
+                className="w-4 h-2.5 sm:w-5 sm:h-3 rounded-sm flex items-center justify-center"
                 style={{
                   background: `linear-gradient(to bottom right, ${opt.previewAccent}88, ${opt.previewAccent}44)`,
                   borderColor: opt.previewAccent,
                   borderWidth: 1,
                 }}
               >
-                <span className="text-white text-[6px] font-bold">?</span>
+                <span className="text-white text-[5px] sm:text-[6px] font-bold">?</span>
               </div>
             </div>
-            <p className="text-white text-xs font-semibold">{opt.label}</p>
-            <p className="text-amber-200/40 text-[9px] leading-tight mt-0.5">{opt.desc}</p>
+            <p className="text-white text-[10px] sm:text-xs font-semibold text-center sm:text-left w-full">{opt.label}</p>
+            <p className="hidden sm:block text-amber-200/40 text-[9px] leading-tight mt-0.5">{opt.desc}</p>
           </button>
         ))}
       </div>

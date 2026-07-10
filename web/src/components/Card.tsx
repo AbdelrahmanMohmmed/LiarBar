@@ -1,6 +1,6 @@
 import { memo, useMemo } from "react";
 import type { Card as CardType } from "@/lib/types";
-import { SUIT_SYMBOLS, SUIT_COLORS, parseCardString } from "@/lib/types";
+import { SUIT_COLORS, parseCardString } from "@/lib/types";
 import { useTheme } from "@/lib/themeContext";
 import { getDominoImagePath } from "@/lib/theme";
 import { cn } from "@/lib/utils";
@@ -12,6 +12,44 @@ interface CardProps {
   small?: boolean;
 }
 
+export const SuitIcon = memo(function SuitIcon({
+  suit,
+  className,
+  style,
+}: {
+  suit: string;
+  className?: string;
+  style?: React.CSSProperties;
+}) {
+  if (suit === "hearts") {
+    return (
+      <svg viewBox="0 0 24 24" fill="currentColor" className={className} style={style}>
+        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+      </svg>
+    );
+  }
+  if (suit === "diamonds") {
+    return (
+      <svg viewBox="0 0 24 24" fill="currentColor" className={className} style={style}>
+        <path d="M12 2L2 12l10 10 10-10L12 2z"/>
+      </svg>
+    );
+  }
+  if (suit === "clubs") {
+    return (
+      <svg viewBox="0 0 24 24" fill="currentColor" className={className} style={style}>
+        <path d="M12 9.5a3.5 3.5 0 0 1 3.5-3.5c1.9 0 3.5 1.6 3.5 3.5 0 2.5-3 4-3 4s1.5.5 3 2c1.5 1.5 1.5 3.5 0 5s-3.5 1.5-5 0c-.8-.8-1-2-1-2s-.2 1.2-1 2c-1.5 1.5-3.5 1.5-5 0s-1.5-3.5 0-5c1.5-1.5 3-2 3-2s-3-1.5-3-4C4 7.6 5.6 6 7.5 6A3.5 3.5 0 0 1 12 9.5zm-3 7.5v5h6v-5h-6z"/>
+      </svg>
+    );
+  }
+  // spades
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} style={style}>
+      <path d="M12 2C9 5 5 8 5 11.5c0 3 2.5 5.5 5.5 5.5.9 0 1.7-.2 2.5-.5V22h-3v1h8v-1h-3v-5.5c.8.3 1.6.5 2.5.5 3 0 5.5-2.5 5.5-5.5C23 8 19 5 12 2Z"/>
+    </svg>
+  );
+});
+
 export const Card = memo(function Card({ card: cardProp, cardStr, faceDown = false, small = false }: CardProps) {
   const { assets, theme } = useTheme();
 
@@ -21,16 +59,19 @@ export const Card = memo(function Card({ card: cardProp, cardStr, faceDown = fal
     return null;
   }, [cardProp, cardStr]);
 
+  // Standard aspect ratio for playing cards (88x124 VIP sheets ratio)
+  const size = small ? "h-12 aspect-[88/124]" : "h-20 aspect-[88/124]";
+
   if (faceDown) {
     return (
       <div
         className={cn(
-          "rounded-lg border-2 bg-gradient-to-br flex items-center justify-center select-none",
+          "rounded-lg border-2 bg-gradient-to-br flex items-center justify-center select-none shadow-md",
           assets.cardBackClass,
-          small ? "w-8 h-12" : "w-14 h-20",
+          size,
         )}
       >
-        <div className="w-6 h-6 rounded border border-red-600/40 flex items-center justify-center">
+        <div className="w-5 h-5 rounded border border-red-600/40 flex items-center justify-center">
           <span className="text-red-500/60 text-[8px] font-bold">?</span>
         </div>
       </div>
@@ -42,7 +83,8 @@ export const Card = memo(function Card({ card: cardProp, cardStr, faceDown = fal
       <div
         className={cn(
           "rounded-lg border-2 border-amber-700/60 bg-gradient-to-b from-[#faf3e0] to-[#e8d5b0] shadow-lg flex items-center justify-center select-none",
-          small ? "w-8 h-12 text-[8px]" : "w-14 h-20 text-xs",
+          size,
+          small ? "text-[8px]" : "text-xs",
         )}
       >
         <span className="text-gray-900 font-mono font-bold">{cardStr ?? "?"}</span>
@@ -51,17 +93,13 @@ export const Card = memo(function Card({ card: cardProp, cardStr, faceDown = fal
   }
 
   if (card.type === "dominoe") {
-    // All themes render dominoes as proper tile images (both the Light and Dark
-    // theme folders ship the full 0–6 double set). If an image ever fails to
-    // load we fall back to a clean CSS tile so the value is still readable.
-    const size = small ? "w-8 h-12" : "w-14 h-20";
-    const textSize = small ? "text-[10px]" : "text-sm";
     const imgPath = getDominoImagePath(card.left, card.right, theme);
+    const textSize = small ? "text-[10px]" : "text-sm";
 
     return (
       <div
         className={cn(
-          "relative rounded-lg overflow-hidden flex-shrink-0 select-none flex items-center justify-center bg-gradient-to-b from-[#faf3e0] to-[#e8d5b0] border border-amber-900/30",
+          "relative flex-shrink-0 select-none flex items-center justify-center overflow-hidden rounded-lg",
           size,
         )}
       >
@@ -77,7 +115,7 @@ export const Card = memo(function Card({ card: cardProp, cardStr, faceDown = fal
           }}
         />
         <div
-          className="absolute inset-0 flex-col items-center justify-center gap-0.5 hidden"
+          className="absolute inset-0 flex flex-col items-center justify-center gap-0.5 rounded-lg bg-gradient-to-b from-[#faf3e0] to-[#e8d5b0] border border-amber-900/30 shadow-lg"
           style={{ display: "none" }}
         >
           <span className={cn("text-gray-900 font-mono font-bold", textSize)}>{card.left}</span>
@@ -88,10 +126,7 @@ export const Card = memo(function Card({ card: cardProp, cardStr, faceDown = fal
     );
   }
 
-  const size = small ? "w-8 h-12" : "w-14 h-20";
-  
   if (theme === "classic") {
-    // Map rank to the filename suffix
     let rankFile = card.rank;
     if (card.rank !== "A" && card.rank !== "J" && card.rank !== "Q" && card.rank !== "K" && card.rank !== "10") {
       rankFile = `0${card.rank}` as any;
@@ -101,7 +136,7 @@ export const Card = memo(function Card({ card: cardProp, cardStr, faceDown = fal
     return (
       <div
         className={cn(
-          "relative rounded-lg overflow-hidden flex-shrink-0 select-none flex items-center justify-center",
+          "relative rounded-lg overflow-hidden flex-shrink-0 select-none flex items-center justify-center shadow-md",
           size,
         )}
         style={{ backgroundColor: "#fff" }}
@@ -109,14 +144,13 @@ export const Card = memo(function Card({ card: cardProp, cardStr, faceDown = fal
         <img
           src={imgPath}
           alt={`${card.rank} of ${card.suit}`}
-          className="w-full h-full object-contain"
+          className="w-full h-full object-fill"
         />
       </div>
     );
   }
 
   if (theme === "vip") {
-    // Map suit to the correct spritesheet file
     const suitFileMap: Record<string, string> = {
       hearts: "Hearts-88x124.png",
       diamonds: "Diamonds-88x124.png",
@@ -124,19 +158,16 @@ export const Card = memo(function Card({ card: cardProp, cardStr, faceDown = fal
       spades: "Spades-88x124.png",
     };
     
-    // Assume standard 13 rank order: A(0), 2(1), ... 10(9), J(10), Q(11), K(12)
     const rankIndex = {
       "A": 0, "2": 1, "3": 2, "4": 3, "5": 4, "6": 5, "7": 6, "8": 7, "9": 8, "10": 9, "J": 10, "Q": 11, "K": 12,
     }[card.rank] ?? 0;
 
     const imgPath = `/Cards_VIP/${suitFileMap[card.suit]}`;
     
-    // Using CSS background to crop the spritesheet
-    // Assuming standard layout: 13 columns of 88px width
     return (
       <div
         className={cn(
-          "relative rounded-lg flex-shrink-0 select-none overflow-hidden",
+          "relative rounded-lg flex-shrink-0 select-none overflow-hidden shadow-md",
           size,
         )}
       >
@@ -144,7 +175,7 @@ export const Card = memo(function Card({ card: cardProp, cardStr, faceDown = fal
           className="w-full h-full"
           style={{
             backgroundImage: `url('${imgPath}')`,
-            backgroundSize: `auto 100%`,
+            backgroundSize: `1300% 100%`, // 13 cards in spritesheet
             backgroundPosition: `${(rankIndex / (13 - 1)) * 100}% 0%`,
             backgroundRepeat: "no-repeat",
           }}
@@ -153,31 +184,37 @@ export const Card = memo(function Card({ card: cardProp, cardStr, faceDown = fal
     );
   }
 
-  // Standard theme (CSS text based)
+  // Standard theme (Premium Vector CSS based)
   const color = SUIT_COLORS[card.suit];
-  const rankSize = small ? "text-[9px]" : "text-xs";
-  const symSize = small ? "text-[8px]" : "text-[10px]";
-  const centerSym = small ? "text-sm" : "text-xl";
+  const rankSize = small ? "text-[8px] sm:text-[9px]" : "text-xs";
+  const symSize = small ? "w-2.5 h-2.5" : "w-3.5 h-3.5";
+  const centerSym = small ? "w-5 h-5" : "w-8 h-8";
 
   return (
     <div
       className={cn(
-        "relative rounded-lg border-2 border-gray-300/80 bg-white shadow-lg flex flex-col items-center justify-center select-none overflow-hidden flex-shrink-0",
+        "relative rounded-lg border border-gray-300/80 bg-gradient-to-br from-white to-gray-50 shadow-md flex flex-col items-center justify-center select-none overflow-hidden flex-shrink-0 hover:shadow-lg transition-all",
         size,
       )}
     >
-      <span className={cn("absolute top-1 left-1.5 font-bold leading-none", rankSize)} style={{ color }}>
-        {card.rank}
-      </span>
-      <span className={cn("absolute top-3.5 left-1.5 leading-none", symSize)} style={{ color }}>
-        {SUIT_SYMBOLS[card.suit]}
-      </span>
-      <span className={centerSym} style={{ color }}>
-        {SUIT_SYMBOLS[card.suit]}
-      </span>
-      <span className={cn("absolute bottom-1 right-1.5 font-bold leading-none rotate-180", rankSize)} style={{ color }}>
-        {card.rank}
-      </span>
+      {/* Top Left Rank and Suit */}
+      <div className="absolute top-1 left-1.5 flex flex-col items-center">
+        <span className={cn("font-bold leading-none mb-0.5", rankSize)} style={{ color }}>
+          {card.rank}
+        </span>
+        <SuitIcon suit={card.suit} className={symSize} style={{ color }} />
+      </div>
+
+      {/* Center Suit Symbol */}
+      <SuitIcon suit={card.suit} className={centerSym} style={{ color }} />
+
+      {/* Bottom Right Rank and Suit (Inverted) */}
+      <div className="absolute bottom-1 right-1.5 flex flex-col items-center rotate-180">
+        <span className={cn("font-bold leading-none mb-0.5", rankSize)} style={{ color }}>
+          {card.rank}
+        </span>
+        <SuitIcon suit={card.suit} className={symSize} style={{ color }} />
+      </div>
     </div>
   );
 });
