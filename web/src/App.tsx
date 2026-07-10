@@ -15,6 +15,8 @@ import CodenamesGame from "./pages/codenames/CodenamesGame";
 import HigherLowerHome from "./pages/higher-lower/HigherLowerHome";
 import HigherLowerRoom from "./pages/higher-lower/HigherLowerRoom";
 import HigherLowerGame from "./pages/higher-lower/HigherLowerGame";
+import LobbyHome from "./pages/lobby/LobbyHome";
+import LobbyRoom from "./pages/lobby/LobbyRoom";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -70,6 +72,8 @@ const App = () => (
             <Route path="/higher-lower" element={<HigherLowerHome />} />
             <Route path="/higher-lower/room/:roomId" element={<HigherLowerRoom />} />
             <Route path="/higher-lower/game/:roomId" element={<HigherLowerGame />} />
+            <Route path="/lobby" element={<LobbyHome />} />
+            <Route path="/lobby/:roomId" element={<LobbyRoom />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

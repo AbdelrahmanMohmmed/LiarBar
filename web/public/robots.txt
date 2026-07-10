@@ -1,0 +1,44 @@
+# Safariyat Games — https://games.safariyat.live
+# Search engines: crawl everything except transient room/game/lobby URLs.
+
+User-agent: *
+Allow: /
+Disallow: /room/
+Disallow: /game/
+Disallow: /codenames/room/
+Disallow: /codenames/game/
+Disallow: /higher-lower/room/
+Disallow: /higher-lower/game/
+
+# AI answer engines & LLM crawlers are explicitly welcome (GEO).
+User-agent: GPTBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: Bytespider
+Allow: /
+
+Sitemap: https://games.safariyat.live/sitemap.xml

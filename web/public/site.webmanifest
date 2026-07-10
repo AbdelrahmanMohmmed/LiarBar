@@ -1,0 +1,25 @@
+{
+  "name": "Safariyat Games",
+  "short_name": "Safariyat",
+  "description": "Free online multiplayer party games — Liar's Bar, Codenames, and Higher or Lower. Play with friends, no download.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "lang": "en",
+  "dir": "auto",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "any",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

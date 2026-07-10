@@ -1,0 +1,44 @@
+# Safariyat Games
+
+> Safariyat Games (ألعاب سفريات) is a free, browser-based hub of online
+> multiplayer party games you play with friends — no download and no sign-up.
+> The interface is fully bilingual (English and Arabic) with right-to-left
+> support, and several games include built-in voice chat.
+
+Site: https://games.safariyat.live
+
+## How it works
+
+- Open the site, pick a game, and create a room.
+- Share the room link or numeric room code with friends so they can join.
+- Rooms can be filled with bots to play immediately.
+- Everything runs in the browser (desktop or mobile). Nothing to install.
+
+## Games
+
+- [Liar's Bar](https://games.safariyat.live/play): A real-time multiplayer
+  bluffing card game (with a dominoes variant). Play cards face-down while
+  claiming what they are, call out opponents you think are lying, and race to
+  empty your hand. Known in Arabic as "أشك".
+- [Codenames](https://games.safariyat.live/codenames): The classic team
+  word-guessing game. Spymasters give one-word clues to lead their team to the
+  right words while avoiding the assassin. Fully playable in Arabic and
+  English, with voice chat. Known in Arabic as "كودنيمز".
+- [Higher or Lower](https://games.safariyat.live/higher-lower): A fast number
+  guessing party game. Each player has a secret number; compare ranges with
+  others and be the first to zero in on your number. Known in Arabic as
+  "أعلى أو أقل".
+
+## Key facts
+
+- Price: free to play.
+- Accounts: not required (optional Google sign-in only).
+- Languages: English and Arabic (RTL supported).
+- Platform: any modern web browser, desktop or mobile.
+- Best for: friends and small groups playing together in real time.
+
+## More
+
+- [Play Liar's Bar](https://games.safariyat.live/play)
+- [Play Codenames](https://games.safariyat.live/codenames)
+- [Play Higher or Lower](https://games.safariyat.live/higher-lower)

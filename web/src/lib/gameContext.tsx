@@ -18,6 +18,7 @@ import type {
   CodenamesRole,
   CodenamesLang,
   HigherLowerState,
+  LobbyState,
 } from "./types";
 
 interface GameActions {
@@ -67,10 +68,13 @@ interface GameActions {
   codenamesRematch: () => Promise<void>;
   higherLowerGuess: (guess: number) => Promise<void>;
   higherLowerRematch: () => Promise<void>;
+  lobbyStartGame: (gameId: string, options: any) => Promise<void>;
+  lobbyReturnToLobby: () => Promise<void>;
 }
 
 interface GameContextValue extends GameActions {
   // State
+  lobbyState: LobbyState | null;
   gameState: GameState | null;
   codenamesState: CodenamesState | null;
   higherLowerState: HigherLowerState | null;
@@ -88,6 +92,7 @@ const LS_ROOM_ID = "liarsbar_roomId";
 const LS_PLAYER_ID = "liarsbar_playerId";
 
 export const [GameProvider, useGame] = createContextHook(() => {
+  const [lobbyState, setLobbyState] = useState<LobbyState | null>(null);
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [codenamesState, setCodenamesState] = useState<CodenamesState | null>(null);
   const [higherLowerState, setHigherLowerState] = useState<HigherLowerState | null>(null);
@@ -120,6 +125,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
   const clearToasts = useCallback(() => setToasts([]), []);
 
   const resetGame = useCallback(() => {
+    setLobbyState(null);
     setGameState(null);
     setCodenamesState(null);
     setHigherLowerState(null);
@@ -141,8 +147,34 @@ export const [GameProvider, useGame] = createContextHook(() => {
       setIsConnected(false);
     };
 
-    const onGameState = (state: GameState | CodenamesState | HigherLowerState) => {
-      if ((state as CodenamesState).gameId === "codenames") {
+    const onGameState = (state: GameState | CodenamesState | HigherLowerState | LobbyState) => {
+      if ((state as LobbyState).gameId === "lobby") {
+        const next = state as LobbyState;
+        setLobbyState(next);
+        if (next.activeGameId === "liars-bar") {
+          setGameState(next.subGameState);
+          setCodenamesState(null);
+          setHigherLowerState(null);
+        } else if (next.activeGameId === "codenames") {
+          setCodenamesState((prev) => {
+            const nextSub = next.subGameState as CodenamesState;
+            return nextSub ? { ...nextSub, you: prev?.you, key: prev?.key } : null;
+          });
+          setGameState(null);
+          setHigherLowerState(null);
+        } else if (next.activeGameId === "higher-lower") {
+          setHigherLowerState((prev) => {
+            const nextSub = next.subGameState as HigherLowerState;
+            return nextSub ? { ...nextSub, mySecretNumber: prev?.mySecretNumber } : null;
+          });
+          setGameState(null);
+          setCodenamesState(null);
+        } else {
+          setGameState(null);
+          setCodenamesState(null);
+          setHigherLowerState(null);
+        }
+      } else if ((state as CodenamesState).gameId === "codenames") {
         const next = state as CodenamesState;
         setCodenamesState((prev) => ({ ...next, you: prev?.you, key: prev?.key }));
       } else if ((state as HigherLowerState).gameId === "higher-lower") {
@@ -234,8 +266,28 @@ export const [GameProvider, useGame] = createContextHook(() => {
     [],
   );
 
-  const applyRoomState = useCallback((state: GameState | CodenamesState | HigherLowerState) => {
-    if ((state as CodenamesState).gameId === "codenames") {
+  const applyRoomState = useCallback((state: GameState | CodenamesState | HigherLowerState | LobbyState) => {
+    if ((state as LobbyState).gameId === "lobby") {
+      const next = state as LobbyState;
+      setLobbyState(next);
+      if (next.activeGameId === "liars-bar") {
+        setGameState(next.subGameState);
+        setCodenamesState(null);
+        setHigherLowerState(null);
+      } else if (next.activeGameId === "codenames") {
+        setCodenamesState(next.subGameState);
+        setGameState(null);
+        setHigherLowerState(null);
+      } else if (next.activeGameId === "higher-lower") {
+        setHigherLowerState(next.subGameState);
+        setGameState(null);
+        setCodenamesState(null);
+      } else {
+        setGameState(null);
+        setCodenamesState(null);
+        setHigherLowerState(null);
+      }
+    } else if ((state as CodenamesState).gameId === "codenames") {
       setCodenamesState(state as CodenamesState);
     } else if ((state as HigherLowerState).gameId === "higher-lower") {
       setHigherLowerState(state as HigherLowerState);
@@ -416,6 +468,19 @@ export const [GameProvider, useGame] = createContextHook(() => {
     await emitWithAck("higher_lower_rematch", {});
   }, [myRoomId, emitWithAck]);
 
+  const lobbyStartGame = useCallback(
+    async (gameId: string, options: any) => {
+      if (!myRoomId) throw new Error("Not in a room");
+      await emitWithAck("lobby_start_game", { gameId, options });
+    },
+    [myRoomId, emitWithAck],
+  );
+
+  const lobbyReturnToLobby = useCallback(async () => {
+    if (!myRoomId) throw new Error("Not in a room");
+    await emitWithAck("lobby_return_to_lobby", {});
+  }, [myRoomId, emitWithAck]);
+
   const sendWebRTCSignal = useCallback(
     (targetId: string, signal: unknown) => {
       if (!myRoomId) return;
@@ -469,6 +534,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
   }, [gameState?.actionLog]);
 
   return {
+    lobbyState,
     gameState,
     codenamesState,
     higherLowerState,
@@ -485,7 +551,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
     startGame,
     addBot,
     removeBot,
-        playCards,
+    playCards,
     callLiar,
     passTurn,
     voteSkip,
@@ -501,5 +567,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
     codenamesRematch,
     higherLowerGuess,
     higherLowerRematch,
+    lobbyStartGame,
+    lobbyReturnToLobby,
   };
 });

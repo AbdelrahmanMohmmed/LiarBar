@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useGame } from "@/lib/gameContext";
 import { useLanguage } from "@/lib/languageContext";
+import { Seo } from "@/lib/seo";
 import { COLORS, uiFont } from "./theme";
 import { Panel, Field, TabButton, PrimaryButton, inputStyle } from "./ui";
 
@@ -108,6 +109,32 @@ export default function HigherLowerHome() {
   }, [playerName, joinRoomId, joinRoom, navigate, addToast, c]);
 
   return (
+    <>
+    <Seo
+      lang={isAr ? "ar" : "en"}
+      title={isAr ? "أعلى أو أقل — لعبة تخمين الأرقام أونلاين" : "Higher or Lower — Online number guessing game"}
+      description={
+        isAr
+          ? "العب أعلى أو أقل مع أصدقائك — خمّن رقمك السري وكن الأول في الوصول إليه. مجاناً وبدون تحميل."
+          : "Play Higher or Lower with friends — a fast number-guessing party game. Race to find your secret number first. Free, no download."
+      }
+      path="/higher-lower"
+      jsonLd={{
+        "@context": "https://schema.org",
+        "@type": "VideoGame",
+        name: "Higher or Lower",
+        alternateName: "أعلى أو أقل",
+        url: "https://games.safariyat.live/higher-lower",
+        description:
+          "A fast number-guessing party game — compare ranges with others and race to find your secret number first.",
+        genre: ["Party", "Guessing"],
+        playMode: "MultiPlayer",
+        gamePlatform: "Web browser",
+        operatingSystem: "Any",
+        applicationCategory: "Game",
+        offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+      }}
+    />
     <div
       dir={dir}
       style={{
@@ -207,5 +234,6 @@ export default function HigherLowerHome() {
         )}
       </Panel>
     </div>
+    </>
   );
 }
