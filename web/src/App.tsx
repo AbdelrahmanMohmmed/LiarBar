@@ -5,6 +5,7 @@ import { GameProvider, useGame } from "@/lib/gameContext";
 import { LanguageProvider } from "@/lib/languageContext";
 import { ThemeProvider } from "@/lib/themeContext";
 import { toast } from "sonner";
+import Landing from "./pages/Landing";
 import Index from "./pages/index";
 import Room from "./pages/Room";
 import Game from "./pages/Game";
@@ -53,7 +54,8 @@ const App = () => (
       <GameProvider>
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={<Index />} />
+            <Route path="/" element={<Landing />} />
+            <Route path="/play" element={<Index />} />
             <Route path="/room/:roomId" element={<Room />} />
             <Route path="/game/:roomId" element={<Game />} />
             <Route path="*" element={<NotFound />} />

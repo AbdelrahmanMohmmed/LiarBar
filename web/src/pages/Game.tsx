@@ -245,11 +245,11 @@ export default function Game() {
       </div>
 
       {/* Top bar */}
-      <div className="relative z-20 flex items-center justify-between px-4 py-3 border-b border-amber-900/20 bg-[#0d1a0d]/80 backdrop-blur-sm">
-        <div className="flex items-center gap-3">
+      <div className="relative z-20 flex items-center justify-between gap-2 flex-wrap px-2 sm:px-4 py-2.5 border-b border-amber-900/20 bg-[#0d1a0d]/80 backdrop-blur-sm">
+        <div className="flex items-center gap-1.5 sm:gap-3 min-w-0 flex-wrap">
           <button
             onClick={() => navigate(`/room/${paramRoomId}`)}
-            className="text-amber-200/50 hover:text-white text-xs bg-transparent"
+            className="text-amber-200/50 hover:text-white text-xs bg-transparent shrink-0"
           >
             {t("game.back_to_room")} {gameState.roomId}
           </button>
@@ -269,7 +269,7 @@ export default function Game() {
             </span>
           )}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1 sm:gap-3 shrink-0">
           {gameState.phase === "playing" && (
             <span className="text-xs text-emerald-400 bg-emerald-900/30 px-2 py-1 rounded-full">
               {t("game.playing")}

@@ -51,38 +51,23 @@ export const Card = memo(function Card({ card: cardProp, cardStr, faceDown = fal
   }
 
   if (card.type === "dominoe") {
-    if (theme === "standard") {
-      const size = small ? "w-8 h-12" : "w-14 h-20";
-      const textSize = small ? "text-[10px]" : "text-sm";
-      return (
-        <div
-          className={cn(
-            "relative rounded-lg border-2 border-amber-900/40 bg-gradient-to-b from-[#faf3e0] to-[#e8d5b0] shadow-lg flex flex-col items-center justify-center gap-1 select-none overflow-hidden flex-shrink-0",
-            size,
-          )}
-        >
-          <div className="w-full h-px bg-gray-400 absolute top-1/2" />
-          <span className={cn("text-gray-900 font-mono font-bold z-10", textSize)}>{card.left}</span>
-          <span className={cn("text-gray-900 font-mono font-bold z-10", textSize)}>{card.right}</span>
-        </div>
-      );
-    }
-
+    // All themes render dominoes as proper tile images (both the Light and Dark
+    // theme folders ship the full 0–6 double set). If an image ever fails to
+    // load we fall back to a clean CSS tile so the value is still readable.
     const size = small ? "w-8 h-12" : "w-14 h-20";
+    const textSize = small ? "text-[10px]" : "text-sm";
     const imgPath = getDominoImagePath(card.left, card.right, theme);
 
     return (
       <div
         className={cn(
-
-          "relative rounded-lg overflow-hidden flex-shrink-0 select-none flex items-center justify-center",
+          "relative rounded-lg overflow-hidden flex-shrink-0 select-none flex items-center justify-center bg-gradient-to-b from-[#faf3e0] to-[#e8d5b0] border border-amber-900/30",
           size,
         )}
       >
         <img
           src={imgPath}
-          alt={`${card.left}|${card.right}`}
-
+          alt={`domino ${card.left}|${card.right}`}
           className="w-full h-full object-contain"
           onError={(e) => {
             const el = e.currentTarget;
@@ -92,12 +77,12 @@ export const Card = memo(function Card({ card: cardProp, cardStr, faceDown = fal
           }}
         />
         <div
-          className="absolute inset-0 flex-col items-center justify-center gap-1 hidden"
+          className="absolute inset-0 flex-col items-center justify-center gap-0.5 hidden"
           style={{ display: "none" }}
         >
-          <span className="w-full h-px bg-gray-400" />
-          <span className="text-gray-900 font-mono font-bold text-xs">{card.left}</span>
-          <span className="text-gray-900 font-mono font-bold text-xs">{card.right}</span>
+          <span className={cn("text-gray-900 font-mono font-bold", textSize)}>{card.left}</span>
+          <span className="w-2/3 h-px bg-gray-400" />
+          <span className={cn("text-gray-900 font-mono font-bold", textSize)}>{card.right}</span>
         </div>
       </div>
     );

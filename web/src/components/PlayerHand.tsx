@@ -64,7 +64,7 @@ export const PlayerHand = memo(function PlayerHand({
         )}
       </div>
 
-      <div className="flex flex-wrap justify-center gap-1.5 max-w-2xl mx-auto">
+      <div className="flex flex-wrap justify-center gap-1.5 max-w-2xl mx-auto max-h-[34vh] overflow-y-auto pt-5">
         {cards.map((card, index) => (
           <button
             key={index}
