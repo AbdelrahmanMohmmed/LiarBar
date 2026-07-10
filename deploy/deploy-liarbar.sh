@@ -20,10 +20,21 @@ docker run -d --name liarbar --restart unless-stopped \
   --env-file ~/liarbar.env \
   liarbar-server
 
-echo "==> Health check"
-sleep 3
-curl -sf http://127.0.0.1:3001/api/health
-echo
+echo "==> Health check (up to 30s)"
+healthy=0
+for i in $(seq 1 15); do
+  if curl -sf http://127.0.0.1:3001/api/health; then
+    echo
+    healthy=1
+    break
+  fi
+  sleep 2
+done
+if [ "$healthy" != "1" ]; then
+  echo "HEALTH CHECK FAILED — recent container logs:"
+  docker logs liarbar 2>&1 | tail -20
+  exit 1
+fi
 echo "==> Cleaning old images"
 docker image prune -f > /dev/null
 
