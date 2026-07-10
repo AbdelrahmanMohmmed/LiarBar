@@ -1,6 +1,6 @@
 # Liar's Bar
 
-Online multiplayer bluffing card game (cards & dominoes variants) with bots, voice chat, themes, and English/Arabic support.
+Online multiplayer games including Liar's Bar (cards & dominoes variants) and bilingual Codenames (Arabic/English) with voice chat, styling themes, and full Arabic RTL support.
 
 - **`server/`** — Node.js + Express + Socket.IO game server (TypeScript)
 - **`web/`** — React + Vite + Tailwind client
