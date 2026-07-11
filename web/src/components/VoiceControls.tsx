@@ -20,16 +20,33 @@ function getIceServers(): RTCIceServer[] {
     { urls: "stun:stun1.l.google.com:19302" },
   ];
 
-  const turnUrl = import.meta.env.VITE_TURN_URL as string | undefined;
-  if (turnUrl) {
-    servers.push({
-      urls: turnUrl,
-      username: import.meta.env.VITE_TURN_USERNAME as string | undefined,
-      credential: import.meta.env.VITE_TURN_CREDENTIAL as string | undefined,
-    });
+  const turnUrl = (import.meta.env.VITE_TURN_URL as string | undefined)?.trim();
+  const turnUser = (import.meta.env.VITE_TURN_USERNAME as string | undefined)?.trim();
+  const turnCred = (import.meta.env.VITE_TURN_CREDENTIAL as string | undefined)?.trim();
+
+  // A turn:/turns: server with no credentials makes RTCPeerConnection throw,
+  // which would break ALL voice — so only add TURN when fully configured.
+  if (turnUrl && turnCred) {
+    servers.push({ urls: turnUrl, username: turnUser, credential: turnCred });
+  } else if (turnUrl) {
+    console.warn(
+      "[voice] VITE_TURN_URL is set but username/credential is missing — " +
+        "ignoring TURN and using STUN only. Cross-network calls will fail.",
+    );
+  }
+
+  if (!voiceIceLogged) {
+    voiceIceLogged = true;
+    console.info(
+      "[voice] ICE servers:",
+      servers.map((s) => s.urls),
+      turnUrl && turnCred ? "(TURN active)" : "(STUN only — no TURN)",
+    );
   }
   return servers;
 }
+
+let voiceIceLogged = false;
 
 export const VoiceControls = memo(function VoiceControls({
   roomId,
@@ -91,7 +108,16 @@ export const VoiceControls = memo(function VoiceControls({
 
   const createPeerConnection = useCallback(
     (peerId: string, initiator: boolean): RTCPeerConnection => {
-      const pc = new RTCPeerConnection({ iceServers: getIceServers() });
+      let pc: RTCPeerConnection;
+      try {
+        pc = new RTCPeerConnection({ iceServers: getIceServers() });
+      } catch (err) {
+        // Bad TURN config should never kill voice — fall back to plain STUN.
+        console.error("[voice] RTCPeerConnection init failed, retrying STUN-only:", err);
+        pc = new RTCPeerConnection({
+          iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+        });
+      }
 
       // The initiator seeds a single audio m-line in recvonly so that both
       // sides are connected and can *receive* before anyone opens their mic.
