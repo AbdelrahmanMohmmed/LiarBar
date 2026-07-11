@@ -170,7 +170,11 @@ export const VoiceControls = memo(function VoiceControls({
           audioEl.autoplay = true;
           audioElementsRef.current.set(peerId, audioEl);
         }
-        audioEl.srcObject = event.streams[0];
+        // We attach the mic via replaceTrack (no associated MediaStream), so
+        // event.streams is often empty — build a stream from the track itself.
+        const stream =
+          event.streams[0] ?? new MediaStream([event.track]);
+        audioEl.srcObject = stream;
         audioEl.play().catch(() => {
           // Autoplay blocked until a user gesture; unlockAudio() retries.
         });
