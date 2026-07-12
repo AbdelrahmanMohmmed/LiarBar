@@ -489,10 +489,18 @@ export default function Game() {
         </div>
       </div>
 
-      {/* Floating collapsible chat pill (bottom-center, expands upward) */}
+      {/* Floating collapsible chat pill (bottom-center, expands upward).
+          Hidden while the mobile hand sheet is up so it can't cover the
+          sheet's Skip/Make Claim button, which sits in the same corner. */}
       <div
-        className="fixed left-1/2 -translate-x-1/2 z-[90] w-[calc(100%-2rem)] max-w-[420px] rounded-3xl border border-amber-900/40 bg-[#1c0d0d]/95 backdrop-blur-xl shadow-2xl shadow-black/60 overflow-hidden flex flex-col transition-[height] duration-300"
-        style={{ bottom: 12, height: chatOpen ? 300 : 48 }}
+        className="fixed left-1/2 -translate-x-1/2 z-[90] w-[calc(100%-2rem)] max-w-[420px] rounded-3xl border border-amber-900/40 bg-[#1c0d0d]/95 backdrop-blur-xl shadow-2xl shadow-black/60 overflow-hidden flex flex-col transition-all duration-300"
+        style={{
+          bottom: 12,
+          height: chatOpen ? 300 : 48,
+          transform: showMobileHandSheet ? "translateY(150%)" : "translateY(0)",
+          opacity: showMobileHandSheet ? 0 : 1,
+          pointerEvents: showMobileHandSheet ? "none" : "auto",
+        }}
       >
         <button
           type="button"
