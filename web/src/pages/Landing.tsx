@@ -33,6 +33,10 @@ const COPY = {
     gameLobbySubtitle: "غرفة تجمع الألعاب",
     gameLobbyDesc: "أنشئ غرفة تجمع دائمة لأصدقائك، وتحدث معهم بالصوت، وابدأ أي لعبة بسلاسة دون انقطاع الاتصال!",
     lobbyPlayLabel: "إنشاء لوبي",
+    arcadeTitle: "صالة الألعاب",
+    arcadeSubtitle: "Arcade",
+    arcadeDesc: "مجموعة ألعاب أركيد أحادية اللاعب تلعبها مباشرة في المتصفح — أفعى، تيك تاك تو، نزال، وغزاة الفضاء!",
+    arcadePlayLabel: "ادخل الصالة",
     footerText: "© 2026 ألعاب سفريات — العب في أي وقت، في أي مكان.",
   },
   en: {
@@ -57,6 +61,10 @@ const COPY = {
     gameLobbySubtitle: "Game Party Hub",
     gameLobbyDesc: "Create a persistent party lobby, chat with friends via voice, and seamlessly launch any game without disconnecting!",
     lobbyPlayLabel: "Create Lobby",
+    arcadeTitle: "Arcade",
+    arcadeSubtitle: "Arcade",
+    arcadeDesc: "A collection of single-player arcade games you can play right in your browser — Snake, Tic-Tac-Toe, Fighter, and Space Invaders!",
+    arcadePlayLabel: "Enter Arcade",
     footerText: "© 2026 Safariyat Games — play anytime, anywhere.",
   },
 } as const;
@@ -79,6 +87,7 @@ export default function Landing() {
   const goToCodenames = useCallback(() => navigate("/codenames"), [navigate]);
   const goToHigherLower = useCallback(() => navigate("/higher-lower"), [navigate]);
   const goToLobby = useCallback(() => navigate("/lobby"), [navigate]);
+  const goToArcade = useCallback(() => navigate("/arcade"), [navigate]);
 
   return (
     <>
@@ -656,6 +665,122 @@ export default function Landing() {
                 }}
               >
                 {c.lobbyPlayLabel}
+              </button>
+            </div>
+          </article>
+
+          {/* Arcade — available */}
+          <article
+            style={{
+              animation: "dc-pop-in 0.5s ease 0.4s both",
+              background: "#FFFFFF",
+              borderRadius: 24,
+              border: "3px solid #2B2420",
+              overflow: "hidden",
+              boxShadow: "6px 6px 0 #2B2420",
+            }}
+          >
+            <div
+              style={{
+                height: 140,
+                background: "#E0E7FF",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 14,
+                position: "relative",
+              }}
+            >
+              <div
+                style={{
+                  width: 46,
+                  height: 46,
+                  borderRadius: 12,
+                  background: "#7C3AED",
+                  border: "3px solid #2B2420",
+                  boxShadow: "3px 3px 0 #2B2420",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 22,
+                  transform: "rotate(-7deg)",
+                }}
+              >
+                🐍
+              </div>
+              <div
+                style={{
+                  width: 46,
+                  height: 46,
+                  borderRadius: 12,
+                  background: "#22D3EE",
+                  border: "3px solid #2B2420",
+                  boxShadow: "3px 3px 0 #2B2420",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 22,
+                  transform: "rotate(7deg)",
+                }}
+              >
+                👾
+              </div>
+              <span
+                style={{
+                  position: "absolute",
+                  top: 10,
+                  [badgeSide]: 10,
+                  background: "#3AA6A6",
+                  color: "#FDF6EC",
+                  fontFamily: BUTTON_FONT,
+                  fontWeight: 700,
+                  fontSize: 12,
+                  padding: "5px 12px",
+                  borderRadius: 999,
+                  animation: "dc-float-badge 2.4s ease-in-out infinite",
+                }}
+              >
+                {c.availableLabel}
+              </span>
+            </div>
+            <div
+              style={{
+                padding: "16px 20px 20px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 10,
+                textAlign,
+              }}
+            >
+              <div>
+                <div style={{ fontFamily: font, fontWeight: 800, fontSize: 22, color: "#2B2420" }}>
+                  {c.arcadeTitle}
+                </div>
+                <div style={{ fontFamily: font, fontSize: 14, color: "#8A7F73", marginTop: 2 }}>
+                  {c.arcadeSubtitle}
+                </div>
+              </div>
+              <p style={{ fontFamily: font, fontSize: 14, lineHeight: 1.6, color: "#5B5147", margin: 0 }}>
+                {c.arcadeDesc}
+              </p>
+              <button
+                onClick={goToArcade}
+                className="dc-play-btn"
+                style={{
+                  alignSelf: buttonAlign,
+                  marginTop: 4,
+                  background: "#7C3AED",
+                  color: "#FDF6EC",
+                  border: "none",
+                  fontFamily: BUTTON_FONT,
+                  fontWeight: 700,
+                  fontSize: 15,
+                  padding: "10px 22px",
+                  borderRadius: 999,
+                  cursor: "pointer",
+                }}
+              >
+                {c.arcadePlayLabel}
               </button>
             </div>
           </article>

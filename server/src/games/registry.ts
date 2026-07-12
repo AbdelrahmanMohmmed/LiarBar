@@ -8,6 +8,10 @@ import type { GameVariant, ClaimType } from "./liars-bar/Deck.js";
 import { CodenamesGame } from "./codenames/CodenamesGame.js";
 import { HigherLowerGame } from "./higher-lower/HigherLowerGame.js";
 import { LobbyRoom } from "./lobby/LobbyRoom.js";
+import { TicTacToeGame } from "./tictactoe/TicTacToeGame.js";
+import { SnakeGame } from "./snake/SnakeGame.js";
+import { SpaceInvadersGame } from "./space-invaders/SpaceInvadersGame.js";
+import { FighterGame } from "./fighter/FighterGame.js";
 import type { Lang } from "./codenames/board.js";
 
 /**
@@ -103,4 +107,21 @@ registerGame("lobby", (roomId, options, callbacks) => {
     options.maxPlayers,
     callbacks,
   );
+});
+
+registerGame("tictactoe", (roomId, options, callbacks) => {
+  return new TicTacToeGame(roomId, options.maxPlayers, callbacks);
+});
+
+registerGame("snake", (roomId, options, callbacks) => {
+  const duration = Number((options as any).duration) || 60;
+  return new SnakeGame(roomId, options.maxPlayers, callbacks, duration);
+});
+
+registerGame("space-invaders", (roomId, options, callbacks) => {
+  return new SpaceInvadersGame(roomId, options.maxPlayers, callbacks);
+});
+
+registerGame("fighter", (roomId, options, callbacks) => {
+  return new FighterGame(roomId, options, callbacks);
 });
