@@ -1,6 +1,6 @@
 import { memo, useMemo } from "react";
 import type { Card as CardType } from "@/lib/types";
-import { SUIT_COLORS, parseCardString } from "@/lib/types";
+import { parseCardString, SUIT_SYMBOLS } from "@/lib/types";
 import { useTheme } from "@/lib/themeContext";
 import { getDominoImagePath } from "@/lib/theme";
 import { cn } from "@/lib/utils";
@@ -126,44 +126,87 @@ export const Card = memo(function Card({ card: cardProp, cardStr, faceDown = fal
     );
   }
 
-  if (theme === "classic") {
+    if (theme === "standard") {
+    // Render the playing card with pure HTML + CSS (old standard-theme style).
+    const suitColor = assets.cardSuitColors[card.suit] ?? "#111827";
+    const symbol = SUIT_SYMBOLS[card.suit];
+    const cornerRank = cn(
+      "absolute top-1 left-1.5 font-bold leading-none",
+      small ? "text-[9px]" : "text-xs",
+    );
+    const cornerSuit = cn(
+      "absolute top-3.5 left-1.5 leading-none",
+      small ? "text-[8px]" : "text-[10px]",
+    );
+    const centerSuit = cn(
+      "leading-none",
+      small ? "text-base" : "text-xl",
+    );
+
+    return (
+      <div
+        className={cn(
+          "relative rounded-lg flex-shrink-0 select-none shadow-md bg-white border border-gray-300/80 flex items-center justify-center",
+          size,
+        )}
+        style={{ color: suitColor }}
+      >
+        <span className={cornerRank} style={{ color: suitColor }}>{card.rank}</span>
+        <span className={cornerSuit} style={{ color: suitColor }}>{symbol}</span>
+        <span className={centerSuit} style={{ color: suitColor }}>{symbol}</span>
+        <span
+          className={cn(cornerRank, "bottom-1 right-1.5 rotate-180")}
+          style={{ color: suitColor }}
+        >
+          {card.rank}
+        </span>
+      </div>
+    );
+  }
+
+    if (theme === "classic") {
     let rankFile = card.rank;
     if (card.rank !== "A" && card.rank !== "J" && card.rank !== "Q" && card.rank !== "K" && card.rank !== "10") {
       rankFile = `0${card.rank}` as any;
     }
     const imgPath = `/Cards/card_${card.suit}_${rankFile}.png`;
 
+    // Use an img tag with object-cover and scaling to crop out the built-in border from the asset
     return (
       <div
         className={cn(
-          "relative rounded-lg overflow-hidden flex-shrink-0 select-none flex items-center justify-center shadow-md",
+          "relative rounded-lg overflow-hidden flex-shrink-0 select-none shadow-md bg-transparent",
           size,
         )}
-        style={{ backgroundColor: "#fff" }}
       >
         <img
           src={imgPath}
           alt={`${card.rank} of ${card.suit}`}
-          className="w-full h-full object-fill"
+          className="w-[115%] h-[115%] max-w-none -ml-[7.5%] -mt-[7.5%] object-fill"
         />
       </div>
     );
   }
 
-  if (theme === "vip") {
+    if (theme === "vip") {
     const suitFileMap: Record<string, string> = {
       hearts: "Hearts-88x124.png",
       diamonds: "Diamonds-88x124.png",
       clubs: "Clubs-88x124.png",
       spades: "Spades-88x124.png",
     };
-    
+
     const rankIndex = {
       "A": 0, "2": 1, "3": 2, "4": 3, "5": 4, "6": 5, "7": 6, "8": 7, "9": 8, "10": 9, "J": 10, "Q": 11, "K": 12,
     }[card.rank] ?? 0;
 
     const imgPath = `/Cards_VIP/${suitFileMap[card.suit]}`;
-    
+
+    // Each VIP sprite sheet is a 5x3 grid of 88x124 cells (13 cards in order
+    // A,2..10,J,Q,K, then 2 empty cells). Select the right cell.
+    const col = rankIndex % 5;
+    const row = Math.floor(rankIndex / 5);
+
     return (
       <div
         className={cn(
@@ -171,12 +214,12 @@ export const Card = memo(function Card({ card: cardProp, cardStr, faceDown = fal
           size,
         )}
       >
-        <div 
+        <div
           className="w-full h-full"
           style={{
             backgroundImage: `url('${imgPath}')`,
-            backgroundSize: `1300% 100%`, // 13 cards in spritesheet
-            backgroundPosition: `${(rankIndex / (13 - 1)) * 100}% 0%`,
+            backgroundSize: "500% 300%",
+            backgroundPosition: `${(col / (5 - 1)) * 100}% ${(row / (3 - 1)) * 100}%`,
             backgroundRepeat: "no-repeat",
           }}
         />
@@ -184,37 +227,15 @@ export const Card = memo(function Card({ card: cardProp, cardStr, faceDown = fal
     );
   }
 
-  // Standard theme (Premium Vector CSS based)
-  const color = SUIT_COLORS[card.suit];
-  const rankSize = small ? "text-[8px] sm:text-[9px]" : "text-xs";
-  const symSize = small ? "w-2.5 h-2.5" : "w-3.5 h-3.5";
-  const centerSym = small ? "w-5 h-5" : "w-8 h-8";
-
+  // Fallback (should not be reached for playing cards)
   return (
     <div
       className={cn(
-        "relative rounded-lg border border-gray-300/80 bg-gradient-to-br from-white to-gray-50 shadow-md flex flex-col items-center justify-center select-none overflow-hidden flex-shrink-0 hover:shadow-lg transition-all",
+        "relative rounded-lg border border-gray-300/80 bg-gradient-to-br from-white to-gray-50 shadow-md flex items-center justify-center select-none overflow-hidden flex-shrink-0",
         size,
       )}
     >
-      {/* Top Left Rank and Suit */}
-      <div className="absolute top-1 left-1.5 flex flex-col items-center">
-        <span className={cn("font-bold leading-none mb-0.5", rankSize)} style={{ color }}>
-          {card.rank}
-        </span>
-        <SuitIcon suit={card.suit} className={symSize} style={{ color }} />
-      </div>
-
-      {/* Center Suit Symbol */}
-      <SuitIcon suit={card.suit} className={centerSym} style={{ color }} />
-
-      {/* Bottom Right Rank and Suit (Inverted) */}
-      <div className="absolute bottom-1 right-1.5 flex flex-col items-center rotate-180">
-        <span className={cn("font-bold leading-none mb-0.5", rankSize)} style={{ color }}>
-          {card.rank}
-        </span>
-        <SuitIcon suit={card.suit} className={symSize} style={{ color }} />
-      </div>
+      <span className="font-bold text-gray-900">{card.rank}</span>
     </div>
   );
 });

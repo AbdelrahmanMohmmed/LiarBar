@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LiarBar — Standard Card Theme</title>
+  <style>
+    :root {
+      /* Standard theme suit colors */
+      --suit-hearts: #DC2626;
+      --suit-diamonds: #2563EB;
+      --suit-clubs: #16A34A;
+      --suit-spades: #7C3AED;
+      --table-bg: #0d1a0d;
+      --table-border: #166534;
+      --accent: #F59E0B;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--table-bg);
+      border: 12px solid var(--table-border);
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      color: #e5e7eb;
+      padding: 24px;
+    }
+
+    h1 {
+      text-align: center;
+      color: var(--accent);
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      margin: 0 0 4px;
+    }
+
+    p.subtitle {
+      text-align: center;
+      margin: 0 0 28px;
+      opacity: 0.7;
+      font-size: 14px;
+    }
+
+    .section-title {
+      color: var(--accent);
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin: 28px 0 12px;
+      border-bottom: 1px solid var(--table-border);
+      padding-bottom: 6px;
+    }
+
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    /* ===== Card (pure HTML + CSS) ===== */
+    .card {
+      width: 88px;
+      height: 124px;
+      border-radius: 8px;
+      background: linear-gradient(to bottom, #ffffff, #f8fafc);
+      border: 1px solid rgba(0, 0, 0, 0.15);
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 6px;
+      user-select: none;
+      position: relative;
+    }
+
+    .card .corner {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      line-height: 1;
+    }
+
+    .card .corner .rank {
+      font-weight: 700;
+      font-family: "Courier New", monospace;
+      font-size: 16px;
+    }
+
+    .card .corner .pip {
+      font-size: 14px;
+      line-height: 1;
+    }
+
+    .card .center {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 44px;
+      line-height: 1;
+    }
+
+    .card .corner.bottom {
+      transform: rotate(180deg);
+    }
+
+    /* Suit colors */
+    .card.hearts   { color: var(--suit-hearts); }
+    .card.diamonds { color: var(--suit-diamonds); }
+    .card.clubs    { color: var(--suit-clubs); }
+    .card.spades   { color: var(--suit-spades); }
+
+    /* ===== Card back (standard theme) ===== */
+    .card-back {
+      width: 88px;
+      height: 124px;
+      border-radius: 8px;
+      border: 2px solid rgba(185, 28, 28, 0.6);
+      background: linear-gradient(to bottom right, #991b1b, #450a0a);
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .card-back .seal {
+      width: 26px;
+      height: 26px;
+      border-radius: 6px;
+      border: 1px solid rgba(220, 38, 38, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: rgba(239, 68, 68, 0.6);
+      font-size: 12px;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <h1>LiarBar · Standard Card Theme</h1>
+  <p class="subtitle">Pure HTML + CSS rendering — no images, no framework</p>
+
+  <div class="section-title">Card Back</div>
+  <div class="row" id="backs"></div>
+
+  <div class="section-title">Hearts</div>
+  <div class="row" id="hearts"></div>
+
+  <div class="section-title">Diamonds</div>
+  <div class="row" id="diamonds"></div>
+
+  <div class="section-title">Clubs</div>
+  <div class="row" id="clubs"></div>
+
+  <div class="section-title">Spades</div>
+  <div class="row" id="spades"></div>
+
+  <script>
+    const SUITS = {
+      hearts:   "♥",
+      diamonds: "♦",
+      clubs:    "♣",
+      spades:   "♠",
+    };
+    const RANKS = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+
+    function makeCard(rank, suit) {
+      const sym = SUITS[suit];
+      const el = document.createElement("div");
+      el.className = "card " + suit;
+      el.innerHTML =
+        '<div class="corner top"><span class="rank">' + rank + '</span><span class="pip">' + sym + '</span></div>' +
+        '<div class="center">' + sym + '</div>' +
+        '<div class="corner bottom"><span class="rank">' + rank + '</span><span class="pip">' + sym + '</span></div>';
+      return el;
+    }
+
+    function makeBack() {
+      const el = document.createElement("div");
+      el.className = "card-back";
+      el.innerHTML = '<div class="seal">?</div>';
+      return el;
+    }
+
+    document.getElementById("backs").appendChild(makeBack());
+
+    for (const suit of Object.keys(SUITS)) {
+      const container = document.getElementById(suit);
+      for (const rank of RANKS) {
+        container.appendChild(makeCard(rank, suit));
+      }
+    }
+  </script>
+</body>
+</html>
