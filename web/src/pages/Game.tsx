@@ -303,7 +303,7 @@ export default function Game() {
 
       {/* Main game area */}
       <div className="flex-1 flex flex-col relative z-10">
-        <div className="flex-1 flex items-center justify-center p-4">
+        <div className="flex-1 min-h-0 flex items-center justify-center p-4">
           <GameTable
             gameState={gameState}
             myPlayerId={myPlayerId!}

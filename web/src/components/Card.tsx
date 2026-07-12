@@ -10,6 +10,8 @@ interface CardProps {
   cardStr?: string;
   faceDown?: boolean;
   small?: boolean;
+  /** Slightly smaller than the default size, used to fit a full hand on narrow screens. */
+  compact?: boolean;
 }
 
 export const SuitIcon = memo(function SuitIcon({
@@ -50,7 +52,7 @@ export const SuitIcon = memo(function SuitIcon({
   );
 });
 
-export const Card = memo(function Card({ card: cardProp, cardStr, faceDown = false, small = false }: CardProps) {
+export const Card = memo(function Card({ card: cardProp, cardStr, faceDown = false, small = false, compact = false }: CardProps) {
   const { assets, theme } = useTheme();
 
   const card = useMemo(() => {
@@ -60,7 +62,7 @@ export const Card = memo(function Card({ card: cardProp, cardStr, faceDown = fal
   }, [cardProp, cardStr]);
 
   // Standard aspect ratio for playing cards (88x124 VIP sheets ratio)
-  const size = small ? "h-12 aspect-[88/124]" : "h-20 aspect-[88/124]";
+  const size = small ? "h-12 aspect-[88/124]" : compact ? "h-14 aspect-[88/124]" : "h-20 aspect-[88/124]";
 
   if (faceDown) {
     return (
