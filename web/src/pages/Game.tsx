@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useGame } from "@/lib/gameContext";
 import { GameTable } from "@/components/GameTable";
@@ -12,7 +12,7 @@ import { LangToggle } from "@/components/LangToggle";
 import { useLanguage } from "@/lib/languageContext";
 import type { CardDeclaration } from "@/lib/types";
 import { declarationToString } from "@/lib/types";
-import { AlertTriangle, ThumbsDown, Play, Clock, Eye, SkipForward, MessageCircle, HelpCircle } from "lucide-react";
+import { AlertTriangle, ThumbsDown, Play, Clock, Eye, SkipForward, MessageCircle, HelpCircle, ChevronDown, ChevronUp, Send } from "lucide-react";
 
 export default function Game() {
   const { roomId: paramRoomId } = useParams<{ roomId: string }>();
@@ -38,12 +38,13 @@ export default function Game() {
   const [showDeclaration, setShowDeclaration] = useState(false);
   const [reconnected, setReconnected] = useState(false);
   const [chatInput, setChatInput] = useState("");
-  const [showChat, setShowChat] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [challengeCountdown, setChallengeCountdown] = useState<number | null>(null);
   const [revealCountdown, setRevealCountdown] = useState<number | null>(null);
   const [hasVoted, setHasVoted] = useState(false);
   const [canVoteYet, setCanVoteYet] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (reconnected) return;
@@ -126,6 +127,13 @@ export default function Game() {
       }
     }
   }, [gameState?.phase, gameState?.skipVotes, gameState?.challengeMode, gameState?.challengeStartedAt, myPlayerId]);
+
+  // Auto-scroll chat to the latest message while it's open
+  useEffect(() => {
+    if (chatOpen) {
+      chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [chatMessages, chatOpen]);
 
   const myPlayer = gameState?.players.find((p) => p.id === myPlayerId);
   const isMyTurn =
@@ -289,61 +297,9 @@ export default function Game() {
           >
             <HelpCircle className="w-4 h-4" />
           </button>
-          <button
-            onClick={() => setShowChat(!showChat)}
-            className="relative p-2 rounded-lg text-amber-200/60 hover:text-white hover:bg-[#2a1515] transition-all"
-            title=              {showChat ? t("chat.hide") : t("chat.show")}
-          >
-            <MessageCircle className="w-4 h-4" />
-            {chatMessages.length > 0 && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 rounded-full text-[9px] font-bold text-white flex items-center justify-center">
-                {chatMessages.length > 9 ? "9+" : chatMessages.length}
-              </span>
-            )}
-          </button>
           {!lobbyState && <VoiceControls roomId={paramRoomId!} />}
         </div>
       </div>
-
-      {/* Chat panel */}
-      {showChat && (
-        <div className="absolute top-14 right-4 z-30 w-[calc(100vw-2rem)] sm:w-72 h-[calc(100vh-7rem)] flex flex-col bg-[#0d1a0d]/95 backdrop-blur-xl border border-amber-900/30 rounded-2xl shadow-2xl shadow-black/60 overflow-hidden animate-in slide-in-from-right-2 duration-200">
-          <div className="p-3 pb-1 border-b border-amber-900/20">
-              <h3 className="text-white text-sm font-bold flex items-center gap-2">
-                <MessageCircle className="w-4 h-4 text-amber-400" />
-                {t("room.chat")}
-              </h3>
-          </div>
-          <div className="flex-1 flex flex-col p-3 gap-2 min-h-0">
-            <div className="flex-1 overflow-y-auto space-y-1.5">
-              {chatMessages.map((msg, i) => (
-                <div key={i} className="text-xs">
-                  <span className="text-amber-400 font-medium">{msg.playerName}:</span>{" "}
-                  <span className="text-amber-100/80">{msg.message}</span>
-                </div>
-              ))}
-              {chatMessages.length === 0 && (
-                <p className="text-amber-200/30 text-xs text-center mt-8">{t("room.no_messages")}</p>
-              )}
-            </div>
-            <form onSubmit={handleSendChat} className="flex gap-2 shrink-0">
-              <input
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                placeholder={t("room.type_message")}
-                maxLength={200}
-                className="flex-1 px-2.5 py-2 rounded-lg bg-[#2a1515] border border-amber-900/40 text-white placeholder:text-amber-200/30 text-xs focus:border-amber-500/60 focus:outline-none"
-              />
-              <button
-                type="submit"
-                className="p-2 rounded-lg bg-amber-700 hover:bg-amber-600 text-white shrink-0 transition-all"
-              >
-                <MessageCircle className="w-3.5 h-3.5" />
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* Main game area */}
       <div className="flex-1 flex flex-col relative z-10">
@@ -356,8 +312,8 @@ export default function Game() {
           />
         </div>
 
-        {/* Action area */}
-        <div className="relative z-20">
+        {/* Action area (bottom padding reserves room for the floating chat pill) */}
+        <div className="relative z-20 pb-16">
           {/* Challenge notification for ANY player (except lastPlayer) */}
           {canChallenge && (
             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-4 w-full max-w-md animate-in slide-in-from-bottom-4 duration-300">
@@ -514,6 +470,69 @@ export default function Game() {
             />
           )}
         </div>
+      </div>
+
+      {/* Floating collapsible chat pill (bottom-center, expands upward) */}
+      <div
+        className="fixed left-1/2 -translate-x-1/2 z-[90] w-[calc(100%-2rem)] max-w-[420px] rounded-3xl border border-amber-900/40 bg-[#1c0d0d]/95 backdrop-blur-xl shadow-2xl shadow-black/60 overflow-hidden flex flex-col transition-[height] duration-300"
+        style={{ bottom: 12, height: chatOpen ? 300 : 48 }}
+      >
+        <button
+          type="button"
+          onClick={() => setChatOpen(!chatOpen)}
+          className="flex h-12 items-center justify-between gap-2 px-4 shrink-0 text-amber-100"
+        >
+          <span className="flex items-center gap-2 min-w-0">
+            <MessageCircle className="w-4 h-4 text-amber-400 shrink-0" />
+            {!chatOpen && chatMessages.length > 0 ? (
+              <span className="text-xs font-semibold text-amber-200/90 truncate">
+                {chatMessages[chatMessages.length - 1].playerName}: {chatMessages[chatMessages.length - 1].message}
+              </span>
+            ) : (
+              <span className="text-sm font-bold">{t("room.chat")}</span>
+            )}
+          </span>
+          <span className="flex items-center gap-2 shrink-0">
+            {chatMessages.length > 0 && !chatOpen && (
+              <span className="w-4 h-4 bg-amber-500 rounded-full text-[9px] font-bold text-white flex items-center justify-center">
+                {chatMessages.length > 9 ? "9+" : chatMessages.length}
+              </span>
+            )}
+            {chatOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+          </span>
+        </button>
+
+        {chatOpen && (
+          <div className="flex-1 flex flex-col p-3 gap-2 min-h-0 border-t border-amber-900/20">
+            <div className="flex-1 overflow-y-auto space-y-1.5">
+              {chatMessages.map((msg, i) => (
+                <div key={i} className="text-xs">
+                  <span className="text-amber-400 font-medium">{msg.playerName}:</span>{" "}
+                  <span className="text-amber-100/80">{msg.message}</span>
+                </div>
+              ))}
+              {chatMessages.length === 0 && (
+                <p className="text-amber-200/30 text-xs text-center mt-8">{t("room.no_messages")}</p>
+              )}
+              <div ref={chatEndRef} />
+            </div>
+            <form onSubmit={handleSendChat} className="flex gap-2 shrink-0">
+              <input
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                placeholder={t("room.type_message")}
+                maxLength={200}
+                className="flex-1 px-2.5 py-2 rounded-lg bg-[#2a1515] border border-amber-900/40 text-white placeholder:text-amber-200/30 text-xs focus:border-amber-500/60 focus:outline-none"
+              />
+              <button
+                type="submit"
+                className="p-2 rounded-lg bg-amber-700 hover:bg-amber-600 text-white shrink-0 transition-all"
+              >
+                <Send className="w-3.5 h-3.5" />
+              </button>
+            </form>
+          </div>
+        )}
       </div>
 
       {/* Guide modal */}
