@@ -3,19 +3,25 @@ import { useNavigate } from "react-router-dom";
 import { useGame } from "@/lib/gameContext";
 import { useLanguage } from "@/lib/languageContext";
 import { Seo } from "@/lib/seo";
-import { LangToggle } from "@/components/LangToggle";
 import { GuideModal } from "@/components/GuideModal";
 import { ThemeSelector } from "@/components/ThemeSelector";
 import { useTheme } from "@/lib/themeContext";
-import { Swords, Users, Gamepad2, Dice1, LogIn, HelpCircle, ArrowLeft, ChevronDown, SlidersHorizontal } from "lucide-react";
+import { COLORS, uiFont } from "./theme";
+import { Panel, Field, inputStyle, PrimaryButton, TabButton, PillToggle } from "./ui";
+import { Swords, Users, Gamepad2, Dice1, LogIn, HelpCircle, ArrowLeft, ChevronDown, SlidersHorizontal, Globe } from "lucide-react";
 import type { GameVariant, ClaimType, ChallengeMode } from "@/lib/types";
 import { isFirebaseConfigured, signInWithGoogle, onAuthChange } from "@/lib/firebase";
 
 export default function Index() {
   const navigate = useNavigate();
   const { createRoom, joinRoom, addToast } = useGame();
-  const { t, lang } = useLanguage();
+  const { t, lang, toggleLang } = useLanguage();
   const { theme } = useTheme();
+
+  const isAr = lang === "ar";
+  const dir = isAr ? "rtl" : "ltr";
+  const font = uiFont(isAr);
+  const textAlign = isAr ? "right" : "left";
 
   const [playerName, setPlayerName] = useState("");
   const [showGuide, setShowGuide] = useState(false);
@@ -103,6 +109,9 @@ export default function Index() {
     }
   }, [playerName, joinRoomId, joinRoom, navigate, addToast]);
 
+  const selectStyle = { ...inputStyle(textAlign), cursor: "pointer" };
+  const labelStyle = { fontSize: 12, color: COLORS.textSecondary, display: "block", marginBottom: 6, textAlign } as const;
+
   return (
     <>
     <Seo
@@ -130,316 +139,233 @@ export default function Index() {
         offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
       }}
     />
-    <div className="min-h-screen bg-gradient-to-b from-[#1a0a0a] via-[#2d1111] to-[#1a0a0a] flex flex-col items-center justify-center p-4 py-8">
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-amber-600/5 rounded-full blur-3xl" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-red-800/5 rounded-full blur-3xl" />
-      </div>
-
+    <div
+      dir={dir}
+      style={{
+        minHeight: "100vh", background: COLORS.cream, fontFamily: font, color: COLORS.ink,
+        display: "flex", flexDirection: "column", alignItems: "center", padding: "24px 16px 40px",
+        boxSizing: "border-box", position: "relative",
+      }}
+    >
       <button
         onClick={() => navigate("/")}
-        className="absolute top-4 left-4 z-20 inline-flex items-center gap-1.5 text-amber-200/50 hover:text-white text-sm px-3 py-2 rounded-lg hover:bg-[#2a1515] transition-all"
+        style={{
+          position: "absolute", top: 20, [isAr ? "right" : "left"]: 20,
+          display: "flex", alignItems: "center", gap: 6, border: `2px solid ${COLORS.ink}`,
+          background: COLORS.white, color: COLORS.ink, fontWeight: 700, fontSize: 13,
+          padding: "8px 14px", borderRadius: 999, cursor: "pointer", fontFamily: font,
+        }}
       >
-        <ArrowLeft className="w-4 h-4" />
+        <ArrowLeft className="w-4 h-4" style={isAr ? { transform: "scaleX(-1)" } : undefined} />
         {t("index.back_to_arcade")}
       </button>
 
-      <div className="mb-6 text-center relative z-10">
-        <div className="inline-flex items-center gap-3 mb-2">
-          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center shadow-lg shadow-amber-900/50">
-            <Swords className="w-6 h-6 text-white" />
+      <div style={{ marginBottom: 20, marginTop: 36, textAlign: "center" }}>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+          <div
+            style={{
+              width: 42, height: 42, borderRadius: 10, background: COLORS.red,
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}
+          >
+            <Swords className="w-5 h-5" color={COLORS.cream} />
           </div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">
-            {t("index.title")}
-          </h1>
+          <h1 style={{ fontSize: 26, fontWeight: 800, margin: 0 }}>{t("index.title")}</h1>
         </div>
-        <p className="text-amber-200/60 text-sm mt-1">
-          {t("index.subtitle")}
-        </p>
+        <p style={{ color: COLORS.textSecondary, fontSize: 14, margin: 0 }}>{t("index.subtitle")}</p>
       </div>
 
-      <div className="w-full max-w-md bg-[#1c0d0d]/90 backdrop-blur-xl border border-amber-900/30 shadow-2xl shadow-black/50 rounded-2xl relative z-10">
-        <div className="p-6 pb-2 flex items-start justify-between">
-          <div>
-            <h2 className="text-white text-xl font-bold">{t("index.join_table")}</h2>
-            <p className="text-amber-200/50 text-sm">{t("index.enter_name_hint")}</p>
+      <Panel style={{ width: "100%", maxWidth: 420, padding: 24 }}>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16 }}>
+          <div style={{ textAlign }}>
+            <h2 style={{ fontSize: 19, fontWeight: 800, margin: 0 }}>{t("index.join_table")}</h2>
+            <p style={{ color: COLORS.textMuted, fontSize: 13, margin: "2px 0 0" }}>{t("index.enter_name_hint")}</p>
           </div>
-          <div className="flex items-center gap-1">
+          <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
             <button
               onClick={() => setShowGuide(true)}
-              className="p-2 rounded-lg text-amber-200/60 hover:text-white hover:bg-[#2a1515] transition-all"
+              style={{ border: "none", background: "transparent", color: COLORS.textMuted, cursor: "pointer", padding: 6 }}
               title={t("guide.title")}
             >
               <HelpCircle className="w-4 h-4" />
             </button>
-            <LangToggle />
+            <button
+              onClick={toggleLang}
+              style={{ border: "none", background: "transparent", color: COLORS.textMuted, cursor: "pointer", padding: 6, display: "flex", alignItems: "center", gap: 4 }}
+              title={t("lang.switch_to")}
+            >
+              <Globe className="w-4 h-4" />
+            </button>
           </div>
         </div>
-        <div className="p-6 pt-2 space-y-4">
-          <div className="space-y-2">
-            <label htmlFor="name" className="text-amber-200/80 text-sm block">{t("index.your_name")}</label>
-            <div className="flex gap-2">
-              <input
-                id="name"
-                placeholder={t("index.name_placeholder")}
-                value={playerName}
-                onChange={(e) => setPlayerName(e.target.value)}
-                maxLength={16}
-                className="flex-1 px-3 py-2.5 rounded-lg bg-[#2a1515] border border-amber-900/40 text-white placeholder:text-amber-200/30 focus:border-amber-500/60 focus:outline-none text-sm"
-              />
-              {isFirebaseConfigured() && (
-                <button
-                  onClick={handleGoogleSignIn}
-                  className="px-3 py-2.5 rounded-lg bg-[#2a1515] border border-amber-900/40 text-amber-200/70 hover:bg-[#3a1f1f] hover:text-white transition-all"
-                  title={googleUser ? `Signed in as ${googleUser.name}` : "Sign in with Google"}
-                >
-                  <LogIn className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-            {googleUser && (
-              <p className="text-emerald-400/60 text-xs">
-                {t("index.signed_in_as")} {googleUser.name}
-              </p>
+
+        <Field label={t("index.your_name")} align={textAlign}>
+          <div style={{ display: "flex", gap: 8 }}>
+            <input
+              id="name"
+              placeholder={t("index.name_placeholder")}
+              value={playerName}
+              onChange={(e) => setPlayerName(e.target.value)}
+              maxLength={16}
+              style={{ ...inputStyle(textAlign), flex: 1 }}
+            />
+            {isFirebaseConfigured() && (
+              <button
+                onClick={handleGoogleSignIn}
+                style={{
+                  border: `2px solid ${COLORS.ink}`, background: COLORS.white, color: COLORS.ink,
+                  borderRadius: 12, padding: "0 12px", cursor: "pointer", flexShrink: 0,
+                }}
+                title={googleUser ? `Signed in as ${googleUser.name}` : "Sign in with Google"}
+              >
+                <LogIn className="w-4 h-4" />
+              </button>
             )}
           </div>
+          {googleUser && (
+            <p style={{ color: COLORS.teal, fontSize: 12, margin: "6px 0 0" }}>
+              {t("index.signed_in_as")} {googleUser.name}
+            </p>
+          )}
+        </Field>
 
-          <div className="flex rounded-lg bg-[#2a1515] p-0.5">
-            <button
-              onClick={() => setTab("create")}
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                tab === "create"
-                  ? "bg-amber-900/60 text-white shadow-sm"
-                  : "text-amber-200/60 hover:text-amber-200/80"
-              }`}
-            >
-              <Gamepad2 className="w-4 h-4" />
-              {t("index.create_room_tab")}
-            </button>
-            <button
-              onClick={() => setTab("join")}
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                tab === "join"
-                  ? "bg-amber-900/60 text-white shadow-sm"
-                  : "text-amber-200/60 hover:text-amber-200/80"
-              }`}
-            >
-              <Users className="w-4 h-4" />
-              {t("index.join_room_tab")}
-            </button>
-          </div>
+        <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+          <TabButton active={tab === "create"} onClick={() => setTab("create")} label={t("index.create_room_tab")} icon={<Gamepad2 className="w-4 h-4" />} />
+          <TabButton active={tab === "join"} onClick={() => setTab("join")} label={t("index.join_room_tab")} icon={<Users className="w-4 h-4" />} />
+        </div>
 
-          {tab === "create" ? (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <label className="text-amber-200/80 text-xs block">{t("index.max_players")}</label>
-                  <select
-                    value={maxPlayers}
-                    onChange={(e) => setMaxPlayers(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-lg bg-[#2a1515] border border-amber-900/40 text-white text-sm focus:border-amber-500/60 focus:outline-none"
-                  >
-                    {[2, 3, 4, 5, 6].map((n) => (
-                      <option key={n} value={String(n)}>{n} {t("index.n_players")}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-amber-200/80 text-xs block">{t("index.game_type")}</label>
-                  <select
-                    value={variant}
-                    onChange={(e) => setVariant(e.target.value as GameVariant)}
-                    className="w-full px-3 py-2.5 rounded-lg bg-[#2a1515] border border-amber-900/40 text-white text-sm focus:border-amber-500/60 focus:outline-none"
-                  >
-                    <option value="cards">{t("index.cards")}</option>
-                    <option value="dominoes">{t("index.dominoes")}</option>
-                  </select>
-                </div>
-              </div>
-
-              {variant === "cards" && (
-                <div className="space-y-2">
-                  <label className="text-amber-200/80 text-xs block">{t("index.claim_type")}</label>
-                  <select
-                    value={claimType}
-                    onChange={(e) => setClaimType(e.target.value as ClaimType)}
-                    className="w-full px-3 py-2.5 rounded-lg bg-[#2a1515] border border-amber-900/40 text-white text-sm focus:border-amber-500/60 focus:outline-none"
-                  >
-                    <option value="suit">{t("index.suit_only")}</option>
-                    <option value="rank">{t("index.rank_only")}</option>
-                  </select>
-                </div>
-              )}
-
-              <button
-                type="button"
-                onClick={() => setShowAdvanced((v) => !v)}
-                className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg bg-[#2a1515]/60 border border-amber-900/30 text-amber-200/80 hover:bg-[#2a1515] transition-all"
-              >
-                <span className="inline-flex items-center gap-2 text-sm">
-                  <SlidersHorizontal className="w-4 h-4" />
-                  {t("index.advanced")}
-                </span>
-                <ChevronDown className={`w-4 h-4 transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
-              </button>
-
-              {showAdvanced && (
-              <div className="space-y-4 border-l-2 border-amber-900/30 pl-3 animate-in fade-in">
-              <div className="space-y-2">
-                <label className="text-amber-200/80 text-xs block">{t("index.num_decks")}</label>
-                <select
-                  value={deckCount}
-                  onChange={(e) => setDeckCount(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-lg bg-[#2a1515] border border-amber-900/40 text-white text-sm focus:border-amber-500/60 focus:outline-none"
-                >
-                  {[1, 2, 3, 4].map((n) => (
-                    <option key={n} value={String(n)}>{n} {n === 1 ? "Deck" : "Decks"}</option>
+        {tab === "create" ? (
+          <div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+              <div>
+                <label style={labelStyle}>{t("index.max_players")}</label>
+                <select value={maxPlayers} onChange={(e) => setMaxPlayers(e.target.value)} style={selectStyle}>
+                  {[2, 3, 4, 5, 6].map((n) => (
+                    <option key={n} value={String(n)}>{n} {t("index.n_players")}</option>
                   ))}
                 </select>
               </div>
-
-              <div className="space-y-2">
-                <label className="text-amber-200/80 text-xs block">
-                  {t("index.reveal_duration")}: <span className="text-amber-400 font-mono">{revealTime}s</span>
-                </label>
-                <input
-                  type="range"
-                  min="3"
-                  max="10"
-                  value={revealTime}
-                  onChange={(e) => setRevealTime(e.target.value)}
-                  className="w-full accent-amber-500"
-                />
-                <div className="flex justify-between text-[10px] text-amber-200/30">
-                  <span>3s</span>
-                  <span>10s</span>
-                </div>
+              <div>
+                <label style={labelStyle}>{t("index.game_type")}</label>
+                <select value={variant} onChange={(e) => setVariant(e.target.value as GameVariant)} style={selectStyle}>
+                  <option value="cards">{t("index.cards")}</option>
+                  <option value="dominoes">{t("index.dominoes")}</option>
+                </select>
               </div>
-
-              {/* Challenge Mode */}
-              <div className="space-y-2">
-                <label className="text-amber-200/80 text-xs block">{t("index.challenge_mode")}</label>
-                <div className="flex rounded-lg bg-[#2a1515] p-0.5">
-                  <button
-                    onClick={() => setChallengeMode("timer")}
-                    className={`flex-1 px-3 py-2 rounded-md text-xs font-medium transition-all ${
-                      challengeMode === "timer"
-                        ? "bg-amber-900/60 text-white shadow-sm"
-                        : "text-amber-200/60 hover:text-amber-200/80"
-                    }`}
-                  >
-                    {t("index.timer_mode")}
-                  </button>
-                  <button
-                    onClick={() => setChallengeMode("vote")}
-                    className={`flex-1 px-3 py-2 rounded-md text-xs font-medium transition-all ${
-                      challengeMode === "vote"
-                        ? "bg-amber-900/60 text-white shadow-sm"
-                        : "text-amber-200/60 hover:text-amber-200/80"
-                    }`}
-                  >
-                    {t("index.vote_mode")}
-                  </button>
-                </div>
-                <p className="text-amber-200/30 text-[10px]">
-                  {challengeMode === "timer"
-                    ? t("index.timer_mode_desc")
-                    : t("index.vote_mode_desc")}
-                </p>
-              </div>
-
-              {/* Challenge Duration */}
-              <div className="space-y-2">
-                <label className="text-amber-200/80 text-xs block">{t("index.challenge_duration")}</label>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setChallengeDuration("5")}
-                    className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all ${
-                      challengeDuration === "5"
-                        ? "bg-amber-600 text-white shadow shadow-amber-900/50"
-                        : "bg-[#2a1515] text-amber-200/70 hover:bg-[#3a1f1f]"
-                    }`}
-                  >
-                    5s
-                  </button>
-                  <button
-                    onClick={() => setChallengeDuration("10")}
-                    className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all ${
-                      challengeDuration === "10"
-                        ? "bg-amber-600 text-white shadow shadow-amber-900/50"
-                        : "bg-[#2a1515] text-amber-200/70 hover:bg-[#3a1f1f]"
-                    }`}
-                  >
-                    10s
-                  </button>
-                </div>
-                <p className="text-amber-200/30 text-[10px]">
-                  {challengeMode === "timer"
-                    ? t("index.challenge_duration_timer_desc")
-                    : t("index.challenge_duration_vote_desc")}
-                </p>
-              </div>
-
-              <ThemeSelector />
-              </div>
-              )}
-
-              <button
-                onClick={handleCreate}
-                disabled={isLoading}
-                className="w-full inline-flex items-center justify-center gap-2 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white font-semibold py-3 rounded-xl shadow-lg shadow-amber-900/30 transition-all active:scale-95 disabled:opacity-50"
-              >
-                {isLoading ? (
-                  <span className="flex items-center gap-2">
-                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    {t("index.creating")}
-                  </span>
-                ) : (
-                  <>
-                    <Dice1 className="w-4 h-4" />
-                    {t("index.create_room")}
-                  </>
-                )}
-              </button>
             </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-amber-200/80 text-xs block">{t("index.room_code")}</label>
-                <input
-                  placeholder={t("index.room_code_placeholder")}
-                  value={joinRoomId}
-                  onChange={(e) => setJoinRoomId(e.target.value.toUpperCase())}
-                  maxLength={6}
-                  className="w-full px-3 py-2.5 rounded-lg bg-[#2a1515] border border-amber-900/40 text-white placeholder:text-amber-200/30 focus:border-amber-500/60 focus:outline-none text-center text-lg tracking-widest font-mono"
-                />
+
+            {variant === "cards" && (
+              <div style={{ marginBottom: 12 }}>
+                <label style={labelStyle}>{t("index.claim_type")}</label>
+                <select value={claimType} onChange={(e) => setClaimType(e.target.value as ClaimType)} style={selectStyle}>
+                  <option value="suit">{t("index.suit_only")}</option>
+                  <option value="rank">{t("index.rank_only")}</option>
+                </select>
               </div>
+            )}
 
-              <button
-                onClick={handleJoin}
-                disabled={isLoading}
-                className="w-full inline-flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-700 to-emerald-800 hover:from-emerald-600 hover:to-emerald-700 text-white font-semibold py-3 rounded-xl shadow-lg shadow-emerald-900/30 transition-all active:scale-95 disabled:opacity-50"
-              >
-                {isLoading ? (
-                  <span className="flex items-center gap-2">
-                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    {t("index.joining")}
-                  </span>
-                ) : (
-                  <>
-                    <Users className="w-4 h-4" />
-                    {t("index.join_room")}
-                  </>
-                )}
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
+            <button
+              type="button"
+              onClick={() => setShowAdvanced((v) => !v)}
+              style={{
+                width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+                gap: 8, padding: "10px 14px", borderRadius: 12, border: `2px dashed ${COLORS.ink}`,
+                background: "transparent", color: COLORS.textSecondary, cursor: "pointer", fontFamily: font,
+                marginBottom: showAdvanced ? 14 : 16,
+              }}
+            >
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+                <SlidersHorizontal className="w-4 h-4" />
+                {t("index.advanced")}
+              </span>
+              <ChevronDown className="w-4 h-4" style={{ transform: showAdvanced ? "rotate(180deg)" : undefined, transition: "transform 0.2s" }} />
+            </button>
 
-      <p className="text-amber-200/20 text-xs mt-6 relative z-10">
-        {t("index.footer")}
-      </p>
+            {showAdvanced && (
+              <div style={{ borderInlineStart: `2px solid ${COLORS.disabledBg}`, paddingInlineStart: 12, marginBottom: 16, display: "flex", flexDirection: "column", gap: 14 }}>
+                <div>
+                  <label style={labelStyle}>{t("index.num_decks")}</label>
+                  <select value={deckCount} onChange={(e) => setDeckCount(e.target.value)} style={selectStyle}>
+                    {[1, 2, 3, 4].map((n) => (
+                      <option key={n} value={String(n)}>{n} {n === 1 ? "Deck" : "Decks"}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={labelStyle}>
+                    {t("index.reveal_duration")}: <span style={{ color: COLORS.red, fontFamily: "monospace" }}>{revealTime}s</span>
+                  </label>
+                  <input
+                    type="range"
+                    min="3"
+                    max="10"
+                    value={revealTime}
+                    onChange={(e) => setRevealTime(e.target.value)}
+                    style={{ width: "100%", accentColor: COLORS.red }}
+                  />
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: COLORS.textMuted }}>
+                    <span>3s</span>
+                    <span>10s</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label style={labelStyle}>{t("index.challenge_mode")}</label>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <PillToggle active={challengeMode === "timer"} onClick={() => setChallengeMode("timer")} label={t("index.timer_mode")} color={COLORS.teal} />
+                    <PillToggle active={challengeMode === "vote"} onClick={() => setChallengeMode("vote")} label={t("index.vote_mode")} color={COLORS.teal} />
+                  </div>
+                  <p style={{ color: COLORS.textMuted, fontSize: 11, margin: "6px 0 0", textAlign }}>
+                    {challengeMode === "timer" ? t("index.timer_mode_desc") : t("index.vote_mode_desc")}
+                  </p>
+                </div>
+
+                <div>
+                  <label style={labelStyle}>{t("index.challenge_duration")}</label>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <PillToggle active={challengeDuration === "5"} onClick={() => setChallengeDuration("5")} label="5s" />
+                    <PillToggle active={challengeDuration === "10"} onClick={() => setChallengeDuration("10")} label="10s" />
+                  </div>
+                  <p style={{ color: COLORS.textMuted, fontSize: 11, margin: "6px 0 0", textAlign }}>
+                    {challengeMode === "timer" ? t("index.challenge_duration_timer_desc") : t("index.challenge_duration_vote_desc")}
+                  </p>
+                </div>
+
+                <ThemeSelector />
+              </div>
+            )}
+
+            <PrimaryButton onClick={handleCreate} disabled={isLoading}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 8, justifyContent: "center", width: "100%" }}>
+                <Dice1 className="w-4 h-4" />
+                {isLoading ? t("index.creating") : t("index.create_room")}
+              </span>
+            </PrimaryButton>
+          </div>
+        ) : (
+          <div>
+            <Field label={t("index.room_code")} align={textAlign}>
+              <input
+                placeholder={t("index.room_code_placeholder")}
+                value={joinRoomId}
+                onChange={(e) => setJoinRoomId(e.target.value.toUpperCase())}
+                maxLength={6}
+                style={{ ...inputStyle("center"), fontSize: 18, letterSpacing: 4, fontFamily: "monospace" }}
+              />
+            </Field>
+
+            <PrimaryButton onClick={handleJoin} disabled={isLoading} color={COLORS.teal}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 8, justifyContent: "center", width: "100%" }}>
+                <Users className="w-4 h-4" />
+                {isLoading ? t("index.joining") : t("index.join_room")}
+              </span>
+            </PrimaryButton>
+          </div>
+        )}
+      </Panel>
+
+      <p style={{ color: COLORS.textMuted, fontSize: 12, marginTop: 20 }}>{t("index.footer")}</p>
 
       <GuideModal
         open={showGuide}

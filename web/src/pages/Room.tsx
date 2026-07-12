@@ -2,10 +2,11 @@ import { useState, useCallback, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useGame } from "@/lib/gameContext";
 import { useLanguage } from "@/lib/languageContext";
-import { LangToggle } from "@/components/LangToggle";
 import { GuideModal } from "@/components/GuideModal";
+import { COLORS, uiFont } from "./theme";
+import { Panel, Field, inputStyle, PrimaryButton, SecondaryButton } from "./ui";
 import {
-  Copy, User, Bot, Play, X, Loader2, ArrowLeft, Crown, MessageCircle, LogIn, HelpCircle,
+  Copy, User, Bot, Play, X, Loader2, ArrowLeft, Crown, MessageCircle, LogIn, HelpCircle, Send, Globe,
 } from "lucide-react";
 import type { BotDifficulty } from "@/lib/types";
 
@@ -18,7 +19,12 @@ export default function Room() {
     gameState, myPlayerId, myRoomId, joinRoom, startGame, addBot, removeBot,
     addToast, reconnectRoom, sendChat, chatMessages,
   } = useGame();
-  const { t } = useLanguage();
+  const { lang, toggleLang, t } = useLanguage();
+
+  const isAr = lang === "ar";
+  const dir = isAr ? "rtl" : "ltr";
+  const font = uiFont(isAr);
+  const textAlign = isAr ? "right" : "left";
 
   const [chatInput, setChatInput] = useState("");
   const [starting, setStarting] = useState(false);
@@ -118,12 +124,34 @@ export default function Room() {
     setChatInput("");
   }, [chatInput, sendChat]);
 
+  // Small pill button matching the header controls on the landing page
+  const pillButtonStyle = {
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    border: `2px solid ${COLORS.ink}`,
+    background: COLORS.white,
+    color: COLORS.ink,
+    fontWeight: 700,
+    fontSize: 13,
+    padding: "8px 14px",
+    borderRadius: 999,
+    cursor: "pointer",
+    fontFamily: font,
+  } as const;
+
   if (isJoining) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-[#1a0a0a] via-[#2d1111] to-[#1a0a0a] flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 text-amber-500 animate-spin mx-auto mb-4" />
-          <p className="text-amber-200/60">{t("room.joining_room")}</p>
+      <div
+        dir={dir}
+        style={{
+          minHeight: "100vh", background: COLORS.cream, fontFamily: font, color: COLORS.ink,
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}
+      >
+        <div style={{ textAlign: "center" }}>
+          <Loader2 size={32} color={COLORS.red} className="animate-spin" style={{ margin: "0 auto 16px" }} />
+          <p style={{ color: COLORS.textSecondary }}>{t("room.joining_room")}</p>
         </div>
       </div>
     );
@@ -131,187 +159,197 @@ export default function Room() {
 
   if (!gameState || !isInRoom) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-[#1a0a0a] via-[#2d1111] to-[#1a0a0a] flex flex-col items-center justify-center p-4">
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-1/3 left-1/3 w-96 h-96 bg-amber-600/5 rounded-full blur-3xl" />
-        </div>
-
-        <div className="w-full max-w-md bg-[#1c0d0d]/90 backdrop-blur-xl border border-amber-900/30 shadow-2xl shadow-black/50 rounded-2xl relative z-10">
-          <div className="p-6 pb-2">
-            <h2 className="text-white text-xl font-bold">{t("room.join_title")}</h2>
-            <p className="text-amber-200/50 text-sm">
-              {t("room.join_desc")} <span className="text-amber-400 font-mono">{paramRoomId}</span>
+      <div
+        dir={dir}
+        style={{
+          minHeight: "100vh", background: COLORS.cream, fontFamily: font, color: COLORS.ink,
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+          padding: "24px 16px 40px", boxSizing: "border-box",
+        }}
+      >
+        <Panel style={{ width: "100%", maxWidth: 400, padding: 24 }}>
+          <div style={{ marginBottom: 20, textAlign }}>
+            <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>{t("room.join_title")}</h2>
+            <p style={{ color: COLORS.textSecondary, fontSize: 14, margin: "6px 0 0" }}>
+              {t("room.join_desc")}{" "}
+              <span style={{ color: COLORS.red, fontWeight: 700, fontFamily: "monospace" }}>{paramRoomId}</span>
             </p>
           </div>
-          <div className="p-6 pt-2 space-y-4">
-            <div className="space-y-2">
-              <label htmlFor="joinName" className="text-amber-200/80 text-sm block">{t("room.your_name")}</label>
-              <input
-                id="joinName"
-                placeholder={t("room.name_placeholder")}
-                value={joinName}
-                onChange={(e) => setJoinName(e.target.value)}
-                maxLength={16}
-                onKeyDown={(e) => { if (e.key === "Enter") handleJoinRoom(); }}
-                className="w-full px-3 py-2.5 rounded-lg bg-[#2a1515] border border-amber-900/40 text-white placeholder:text-amber-200/30 focus:border-amber-500/60 focus:outline-none text-sm"
-              />
-            </div>
-            <button
-              onClick={handleJoinRoom}
-              disabled={isJoining}
-              className="w-full inline-flex items-center justify-center gap-2 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white font-semibold py-3 rounded-xl shadow-lg shadow-amber-900/30 transition-all active:scale-95 disabled:opacity-50"
-            >
-              <LogIn className="w-4 h-4" />
+
+          <Field label={t("room.your_name")} align={textAlign}>
+            <input
+              id="joinName"
+              placeholder={t("room.name_placeholder")}
+              value={joinName}
+              onChange={(e) => setJoinName(e.target.value)}
+              maxLength={16}
+              onKeyDown={(e) => { if (e.key === "Enter") handleJoinRoom(); }}
+              style={inputStyle(textAlign)}
+            />
+          </Field>
+
+          <PrimaryButton onClick={handleJoinRoom} disabled={isJoining}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 8, justifyContent: "center", width: "100%" }}>
+              <LogIn size={16} />
               {isJoining ? t("room.joining") : t("room.join_room_btn")}
-            </button>
-            <button
-              onClick={() => navigate("/")}
-              className="w-full text-amber-200/40 hover:text-amber-200/60 text-sm py-2 transition-all"
-            >
-              {t("room.back_home")}
-            </button>
-          </div>
-        </div>
+            </span>
+          </PrimaryButton>
+
+          <button
+            onClick={() => navigate("/")}
+            style={{
+              width: "100%", border: "none", background: "transparent", color: COLORS.textMuted,
+              fontWeight: 700, fontSize: 14, cursor: "pointer", marginTop: 16, fontFamily: font,
+            }}
+          >
+            {t("room.back_home")}
+          </button>
+        </Panel>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#1a0a0a] via-[#2d1111] to-[#1a0a0a] flex flex-col p-4">
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full bg-amber-600/3 blur-3xl" />
-      </div>
-
-      <div className="max-w-4xl mx-auto w-full relative z-10">
+    <div
+      dir={dir}
+      style={{
+        minHeight: "100vh", background: COLORS.cream, fontFamily: font, color: COLORS.ink,
+        padding: "20px 16px 40px", boxSizing: "border-box",
+      }}
+    >
+      <div style={{ maxWidth: 900, margin: "0 auto" }}>
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
           <button
             onClick={() => {
               localStorage.removeItem("liarsbar_roomId");
               localStorage.removeItem("liarsbar_playerId");
               navigate("/");
             }}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-amber-200/60 hover:text-white hover:bg-[#2a1515] transition-all text-sm"
+            style={pillButtonStyle}
           >
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft size={16} />
             {t("room.leave")}
           </button>
 
-          <div className="text-center">
-            <h1 className="text-2xl font-bold text-white">
+          <div style={{ textAlign: "center" }}>
+            <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>
               {t("room.room_title")}{" "}
-              <span className="text-amber-400 font-mono tracking-widest">
+              <span style={{ color: COLORS.red, fontFamily: "monospace", letterSpacing: 2 }}>
                 {gameState.roomId}
               </span>
             </h1>
-            <p className="text-amber-200/40 text-sm">
+            <p style={{ color: COLORS.textMuted, fontSize: 13, margin: "2px 0 0" }}>
               {gameState.variant === "cards" ? t("room.playing_cards") : t("room.dominoes")} &mdash;{" "}
               {gameState.deckCount} {gameState.deckCount === 1 ? "deck" : "decks"}
               {gameState.claimType && gameState.variant === "cards" && (
-                <> &mdash; <span className="text-amber-400/60">{gameState.claimType === "suit" ? t("room.suit_claim") : t("room.rank_claim")}</span></>
+                <> &mdash; <span style={{ color: COLORS.teal }}>{gameState.claimType === "suit" ? t("room.suit_claim") : t("room.rank_claim")}</span></>
               )}
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowGuide(true)}
-              className="p-2 rounded-lg text-amber-200/60 hover:text-white hover:bg-[#2a1515] transition-all"
-              title={t("guide.title")}
-            >
-              <HelpCircle className="w-4 h-4" />
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <button onClick={() => setShowGuide(true)} style={{ ...pillButtonStyle, padding: 8 }} title={t("guide.title")}>
+              <HelpCircle size={16} />
             </button>
-            <LangToggle />
-            <button
-              onClick={copyInviteLink}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-amber-900/40 text-amber-200/80 hover:bg-[#2a1515] hover:text-white transition-all text-sm"
-            >
-              <Copy className="w-4 h-4" />
+            <button onClick={toggleLang} style={pillButtonStyle}>
+              <Globe size={14} />
+              {t("lang.switch_to")}
+            </button>
+            <button onClick={copyInviteLink} style={pillButtonStyle}>
+              <Copy size={16} />
               {t("room.copy_invite")}
             </button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "flex-start" }}>
           {/* Player List */}
-          <div className="md:col-span-2">
-            <div className="bg-[#1c0d0d]/90 backdrop-blur-xl border border-amber-900/30 rounded-2xl shadow-xl overflow-hidden">
-              <div className="p-6 pb-2">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-white text-lg font-bold">
-                    {t("room.players")} ({gameState.players.length}/{gameState.maxPlayers})
-                  </h2>
-                  {isHost && (
-                    <div className="flex gap-2 items-center">
-                      <select
-                        value={pendingDifficulty}
-                        onChange={(e) => setPendingDifficulty(e.target.value as BotDifficulty)}
-                        className="px-2 py-1.5 rounded-lg bg-[#2a1515] border border-amber-900/40 text-white text-xs focus:border-amber-500/60 focus:outline-none"
-                      >
-                        <option value="easy">{t("room.easy")}</option>
-                        <option value="medium">{t("room.medium")}</option>
-                        <option value="hard">{t("room.hard")}</option>
-                      </select>
-                      <button
-                        onClick={handleAddBot}
-                        disabled={gameState.players.length >= gameState.maxPlayers}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-amber-900/40 text-amber-200/80 hover:bg-[#2a1515] disabled:opacity-30 text-sm transition-all"
-                      >
-                        <Bot className="w-4 h-4" />
-                        {t("room.add_bot")}
-                      </button>
-                      <button
-                        onClick={handleStart}
-                        disabled={starting || gameState.players.length < 2}
-                        className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white font-semibold text-sm shadow-lg disabled:opacity-50 transition-all"
-                      >
-                        {starting ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Play className="w-4 h-4" />
-                        )}
+          <div style={{ flex: "2 1 420px", minWidth: 280 }}>
+            <Panel style={{ padding: 24 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+                <h2 style={{ fontSize: 17, fontWeight: 800, margin: 0 }}>
+                  {t("room.players")} ({gameState.players.length}/{gameState.maxPlayers})
+                </h2>
+                {isHost && (
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <select
+                      value={pendingDifficulty}
+                      onChange={(e) => setPendingDifficulty(e.target.value as BotDifficulty)}
+                      style={{
+                        padding: "8px 10px", borderRadius: 999, border: `2px solid ${COLORS.ink}`,
+                        background: COLORS.white, color: COLORS.ink, fontSize: 12, fontFamily: font, outline: "none",
+                      }}
+                    >
+                      <option value="easy">{t("room.easy")}</option>
+                      <option value="medium">{t("room.medium")}</option>
+                      <option value="hard">{t("room.hard")}</option>
+                    </select>
+                    <SecondaryButton
+                      onClick={handleAddBot}
+                      disabled={gameState.players.length >= gameState.maxPlayers}
+                      style={{ display: "flex", alignItems: "center", gap: 6 }}
+                    >
+                      <Bot size={16} />
+                      {t("room.add_bot")}
+                    </SecondaryButton>
+                    <PrimaryButton
+                      onClick={handleStart}
+                      disabled={starting || gameState.players.length < 2}
+                      style={{ width: "auto", padding: "10px 20px" }}
+                    >
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                        {starting ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} />}
                         {starting ? t("room.starting") : t("room.start")}
-                      </button>
-                    </div>
-                  )}
-                </div>
-                <p className="text-amber-200/50 text-xs mt-1">
-                  {gameState.players.length < 2
-                    ? t("room.need_players")
-                    : t("room.ready")}
-                </p>
+                      </span>
+                    </PrimaryButton>
+                  </div>
+                )}
               </div>
+              <p style={{ color: COLORS.textMuted, fontSize: 12, margin: "6px 0 16px" }}>
+                {gameState.players.length < 2 ? t("room.need_players") : t("room.ready")}
+              </p>
 
-              <div className="p-6 pt-2 space-y-2">
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {gameState.players.map((player) => (
                   <div
                     key={player.id}
-                    className="flex items-center justify-between p-3 rounded-lg bg-[#2a1515] border border-amber-900/20"
+                    style={{
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      padding: "10px 14px", borderRadius: 12, border: `2px solid ${COLORS.ink}`,
+                      background: player.id === myPlayerId ? `${COLORS.peach}55` : COLORS.white,
+                    }}
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-700 to-amber-900 flex items-center justify-center text-white font-bold text-sm shadow-inner">
-                        {player.isBot ? <Bot className="w-5 h-5" /> : <User className="w-5 h-5" />}
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <div
+                        style={{
+                          width: 36, height: 36, borderRadius: "50%", display: "flex", alignItems: "center",
+                          justifyContent: "center", color: COLORS.cream,
+                          background: player.isBot ? COLORS.textMuted : COLORS.teal,
+                        }}
+                      >
+                        {player.isBot ? <Bot size={18} /> : <User size={18} />}
                       </div>
                       <div>
-                        <p className="text-white font-medium flex items-center gap-2">
+                        <p style={{ margin: 0, fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}>
                           {player.name}
-                          {player.isHost && <Crown className="w-3.5 h-3.5 text-amber-400" />}
+                          {player.isHost && <Crown size={14} color={COLORS.red} />}
                           {player.id === myPlayerId && (
-                            <span className="text-xs text-amber-400/60">({t("room.you")})</span>
+                            <span style={{ color: COLORS.textMuted, fontWeight: 500, fontSize: 12 }}>({t("room.you")})</span>
                           )}
                         </p>
-                        <p className="text-amber-200/40 text-xs">
+                        <p style={{ margin: 0, color: COLORS.textMuted, fontSize: 12 }}>
                           {player.isBot ? t("room.bot") : t("room.human")}
-                          {!player.isConnected && ` \u2022 ${t("room.disconnected")}`}
+                          {!player.isConnected && ` • ${t("room.disconnected")}`}
                         </p>
                       </div>
                     </div>
                     {isHost && player.isBot && !player.isHost && (
                       <button
                         onClick={() => handleRemoveBot(player.id)}
-                        className="p-1.5 rounded-lg text-red-400/60 hover:text-red-400 hover:bg-red-900/20 transition-all"
+                        style={{ border: "none", background: "transparent", color: COLORS.red, cursor: "pointer", padding: 4 }}
                       >
-                        <X className="w-4 h-4" />
+                        <X size={16} />
                       </button>
                     )}
                   </div>
@@ -322,58 +360,60 @@ export default function Room() {
                 }).map((_, i) => (
                   <div
                     key={`empty-${i}`}
-                    className="flex items-center gap-3 p-3 rounded-lg border border-dashed border-amber-900/20 opacity-40"
+                    style={{
+                      display: "flex", alignItems: "center", gap: 10, padding: "10px 14px",
+                      borderRadius: 12, border: `2px dashed ${COLORS.disabledText}`, opacity: 0.6,
+                    }}
                   >
-                    <div className="w-10 h-10 rounded-full bg-[#2a1515] flex items-center justify-center">
-                      <User className="w-5 h-5 text-amber-200/30" />
+                    <div style={{ width: 36, height: 36, borderRadius: "50%", background: COLORS.disabledBg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <User size={18} color={COLORS.disabledText} />
                     </div>
-                    <p className="text-amber-200/30 text-sm">{t("room.waiting")}</p>
+                    <p style={{ margin: 0, color: COLORS.disabledText, fontSize: 13 }}>{t("room.waiting")}</p>
                   </div>
                 ))}
               </div>
-            </div>
+            </Panel>
           </div>
 
           {/* Chat */}
-          <div className="md:col-span-1">
-            <div className="bg-[#1c0d0d]/90 backdrop-blur-xl border border-amber-900/30 rounded-2xl shadow-xl h-full flex flex-col overflow-hidden">
-              <div className="p-4 pb-2">
-                <h2 className="text-white text-lg font-bold flex items-center gap-2">
-                  <MessageCircle className="w-4 h-4 text-amber-400" />
-                  {t("room.chat")}
-                </h2>
+          <div style={{ flex: "1 1 260px", minWidth: 260 }}>
+            <Panel style={{ padding: 20, display: "flex", flexDirection: "column", height: 420 }}>
+              <h2 style={{ fontSize: 16, fontWeight: 800, margin: "0 0 12px", display: "flex", alignItems: "center", gap: 8 }}>
+                <MessageCircle size={16} color={COLORS.teal} />
+                {t("room.chat")}
+              </h2>
+
+              <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6, minHeight: 0 }}>
+                {chatMessages.map((msg, i) => (
+                  <div key={i} style={{ fontSize: 13 }}>
+                    <span style={{ color: COLORS.red, fontWeight: 700 }}>{msg.playerName}:</span>{" "}
+                    <span style={{ color: COLORS.textSecondary }}>{msg.message}</span>
+                  </div>
+                ))}
+                {chatMessages.length === 0 && (
+                  <p style={{ color: COLORS.textMuted, fontSize: 12, textAlign: "center", marginTop: 32 }}>{t("room.no_messages")}</p>
+                )}
               </div>
 
-              <div className="flex-1 flex flex-col p-4 pt-0 gap-3 min-h-[300px] max-h-[400px]">
-                <div className="flex-1 overflow-y-auto space-y-2">
-                  {chatMessages.map((msg, i) => (
-                    <div key={i} className="text-sm">
-                      <span className="text-amber-400 font-medium">{msg.playerName}:</span>{" "}
-                      <span className="text-amber-100/80">{msg.message}</span>
-                    </div>
-                  ))}
-                  {chatMessages.length === 0 && (
-                    <p className="text-amber-200/30 text-xs text-center mt-8">{t("room.no_messages")}</p>
-                  )}
-                </div>
-
-                <form onSubmit={handleSendChat} className="flex gap-2">
-                  <input
-                    value={chatInput}
-                    onChange={(e) => setChatInput(e.target.value)}
-                    placeholder={t("room.type_message")}
-                    maxLength={200}
-                    className="flex-1 px-3 py-2 rounded-lg bg-[#2a1515] border border-amber-900/40 text-white placeholder:text-amber-200/30 text-sm focus:border-amber-500/60 focus:outline-none"
-                  />
-                  <button
-                    type="submit"
-                    className="p-2 rounded-lg bg-amber-700 hover:bg-amber-600 text-white shrink-0 transition-all"
-                  >
-                    <MessageCircle className="w-4 h-4" />
-                  </button>
-                </form>
-              </div>
-            </div>
+              <form onSubmit={handleSendChat} style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                <input
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  placeholder={t("room.type_message")}
+                  maxLength={200}
+                  style={{ ...inputStyle(textAlign), flex: 1, padding: "8px 12px", fontSize: 13 }}
+                />
+                <button
+                  type="submit"
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "center", border: "none",
+                    background: COLORS.teal, color: COLORS.cream, borderRadius: 12, width: 38, cursor: "pointer", flexShrink: 0,
+                  }}
+                >
+                  <Send size={16} />
+                </button>
+              </form>
+            </Panel>
           </div>
         </div>
       </div>

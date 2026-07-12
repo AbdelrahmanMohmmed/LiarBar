@@ -4,7 +4,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { GameProvider, useGame } from "@/lib/gameContext";
 import { LanguageProvider } from "@/lib/languageContext";
 import { ThemeProvider } from "@/lib/themeContext";
-import { toast } from "sonner";
+import { toast, Toaster } from "sonner";
 import Landing from "./pages/Landing";
 import Index from "./pages/index";
 import Room from "./pages/Room";
@@ -92,6 +92,7 @@ const App = () => (
           </Routes>
         </BrowserRouter>
         <ToastRenderer />
+        <Toaster position="top-center" richColors closeButton />
     </GameProvider>
   </QueryClientProvider>
   </ThemeProvider>
