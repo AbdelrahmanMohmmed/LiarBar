@@ -51,6 +51,77 @@ export function inputStyle(align: "left" | "right" | "center" = "left"): CSSProp
   };
 }
 
+export function TabButton({
+  active,
+  onClick,
+  label,
+  icon,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  icon?: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        flex: 1,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 6,
+        fontFamily: BUTTON_FONT,
+        fontWeight: 700,
+        fontSize: 14,
+        padding: "10px 12px",
+        borderRadius: 999,
+        border: active ? "none" : `2px solid ${COLORS.ink}`,
+        background: active ? COLORS.ink : COLORS.white,
+        color: active ? COLORS.cream : COLORS.ink,
+        cursor: "pointer",
+      }}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+export function PillToggle({
+  active,
+  onClick,
+  label,
+  color = COLORS.ink,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  color?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        flex: 1,
+        fontFamily: BUTTON_FONT,
+        fontWeight: 700,
+        fontSize: 13,
+        padding: "10px 12px",
+        borderRadius: 999,
+        border: active ? "none" : `2px solid ${COLORS.ink}`,
+        background: active ? color : COLORS.white,
+        color: active ? COLORS.cream : COLORS.ink,
+        cursor: "pointer",
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
 export function PrimaryButton({
   onClick,
   disabled,
