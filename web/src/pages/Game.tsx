@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useGame } from "@/lib/gameContext";
 import { GameTable } from "@/components/GameTable";
 import { PlayerHand } from "@/components/PlayerHand";
+import { MobileHandSheet } from "@/components/MobileHandSheet";
 import { DeclarationModal } from "@/components/DeclarationModal";
 import { Card } from "@/components/Card";
 import { VoiceControls } from "@/components/VoiceControls";
@@ -10,6 +11,7 @@ import { GameOver } from "@/components/GameOver";
 import { GuideModal } from "@/components/GuideModal";
 import { LangToggle } from "@/components/LangToggle";
 import { useLanguage } from "@/lib/languageContext";
+import { useIsMobile } from "@/hooks/user-mobile";
 import type { CardDeclaration } from "@/lib/types";
 import { declarationToString } from "@/lib/types";
 import { AlertTriangle, ThumbsDown, Play, Clock, Eye, SkipForward, MessageCircle, HelpCircle, ChevronDown, ChevronUp, Send } from "lucide-react";
@@ -44,7 +46,9 @@ export default function Game() {
   const [revealCountdown, setRevealCountdown] = useState<number | null>(null);
   const [hasVoted, setHasVoted] = useState(false);
   const [canVoteYet, setCanVoteYet] = useState(false);
+  const [handSheetCollapsed, setHandSheetCollapsed] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     if (reconnected) return;
@@ -139,6 +143,19 @@ export default function Game() {
   const isMyTurn =
     gameState?.phase === "playing" &&
     gameState.players[gameState.currentTurn]?.id === myPlayerId;
+
+  // On mobile, your turn takes over the screen with a full sliding hand
+  // sheet instead of the small in-flow hand bar.
+  const showMobileHandSheet = isMobile && isMyTurn;
+  const claimLabel = gameState?.currentRequiredClaim
+    ? `${t("game.current_claim")} ${declarationToString(gameState.currentRequiredClaim, gameState.claimType)}`
+    : null;
+
+  // Re-expand the hand sheet at the start of every turn, even if the player
+  // collapsed it to peek at the table on a previous turn.
+  useEffect(() => {
+    if (isMyTurn) setHandSheetCollapsed(false);
+  }, [isMyTurn]);
 
   const canChallenge =
     gameState?.phase === "waiting_for_challenge" &&
@@ -446,8 +463,8 @@ export default function Game() {
             </div>
           )}
 
-          {/* Skip/Pass button when it's your turn */}
-          {isMyTurn && selectedCards.length === 0 && (
+          {/* Skip/Pass button when it's your turn (on mobile this lives inside the hand sheet instead) */}
+          {isMyTurn && selectedCards.length === 0 && !showMobileHandSheet && (
             <div className="flex justify-center mb-2">
               <button
                 onClick={handleSkipTurn}
@@ -459,8 +476,8 @@ export default function Game() {
             </div>
           )}
 
-          {/* Player hand */}
-          {myPlayer && (
+          {/* Player hand — normal in-flow bar; replaced by the full sliding sheet on mobile during your turn */}
+          {myPlayer && !showMobileHandSheet && (
             <PlayerHand
               cards={myHand}
               selectedCards={selectedCards}
@@ -534,6 +551,19 @@ export default function Game() {
           </div>
         )}
       </div>
+
+      {/* Full-screen sliding hand sheet (mobile, your turn only) */}
+      <MobileHandSheet
+        visible={showMobileHandSheet}
+        collapsed={handSheetCollapsed}
+        onToggleCollapse={() => setHandSheetCollapsed((v) => !v)}
+        cards={myHand}
+        selectedCards={selectedCards}
+        onCardSelect={handleCardSelect}
+        onPlayClick={() => setShowDeclaration(true)}
+        onSkip={handleSkipTurn}
+        claimLabel={claimLabel}
+      />
 
       {/* Guide modal */}
       <GuideModal

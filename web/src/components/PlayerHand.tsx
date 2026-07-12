@@ -3,7 +3,6 @@ import type { Card as CardType } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Send, Hand } from "lucide-react";
 import { Card } from "@/components/Card";
-import { useIsMobile } from "@/hooks/user-mobile";
 
 interface PlayerHandProps {
   cards: CardType[];
@@ -24,11 +23,6 @@ export const PlayerHand = memo(function PlayerHand({
     (index: number) => onCardSelect(index),
     [onCardSelect],
   );
-
-  const isMobile = useIsMobile();
-  // On mobile, once it's the player's turn, drop the height clamp and shrink
-  // the cards so the whole hand is visible at a glance instead of scrolling.
-  const expandForMobileTurn = isMobile && canPlay;
 
   if (cards.length === 0) {
     return (
@@ -70,12 +64,7 @@ export const PlayerHand = memo(function PlayerHand({
         )}
       </div>
 
-      <div
-        className={cn(
-          "flex flex-wrap justify-center gap-1.5 max-w-2xl mx-auto pt-5",
-          expandForMobileTurn ? "max-h-none overflow-visible" : "max-h-[34vh] overflow-y-auto",
-        )}
-      >
+      <div className="flex flex-wrap justify-center gap-1.5 max-w-2xl mx-auto max-h-[34vh] overflow-y-auto pt-5">
         {cards.map((card, index) => (
           <button
             key={index}
@@ -87,7 +76,7 @@ export const PlayerHand = memo(function PlayerHand({
               !canPlay && !selectedCards.includes(index) && "opacity-50 cursor-not-allowed",
             )}
           >
-            <Card card={card} compact={expandForMobileTurn} />
+            <Card card={card} />
           </button>
         ))}
       </div>
