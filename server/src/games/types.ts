@@ -20,7 +20,7 @@ export interface GameRoom {
   /** Timestamp of the last meaningful activity, used by the stale-room sweeper. */
   readonly lastActivityAt: number;
 
-  addPlayer(name: string, socketId: string, isHost?: boolean): Player;
+  addPlayer(name: string, socketId: string, isHost?: boolean, playerId?: string): Player;
   addBot(name: string, difficulty?: string): Player;
   removeBot(botId: string): boolean;
   getPlayer(id: string): Player | undefined;

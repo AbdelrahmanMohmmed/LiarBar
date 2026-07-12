@@ -15,6 +15,7 @@ import type { BotDifficulty } from "../games/liars-bar/BotAI.js";
 import type { Player } from "../games/liars-bar/Player.js";
 import { CodenamesGame } from "../games/codenames/CodenamesGame.js";
 import { HigherLowerGame } from "../games/higher-lower/HigherLowerGame.js";
+import { LobbyRoom } from "../games/lobby/LobbyRoom.js";
 
 type Ack = ((response: unknown) => void) | undefined;
 
@@ -75,11 +76,16 @@ export function registerSocketHandlers(
         fail(callback, "Not in a room");
         return null;
       }
-      if (!(m.room instanceof GameManager)) {
+      let targetRoom = m.room;
+      if (targetRoom instanceof LobbyRoom && targetRoom.activeSubRoom) {
+        targetRoom = targetRoom.activeSubRoom;
+      }
+      if (!(targetRoom instanceof GameManager)) {
         fail(callback, "Action not supported by this game");
         return null;
       }
-      return { room: m.room, player: m.player };
+      const player = targetRoom.getPlayer(m.player.id) || m.player;
+      return { room: targetRoom, player };
     }
 
     /** Narrow a generic room to the Codenames engine for game actions. */
@@ -89,11 +95,16 @@ export function registerSocketHandlers(
         fail(callback, "Not in a room");
         return null;
       }
-      if (!(m.room instanceof CodenamesGame)) {
+      let targetRoom = m.room;
+      if (targetRoom instanceof LobbyRoom && targetRoom.activeSubRoom) {
+        targetRoom = targetRoom.activeSubRoom;
+      }
+      if (!(targetRoom instanceof CodenamesGame)) {
         fail(callback, "Action not supported by this game");
         return null;
       }
-      return { room: m.room, player: m.player };
+      const player = targetRoom.getPlayer(m.player.id) || m.player;
+      return { room: targetRoom, player };
     }
 
     /** Narrow a generic room to the Higher or Lower engine for game actions. */
@@ -103,11 +114,16 @@ export function registerSocketHandlers(
         fail(callback, "Not in a room");
         return null;
       }
-      if (!(m.room instanceof HigherLowerGame)) {
+      let targetRoom = m.room;
+      if (targetRoom instanceof LobbyRoom && targetRoom.activeSubRoom) {
+        targetRoom = targetRoom.activeSubRoom;
+      }
+      if (!(targetRoom instanceof HigherLowerGame)) {
         fail(callback, "Action not supported by this game");
         return null;
       }
-      return { room: m.room, player: m.player };
+      const player = targetRoom.getPlayer(m.player.id) || m.player;
+      return { room: targetRoom, player };
     }
 
     // ===== ROOM LIFECYCLE =====
@@ -160,6 +176,11 @@ export function registerSocketHandlers(
           } else if (gameId === "higher-lower") {
             if (!Number.isInteger(maxPlayers) || maxPlayers < 2 || maxPlayers > 6) {
               fail(callback, "Players must be between 2 and 6");
+              return;
+            }
+          } else if (gameId === "lobby") {
+            if (!Number.isInteger(maxPlayers) || maxPlayers < 2 || maxPlayers > 10) {
+              fail(callback, "Players must be between 2 and 10");
               return;
             }
           } else {
@@ -535,6 +556,46 @@ export function registerSocketHandlers(
         return;
       }
 
+      reply(callback, { success: true });
+    });
+
+    // ===== LOBBY MODE SUB-GAMES =====
+
+    socket.on(
+      "lobby_start_game",
+      (data: { gameId: string; options: any }, callback: Ack) => {
+        const m = hostMembership(callback);
+        if (!m) return;
+        const { room } = m;
+
+        if (!(room instanceof LobbyRoom)) {
+          fail(callback, "Not in a lobby room");
+          return;
+        }
+
+        const success = room.startSubGame(data?.gameId, data?.options);
+        if (!success) {
+          fail(callback, "Failed to start sub-game");
+          return;
+        }
+
+        sendPrivateHands(io, room);
+        reply(callback, { success: true });
+      }
+    );
+
+    socket.on("lobby_return_to_lobby", (_data: unknown, callback: Ack) => {
+      const m = hostMembership(callback);
+      if (!m) return;
+      const { room } = m;
+
+      if (!(room instanceof LobbyRoom)) {
+        fail(callback, "Not in a lobby room");
+        return;
+      }
+
+      room.returnToLobby();
+      broadcastState(io, room);
       reply(callback, { success: true });
     });
 

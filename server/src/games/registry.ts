@@ -7,6 +7,7 @@ import {
 import type { GameVariant, ClaimType } from "./liars-bar/Deck.js";
 import { CodenamesGame } from "./codenames/CodenamesGame.js";
 import { HigherLowerGame } from "./higher-lower/HigherLowerGame.js";
+import { LobbyRoom } from "./lobby/LobbyRoom.js";
 import type { Lang } from "./codenames/board.js";
 
 /**
@@ -90,6 +91,14 @@ registerGame("codenames", (roomId, options, callbacks) => {
 
 registerGame("higher-lower", (roomId, options, callbacks) => {
   return new HigherLowerGame(
+    roomId,
+    options.maxPlayers,
+    callbacks,
+  );
+});
+
+registerGame("lobby", (roomId, options, callbacks) => {
+  return new LobbyRoom(
     roomId,
     options.maxPlayers,
     callbacks,

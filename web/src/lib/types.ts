@@ -251,6 +251,16 @@ export interface HigherLowerState {
   mySecretNumber?: number; // only populated for the owner
 }
 
+export interface LobbyState {
+  roomId: string;
+  gameId: "lobby";
+  phase: "lobby" | "playing";
+  activeGameId: string | null;
+  players: PlayerData[];
+  maxPlayers: number;
+  subGameState: any;
+}
+
 export function parseCardString(cardStr: string): Card | null {
   // Try symbol format: "5♥", "K♠"
   const symbol = cardStr.slice(-1);

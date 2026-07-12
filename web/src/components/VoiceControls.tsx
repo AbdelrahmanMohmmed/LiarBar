@@ -7,10 +7,55 @@ interface VoiceControlsProps {
   roomId: string;
 }
 
+/**
+ * Build the ICE server list. STUN is enough on the same LAN, but cross-network
+ * calls (mobile data, symmetric NAT) require a TURN relay. Provide TURN via env:
+ *   VITE_TURN_URL=turn:turn.example.com:3478
+ *   VITE_TURN_USERNAME=...
+ *   VITE_TURN_CREDENTIAL=...
+ */
+function getIceServers(): RTCIceServer[] {
+  const servers: RTCIceServer[] = [
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:stun1.l.google.com:19302" },
+  ];
+
+  const turnUrl = (import.meta.env.VITE_TURN_URL as string | undefined)?.trim();
+  const turnUser = (import.meta.env.VITE_TURN_USERNAME as string | undefined)?.trim();
+  const turnCred = (import.meta.env.VITE_TURN_CREDENTIAL as string | undefined)?.trim();
+
+  // A turn:/turns: server with no credentials makes RTCPeerConnection throw,
+  // which would break ALL voice — so only add TURN when fully configured.
+  if (turnUrl && turnCred) {
+    servers.push({ urls: turnUrl, username: turnUser, credential: turnCred });
+  } else if (turnUrl) {
+    console.warn(
+      "[voice] VITE_TURN_URL is set but username/credential is missing — " +
+        "ignoring TURN and using STUN only. Cross-network calls will fail.",
+    );
+  }
+
+  if (!voiceIceLogged) {
+    voiceIceLogged = true;
+    console.info(
+      "[voice] ICE servers:",
+      servers.map((s) => s.urls),
+      turnUrl && turnCred ? "(TURN active)" : "(STUN only — no TURN)",
+    );
+  }
+  return servers;
+}
+
+let voiceIceLogged = false;
+
 export const VoiceControls = memo(function VoiceControls({
   roomId,
 }: VoiceControlsProps) {
-  const { gameState, myPlayerId, sendWebRTCSignal, addToast } = useGame();
+  const { lobbyState, gameState, codenamesState, higherLowerState, myPlayerId, sendWebRTCSignal, addToast } = useGame();
+
+  const activePlayers = lobbyState
+    ? lobbyState.players
+    : (gameState || codenamesState || higherLowerState)?.players ?? [];
   const [isMuted, setIsMuted] = useState(true);
   const [isConnecting, setIsConnecting] = useState(false);
 
@@ -18,14 +63,29 @@ export const VoiceControls = memo(function VoiceControls({
   const peersRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const audioElementsRef = useRef<Map<string, HTMLAudioElement>>(new Map());
   const pendingCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
+  // Perfect-negotiation bookkeeping, per peer.
   const makingOfferRef = useRef<Map<string, boolean>>(new Map());
+  const ignoreOfferRef = useRef<Map<string, boolean>>(new Map());
+
+  // Keep the latest signaling helper in a ref so peer-connection callbacks
+  // (created once, long-lived) always call the current version.
+  const sendSignalRef = useRef(sendWebRTCSignal);
+  sendSignalRef.current = sendWebRTCSignal;
+  const myIdRef = useRef(myPlayerId);
+  myIdRef.current = myPlayerId;
 
   const stopVoice = useCallback(() => {
     if (streamRef.current) {
       streamRef.current.getAudioTracks().forEach((t) => t.stop());
       streamRef.current = null;
     }
-    peersRef.current.forEach((pc) => pc.close());
+    peersRef.current.forEach((pc) => {
+      pc.onicecandidate = null;
+      pc.ontrack = null;
+      pc.onnegotiationneeded = null;
+      pc.oniceconnectionstatechange = null;
+      pc.close();
+    });
     peersRef.current.clear();
     audioElementsRef.current.forEach((audio) => {
       audio.pause();
@@ -34,24 +94,69 @@ export const VoiceControls = memo(function VoiceControls({
     audioElementsRef.current.clear();
     pendingCandidatesRef.current.clear();
     makingOfferRef.current.clear();
+    ignoreOfferRef.current.clear();
     setIsMuted(true);
   }, []);
 
-  const createPeerConnection = useCallback(
-    (peerId: string): RTCPeerConnection => {
-      const pc = new RTCPeerConnection({
-        iceServers: [
-          { urls: "stun:stun.l.google.com:19302" },
-          { urls: "stun:stun1.l.google.com:19302" },
-        ],
-      });
+  const getPeerAudioTransceiver = (pc: RTCPeerConnection) =>
+    pc.getTransceivers().find(
+      (t) =>
+        t.sender.track?.kind === "audio" ||
+        t.receiver.track?.kind === "audio" ||
+        t.mid === "0",
+    );
 
-      // Add transceiver for audio in recvonly direction to listen without sharing mic yet
-      pc.addTransceiver("audio", { direction: "recvonly" });
+  const createPeerConnection = useCallback(
+    (peerId: string, initiator: boolean): RTCPeerConnection => {
+      let pc: RTCPeerConnection;
+      try {
+        pc = new RTCPeerConnection({ iceServers: getIceServers() });
+      } catch (err) {
+        // Bad TURN config should never kill voice — fall back to plain STUN.
+        console.error("[voice] RTCPeerConnection init failed, retrying STUN-only:", err);
+        pc = new RTCPeerConnection({
+          iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+        });
+      }
+
+      // The initiator seeds a single audio m-line in recvonly so that both
+      // sides are connected and can *receive* before anyone opens their mic.
+      // The responder gets its transceiver from the remote offer, so only the
+      // initiator adds one here (avoids duplicate m-lines).
+      if (initiator) {
+        pc.addTransceiver("audio", { direction: "recvonly" });
+        // If the mic is already live (unmuted before this peer joined),
+        // upgrade to sendrecv straight away.
+        if (streamRef.current) {
+          const track = streamRef.current.getAudioTracks()[0];
+          const transceiver = getPeerAudioTransceiver(pc);
+          if (track && transceiver) {
+            transceiver.sender.replaceTrack(track);
+            transceiver.direction = "sendrecv";
+          }
+        }
+      }
+
+      // Perfect negotiation: either side can (re)negotiate. Changing a
+      // transceiver's direction (recvonly -> sendrecv on unmute) fires this.
+      pc.onnegotiationneeded = async () => {
+        try {
+          makingOfferRef.current.set(peerId, true);
+          await pc.setLocalDescription();
+          sendSignalRef.current(peerId, {
+            type: "description",
+            sdp: pc.localDescription,
+          });
+        } catch (err) {
+          console.error("[voice] negotiation error:", peerId, err);
+        } finally {
+          makingOfferRef.current.set(peerId, false);
+        }
+      };
 
       pc.onicecandidate = (event) => {
         if (event.candidate) {
-          sendWebRTCSignal(peerId, {
+          sendSignalRef.current(peerId, {
             type: "ice-candidate",
             candidate: event.candidate.toJSON(),
           });
@@ -65,54 +170,48 @@ export const VoiceControls = memo(function VoiceControls({
           audioEl.autoplay = true;
           audioElementsRef.current.set(peerId, audioEl);
         }
-        audioEl.srcObject = event.streams[0];
+        // We attach the mic via replaceTrack (no associated MediaStream), so
+        // event.streams is often empty — build a stream from the track itself.
+        const stream =
+          event.streams[0] ?? new MediaStream([event.track]);
+        audioEl.srcObject = stream;
         audioEl.play().catch(() => {
-          // Autoplay blocked - user needs to interact first
+          // Autoplay blocked until a user gesture; unlockAudio() retries.
         });
       };
 
       pc.oniceconnectionstatechange = () => {
-        if (
-          pc.iceConnectionState === "disconnected" ||
-          pc.iceConnectionState === "failed"
-        ) {
-          peersRef.current.delete(peerId);
+        if (pc.iceConnectionState === "failed") {
+          // Recoverable: force an ICE restart rather than dropping the peer.
+          try {
+            pc.restartIce();
+          } catch {
+            /* not supported everywhere; the reconnect effect will retry */
+          }
         }
       };
 
       return pc;
     },
-    [sendWebRTCSignal],
+    [],
   );
 
-  const connectToPeer = useCallback(
-    async (peerId: string) => {
-      if (peersRef.current.has(peerId)) return;
-
-      const pc = createPeerConnection(peerId);
-      peersRef.current.set(peerId, pc);
-
-      // Polite pattern: only the smaller player ID initiates the offer
-      if (myPlayerId && myPlayerId < peerId) {
-        try {
-          makingOfferRef.current.set(peerId, true);
-          const offer = await pc.createOffer();
-          await pc.setLocalDescription(offer);
-          sendWebRTCSignal(peerId, {
-            type: "offer",
-            sdp: pc.localDescription,
-          });
-        } catch (err) {
-          console.error("Failed to create offer for peer:", peerId, err);
-        } finally {
-          makingOfferRef.current.set(peerId, false);
-        }
+  // Ensure a peer connection exists. `initiator` is decided by ID ordering so
+  // exactly one side seeds the connection (the other builds it from the offer).
+  const ensurePeer = useCallback(
+    (peerId: string, initiator: boolean): RTCPeerConnection => {
+      let pc = peersRef.current.get(peerId);
+      if (!pc) {
+        pc = createPeerConnection(peerId, initiator);
+        peersRef.current.set(peerId, pc);
       }
+      return pc;
     },
-    [createPeerConnection, myPlayerId, sendWebRTCSignal],
+    [createPeerConnection],
   );
 
   const unmuteMic = useCallback(async () => {
+    // Already have a stream: just re-enable the track.
     if (streamRef.current) {
       const track = streamRef.current.getAudioTracks()[0];
       if (track) {
@@ -133,56 +232,29 @@ export const VoiceControls = memo(function VoiceControls({
       });
       streamRef.current = stream;
       const track = stream.getAudioTracks()[0];
-      if (track) {
-        track.enabled = true;
-      }
+      if (track) track.enabled = true;
       setIsMuted(false);
       addToast("Microphone connected", "success");
 
-      // Update all active connections to send audio
-      for (const [peerId, pc] of peersRef.current) {
-        const transceivers = pc.getTransceivers();
-        const audioTransceiver = transceivers.find(
-          (t) => t.receiver.track.kind === "audio"
-        );
-
-        if (audioTransceiver) {
-          audioTransceiver.direction = "sendrecv";
-        }
-
-        if (track) {
-          const sender = pc.getSenders().find((s) => s.track?.kind === "audio");
-          if (sender) {
-            await sender.replaceTrack(track);
-          } else {
-            pc.addTrack(track, stream);
-          }
-        }
-
-        // Renegotiate if we are the polite peer initiator
-        if (myPlayerId && myPlayerId < peerId) {
-          try {
-            makingOfferRef.current.set(peerId, true);
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-            sendWebRTCSignal(peerId, {
-              type: "offer",
-              sdp: pc.localDescription,
-            });
-          } catch (err) {
-            console.error("Renegotiation offer error:", err);
-          } finally {
-            makingOfferRef.current.set(peerId, false);
-          }
+      // Attach the mic to every existing peer. Flipping the transceiver to
+      // sendrecv fires onnegotiationneeded on THIS side regardless of which
+      // player has the smaller ID — perfect negotiation handles the rest.
+      for (const pc of peersRef.current.values()) {
+        const transceiver = getPeerAudioTransceiver(pc);
+        if (transceiver) {
+          await transceiver.sender.replaceTrack(track);
+          transceiver.direction = "sendrecv";
+        } else {
+          pc.addTrack(track, stream);
         }
       }
     } catch (err) {
-      console.error("Failed to get microphone:", err);
+      console.error("[voice] failed to get microphone:", err);
       addToast("Could not access microphone. Check permissions.", "error");
     } finally {
       setIsConnecting(false);
     }
-  }, [addToast, myPlayerId, sendWebRTCSignal]);
+  }, [addToast]);
 
   const muteMic = useCallback(() => {
     if (streamRef.current) {
@@ -194,101 +266,132 @@ export const VoiceControls = memo(function VoiceControls({
     }
   }, []);
 
-  // Monitor room players and connect automatically
+  // Connect to every other human player. Only the smaller ID initiates; the
+  // larger ID waits for the incoming offer. This yields exactly one audio
+  // m-line per pair and lets muted users listen immediately.
   useEffect(() => {
-    if (!gameState || !myPlayerId) return;
+    if (!myPlayerId) return;
 
-    const otherPlayers = gameState.players.filter(
-      (p) => p.id !== myPlayerId && !p.isBot && p.isConnected
+    const others = activePlayers.filter(
+      (p) => p.id !== myPlayerId && !p.isBot && p.isConnected,
     );
 
-    for (const player of otherPlayers) {
-      connectToPeer(player.id);
+    for (const player of others) {
+      if (myPlayerId < player.id) {
+        ensurePeer(player.id, true);
+      }
     }
-  }, [gameState, myPlayerId, connectToPeer]);
 
-  // Handle WebRTC signals from signaling server
+    // Tear down peers for players who left.
+    const presentIds = new Set(others.map((p) => p.id));
+    for (const peerId of Array.from(peersRef.current.keys())) {
+      if (!presentIds.has(peerId)) {
+        peersRef.current.get(peerId)?.close();
+        peersRef.current.delete(peerId);
+        const audio = audioElementsRef.current.get(peerId);
+        if (audio) {
+          audio.pause();
+          audio.srcObject = null;
+          audioElementsRef.current.delete(peerId);
+        }
+        pendingCandidatesRef.current.delete(peerId);
+        makingOfferRef.current.delete(peerId);
+        ignoreOfferRef.current.delete(peerId);
+      }
+    }
+  }, [activePlayers, myPlayerId, ensurePeer]);
+
+  // Handle inbound signaling with the perfect-negotiation algorithm.
   useEffect(() => {
     const handleSignal = async (event: Event) => {
       const { fromId, signal } = (event as CustomEvent).detail;
-      if (!signal || !myPlayerId) return;
+      const selfId = myIdRef.current;
+      if (!signal || !selfId) return;
 
-      let pc = peersRef.current.get(fromId);
-      const polite = myPlayerId < fromId;
+      // Politeness: the larger ID yields on collisions. The smaller ID is the
+      // initiator and never yields.
+      const polite = selfId > fromId;
 
       try {
-        if (signal.type === "offer") {
-          const makingOffer = makingOfferRef.current.get(fromId) || false;
-          const offerCollision = makingOffer || (pc && pc.signalingState !== "stable");
+        if (signal.type === "description") {
+          // Build the peer lazily if the offer arrives first (responder side).
+          const pc = ensurePeer(fromId, false);
+          const description = signal.sdp as RTCSessionDescriptionInit;
 
-          if (offerCollision && !polite) {
-            // Impolite peer ignores colliding offers
-            return;
-          }
+          const offerCollision =
+            description.type === "offer" &&
+            (makingOfferRef.current.get(fromId) || pc.signalingState !== "stable");
 
-          if (!pc) {
-            pc = createPeerConnection(fromId);
-            peersRef.current.set(fromId, pc);
-          }
+          const ignoreOffer = !polite && offerCollision;
+          ignoreOfferRef.current.set(fromId, ignoreOffer);
+          if (ignoreOffer) return;
 
-          if (offerCollision && polite) {
-            // Polite peer rolls back its own offer in case of collision
-            await pc.setLocalDescription({ type: "rollback" });
-          }
+          await pc.setRemoteDescription(description);
 
-          await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
-
-          // If we have a local stream, attach it
-          if (streamRef.current) {
-            const track = streamRef.current.getAudioTracks()[0];
-            const sender = pc.getSenders().find((s) => s.track?.kind === "audio");
-            if (track) {
-              if (sender) {
-                await sender.replaceTrack(track);
-              } else {
-                pc.addTrack(track, streamRef.current);
+          // Flush any ICE candidates that arrived before the remote description.
+          const pending = pendingCandidatesRef.current.get(fromId);
+          if (pending) {
+            for (const c of pending) {
+              try {
+                await pc.addIceCandidate(new RTCIceCandidate(c));
+              } catch (err) {
+                console.error("[voice] queued candidate error:", err);
               }
             }
-            const transceivers = pc.getTransceivers();
-            const audioTransceiver = transceivers.find(
-              (t) => t.receiver.track.kind === "audio"
-            );
-            if (audioTransceiver) {
-              audioTransceiver.direction = "sendrecv";
-            }
+            pendingCandidatesRef.current.delete(fromId);
           }
 
-          const answer = await pc.createAnswer();
-          await pc.setLocalDescription(answer);
-          sendWebRTCSignal(fromId, { type: "answer", sdp: pc.localDescription });
-
-          // Process queued candidates
-          const pending = pendingCandidatesRef.current.get(fromId) || [];
-          for (const candidate of pending) {
-            await pc.addIceCandidate(new RTCIceCandidate(candidate));
+          if (description.type === "offer") {
+            await pc.setLocalDescription();
+            sendSignalRef.current(fromId, {
+              type: "description",
+              sdp: pc.localDescription,
+            });
           }
-          pendingCandidatesRef.current.delete(fromId);
-
-        } else if (signal.type === "answer") {
-          if (!pc) return;
-          await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
         } else if (signal.type === "ice-candidate") {
+          const pc = peersRef.current.get(fromId);
           if (pc && pc.remoteDescription) {
-            await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+            try {
+              await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+            } catch (err) {
+              if (!ignoreOfferRef.current.get(fromId)) {
+                console.error("[voice] addIceCandidate error:", err);
+              }
+            }
           } else {
+            // Remote description not set yet — queue until it is.
             const pending = pendingCandidatesRef.current.get(fromId) || [];
             pending.push(signal.candidate);
             pendingCandidatesRef.current.set(fromId, pending);
           }
         }
       } catch (err) {
-        console.error("WebRTC signal handling error:", err);
+        console.error("[voice] signal handling error:", err);
       }
     };
 
     window.addEventListener("webrtc_signal", handleSignal);
     return () => window.removeEventListener("webrtc_signal", handleSignal);
-  }, [sendWebRTCSignal, createPeerConnection, myPlayerId]);
+  }, [ensurePeer]);
+
+  // Browsers block autoplay of remote audio until the user interacts with the
+  // page. Retry playback on the first gesture so listen-only works without
+  // ever opening the mic.
+  useEffect(() => {
+    const unlock = () => {
+      audioElementsRef.current.forEach((audio) => {
+        if (audio.paused) audio.play().catch(() => {});
+      });
+    };
+    window.addEventListener("click", unlock);
+    window.addEventListener("keydown", unlock);
+    window.addEventListener("touchstart", unlock);
+    return () => {
+      window.removeEventListener("click", unlock);
+      window.removeEventListener("keydown", unlock);
+      window.removeEventListener("touchstart", unlock);
+    };
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -296,8 +399,8 @@ export const VoiceControls = memo(function VoiceControls({
     };
   }, [stopVoice]);
 
-  const voiceActivePlayers = gameState?.players.filter(
-    (p) => p.id !== myPlayerId && !p.isBot && p.isConnected
+  const voiceActivePlayers = activePlayers.filter(
+    (p) => p.id !== myPlayerId && !p.isBot && p.isConnected,
   ).length ?? 0;
 
   return (

@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useGame } from "@/lib/gameContext";
 import { useLanguage } from "@/lib/languageContext";
+import { Seo } from "@/lib/seo";
 import type { CodenamesLang } from "@/lib/types";
 import { COLORS, uiFont } from "./theme";
 import { Panel, Field, TabButton, PillToggle, PrimaryButton, inputStyle } from "./ui";
@@ -117,6 +118,32 @@ export default function CodenamesHome() {
   }, [playerName, joinRoomId, joinRoom, navigate, addToast, c]);
 
   return (
+    <>
+    <Seo
+      lang={isAr ? "ar" : "en"}
+      title={isAr ? "كودنيمز أونلاين — لعبة تخمين الكلمات بالفرق" : "Codenames Online — Team word-guessing game"}
+      description={
+        isAr
+          ? "العب كودنيمز أونلاين مع أصدقائك بالعربية أو الإنجليزية، مع دردشة صوتية. مجاناً وبدون تحميل."
+          : "Play Codenames online with friends — the classic team word-guessing game in Arabic or English, with voice chat. Free, no download."
+      }
+      path="/codenames"
+      jsonLd={{
+        "@context": "https://schema.org",
+        "@type": "VideoGame",
+        name: "Codenames",
+        alternateName: "كودنيمز",
+        url: "https://games.safariyat.live/codenames",
+        description:
+          "The classic team word-guessing game, playable in Arabic and English with voice chat.",
+        genre: ["Party", "Word game", "Team"],
+        playMode: "MultiPlayer",
+        gamePlatform: "Web browser",
+        operatingSystem: "Any",
+        applicationCategory: "Game",
+        offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+      }}
+    />
     <div
       dir={dir}
       style={{
@@ -227,5 +254,6 @@ export default function CodenamesHome() {
         </Panel>
       </div>
     </div>
+    </>
   );
 }

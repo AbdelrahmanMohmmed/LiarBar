@@ -62,8 +62,8 @@ export class CodenamesGame implements GameRoom {
     this.lastActivityAt = Date.now();
   }
 
-  addPlayer(name: string, socketId: string, isHost: boolean = false): Player {
-    const id = nanoid(8);
+  addPlayer(name: string, socketId: string, isHost: boolean = false, playerId?: string): Player {
+    const id = playerId || nanoid(8);
     const player = new Player(id, name, false, isHost);
     player.socketId = socketId;
     player.isConnected = true;

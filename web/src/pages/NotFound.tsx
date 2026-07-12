@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { useLanguage } from "@/lib/languageContext";
+import { Seo } from "@/lib/seo";
 import { LangToggle } from "@/components/LangToggle";
 
 const NotFound = () => {
@@ -12,6 +13,8 @@ const NotFound = () => {
   }, [location.pathname]);
 
   return (
+    <>
+    <Seo lang={lang === "ar" ? "ar" : "en"} title="Page not found" description="This page could not be found." path={location.pathname} noindex />
     <div className="min-h-screen bg-gradient-to-b from-[#1a0a0a] via-[#2d1111] to-[#1a0a0a] flex flex-col items-center justify-center p-4" dir={lang === "ar" ? "rtl" : "ltr"}>
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-1/3 left-1/3 w-96 h-96 bg-amber-600/5 rounded-full blur-3xl" />
@@ -32,6 +35,7 @@ const NotFound = () => {
         </a>
       </div>
     </div>
+    </>
   );
 };
 
