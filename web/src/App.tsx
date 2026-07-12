@@ -18,6 +18,13 @@ import HigherLowerGame from "./pages/higher-lower/HigherLowerGame";
 import LobbyHome from "./pages/lobby/LobbyHome";
 import LobbyRoom from "./pages/lobby/LobbyRoom";
 import NotFound from "./pages/NotFound";
+import ArcadeHub from "./pages/arcade/ArcadeHub";
+import SnakeGame from "./pages/arcade/SnakeGame";
+import TicTacToeGame from "./pages/arcade/TicTacToeGame";
+import FighterGame from "./pages/arcade/FighterGame";
+import JumperGame from "./pages/arcade/JumperGame";
+import SpaceInvadersGame from "./pages/arcade/SpaceInvadersGame";
+import SpaceAlienGame from "./pages/arcade/SpaceAlienGame";
 
 const queryClient = new QueryClient();
 
@@ -74,6 +81,13 @@ const App = () => (
             <Route path="/higher-lower/game/:roomId" element={<HigherLowerGame />} />
             <Route path="/lobby" element={<LobbyHome />} />
             <Route path="/lobby/:roomId" element={<LobbyRoom />} />
+            <Route path="/arcade" element={<ArcadeHub />} />
+            <Route path="/arcade/snake" element={<SnakeGame />} />
+            <Route path="/arcade/tictactoe" element={<TicTacToeGame />} />
+            <Route path="/arcade/fighter" element={<FighterGame />} />
+            <Route path="/arcade/jumper" element={<JumperGame />} />
+            <Route path="/arcade/space-invaders" element={<SpaceInvadersGame />} />
+            <Route path="/arcade/space-alien" element={<SpaceAlienGame />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

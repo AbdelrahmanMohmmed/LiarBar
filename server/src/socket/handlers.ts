@@ -15,6 +15,10 @@ import type { BotDifficulty } from "../games/liars-bar/BotAI.js";
 import type { Player } from "../games/liars-bar/Player.js";
 import { CodenamesGame } from "../games/codenames/CodenamesGame.js";
 import { HigherLowerGame } from "../games/higher-lower/HigherLowerGame.js";
+import { TicTacToeGame } from "../games/tictactoe/TicTacToeGame.js";
+import { SnakeGame } from "../games/snake/SnakeGame.js";
+import { SpaceInvadersGame } from "../games/space-invaders/SpaceInvadersGame.js";
+import { FighterGame } from "../games/fighter/FighterGame.js";
 import { LobbyRoom } from "../games/lobby/LobbyRoom.js";
 
 type Ack = ((response: unknown) => void) | undefined;
@@ -124,6 +128,78 @@ export function registerSocketHandlers(
       }
       const player = targetRoom.getPlayer(m.player.id) || m.player;
       return { room: targetRoom, player };
+    }
+
+    /** Narrow to the Tic-Tac-Toe engine. */
+    function tttMembership(callback: Ack) {
+      const m = membership();
+      if (!m) {
+        fail(callback, "Not in a room");
+        return null;
+      }
+      let targetRoom = m.room;
+      if (targetRoom instanceof LobbyRoom && targetRoom.activeSubRoom) {
+        targetRoom = targetRoom.activeSubRoom;
+      }
+      if (!(targetRoom instanceof TicTacToeGame)) {
+        fail(callback, "Action not supported by this game");
+        return null;
+      }
+      return { room: targetRoom, player: m.player };
+    }
+
+    /** Narrow to the Snake engine. */
+    function snakeMembership(callback: Ack) {
+      const m = membership();
+      if (!m) {
+        fail(callback, "Not in a room");
+        return null;
+      }
+      let targetRoom = m.room;
+      if (targetRoom instanceof LobbyRoom && targetRoom.activeSubRoom) {
+        targetRoom = targetRoom.activeSubRoom;
+      }
+      if (!(targetRoom instanceof SnakeGame)) {
+        fail(callback, "Action not supported by this game");
+        return null;
+      }
+      return { room: targetRoom, player: m.player };
+    }
+
+    /** Narrow to the Space Invaders engine. */
+    function siMembership(callback: Ack) {
+      const m = membership();
+      if (!m) {
+        fail(callback, "Not in a room");
+        return null;
+      }
+      let targetRoom = m.room;
+      if (targetRoom instanceof LobbyRoom && targetRoom.activeSubRoom) {
+        targetRoom = targetRoom.activeSubRoom;
+      }
+      if (!(targetRoom instanceof SpaceInvadersGame)) {
+        fail(callback, "Action not supported by this game");
+        return null;
+      }
+      return { room: targetRoom, player: m.player };
+    }
+
+    /** Narrow to the Fighter engine. */
+    function fighterMembership(callback: Ack) {
+      const m = membership();
+      if (!m) {
+        fail(callback, "Not in a room");
+        return null;
+      }
+      let targetRoom = m.room;
+      if (targetRoom instanceof LobbyRoom && targetRoom.activeSubRoom) {
+        targetRoom = targetRoom.activeSubRoom;
+      }
+      if (!(targetRoom instanceof FighterGame)) {
+        fail(callback, "Action not supported by this game");
+        return null;
+      }
+      return { room: targetRoom, player: m.player };
     }
 
     // ===== ROOM LIFECYCLE =====
@@ -555,9 +631,76 @@ export function registerSocketHandlers(
         fail(callback, result.error ?? "Cannot start rematch");
         return;
       }
-
       reply(callback, { success: true });
     });
+
+    // ===== GAMEPLAY (Tic-Tac-Toe) =====
+
+    socket.on("ttt_move", (data: { index: number }, callback: Ack) => {
+      const m = tttMembership(callback);
+      if (!m) return;
+      const result = m.room.move(m.player.id, Number(data?.index));
+      if (!result.success) {
+        fail(callback, result.error ?? "Invalid move");
+        return;
+      }
+      reply(callback, { success: true });
+    });
+
+    // ===== GAMEPLAY (Snake) =====
+
+    socket.on("snake_set_dir", (data: { dir: "up" | "down" | "left" | "right" }, callback: Ack) => {
+      const m = snakeMembership(callback);
+      if (!m) return;
+      const result = m.room.setDirection(m.player.id, data?.dir);
+      if (!result.success) {
+        fail(callback, result.error ?? "Invalid direction");
+        return;
+      }
+      reply(callback, { success: true });
+    });
+
+    // ===== GAMEPLAY (Space Invaders) =====
+
+    socket.on(
+      "si_input",
+      (data: { dx?: number; dy?: number; fire?: boolean }, callback: Ack) => {
+        const m = siMembership(callback);
+        if (!m) return;
+        const result = m.room.setInput(m.player.id, {
+          dx: data?.dx,
+          dy: data?.dy,
+          fire: data?.fire,
+        });
+        if (!result.success) {
+          fail(callback, result.error ?? "Invalid input");
+          return;
+        }
+        reply(callback, { success: true });
+      },
+    );
+
+    // ===== GAMEPLAY (Fighter) =====
+
+    socket.on(
+      "fighter_input",
+      (data: { left?: boolean; right?: boolean; jump?: boolean; attack1?: boolean; attack2?: boolean }, callback: Ack) => {
+        const m = fighterMembership(callback);
+        if (!m) return;
+        const result = m.room.setInput(m.player.id, {
+          left: data?.left,
+          right: data?.right,
+          jump: data?.jump,
+          attack1: data?.attack1,
+          attack2: data?.attack2,
+        });
+        if (!result.success) {
+          fail(callback, result.error ?? "Invalid input");
+          return;
+        }
+        reply(callback, { success: true });
+      },
+    );
 
     // ===== LOBBY MODE SUB-GAMES =====
 
