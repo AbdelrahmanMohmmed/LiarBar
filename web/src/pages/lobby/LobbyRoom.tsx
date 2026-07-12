@@ -6,6 +6,10 @@ import { VoiceControls } from "@/components/VoiceControls";
 import Game from "../Game";
 import CodenamesGame from "../codenames/CodenamesGame";
 import HigherLowerGame from "../higher-lower/HigherLowerGame";
+import SnakeLobbyGame from "./games/SnakeLobbyGame";
+import TicTacToeLobbyGame from "./games/TicTacToeLobbyGame";
+import SpaceInvadersLobbyGame from "./games/SpaceInvadersLobbyGame";
+import FighterLobbyGame from "./games/FighterLobbyGame";
 import {
   ArrowLeft,
   Crown,
@@ -42,7 +46,7 @@ export default function LobbyRoom() {
   const [isJoining, setIsJoining] = useState(false);
 
   // Selected game and settings in host options
-  const [selectedGame, setSelectedGame] = useState<"liars-bar" | "codenames" | "higher-lower">("liars-bar");
+  const [selectedGame, setSelectedGame] = useState<"liars-bar" | "codenames" | "higher-lower" | "snake" | "tictactoe" | "space-invaders" | "fighter">("liars-bar");
   
   // Liar's Bar options
   const [lbMaxPlayers, setLbMaxPlayers] = useState("4");
@@ -59,6 +63,12 @@ export default function LobbyRoom() {
 
   // Higher Lower options
   const [hlMaxPlayers, setHlMaxPlayers] = useState("4");
+
+  // Snake options
+  const [snakeDuration, setSnakeDuration] = useState("60");
+
+  // Fighter options
+  const [fighterWins, setFighterWins] = useState("3");
 
   const isInRoom = myPlayerId && lobbyState?.players.some((p) => p.id === myPlayerId);
   const me = lobbyState?.players.find((p) => p.id === myPlayerId);
@@ -131,6 +141,14 @@ export default function LobbyRoom() {
         options = {
           maxPlayers: parseInt(hlMaxPlayers),
         };
+      } else if (selectedGame === "snake") {
+        options = {
+          duration: parseInt(snakeDuration),
+        };
+      } else if (selectedGame === "tictactoe" || selectedGame === "space-invaders") {
+        options = {};
+      } else if (selectedGame === "fighter") {
+        options = { winTarget: parseInt(fighterWins) };
       }
 
       await lobbyStartGame(selectedGame, options);
@@ -149,6 +167,8 @@ export default function LobbyRoom() {
     cnMaxPlayers,
     cnLanguage,
     hlMaxPlayers,
+    snakeDuration,
+    fighterWins,
     lobbyStartGame,
     addToast,
   ]);
@@ -234,6 +254,10 @@ export default function LobbyRoom() {
         {lobbyState.activeGameId === "liars-bar" && <Game />}
         {lobbyState.activeGameId === "codenames" && <CodenamesGame />}
         {lobbyState.activeGameId === "higher-lower" && <HigherLowerGame />}
+        {lobbyState.activeGameId === "snake" && <SnakeLobbyGame />}
+        {lobbyState.activeGameId === "tictactoe" && <TicTacToeLobbyGame />}
+        {lobbyState.activeGameId === "space-invaders" && <SpaceInvadersLobbyGame />}
+        {lobbyState.activeGameId === "fighter" && <FighterLobbyGame />}
       </div>
     );
   }
@@ -329,8 +353,8 @@ export default function LobbyRoom() {
             {isHost ? (
               <div className="flex-1 flex flex-col gap-4">
                 {/* Game Type Picker */}
-                <div className="grid grid-cols-3 gap-2">
-                  {(["liars-bar", "codenames", "higher-lower"] as const).map((game) => (
+                <div className="grid grid-cols-4 gap-2">
+                  {(["liars-bar", "codenames", "higher-lower", "snake", "tictactoe", "space-invaders", "fighter"] as const).map((game) => (
                     <button
                       key={game}
                       onClick={() => setSelectedGame(game)}
@@ -487,6 +511,78 @@ export default function LobbyRoom() {
                           </select>
                         </label>
                       </div>
+                    </div>
+                  )}
+
+                  {selectedGame === "snake" && (
+                    <div className="space-y-3">
+                      <h3 className="font-black text-purple-400 border-b border-purple-950/20 pb-1.5">Snake Battle Settings</h3>
+                      <div className="grid grid-cols-2 gap-3">
+                        <label className="space-y-1 block">
+                          <span className="text-purple-300/70 block">Match Duration</span>
+                          <select
+                            value={snakeDuration}
+                            onChange={(e) => setSnakeDuration(e.target.value)}
+                            className="w-full bg-[#271533] border border-purple-900/40 rounded px-2 py-1.5 text-white focus:outline-none"
+                          >
+                            <option value="15">15s</option>
+                            <option value="30">30s</option>
+                            <option value="60">60s</option>
+                            <option value="120">120s</option>
+                            <option value="180">180s</option>
+                            <option value="300">300s</option>
+                          </select>
+                        </label>
+                        <p className="text-purple-300/50 text-[10px] leading-snug col-span-2">
+                          Up to 4 players. Highest score when time runs out wins. Make a friend
+                          crash into your body to eliminate them!
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedGame === "tictactoe" && (
+                    <div className="space-y-3">
+                      <h3 className="font-black text-purple-400 border-b border-purple-950/20 pb-1.5">Tic-Tac-Toe Settings</h3>
+                      <p className="text-purple-300/50 text-[10px] leading-snug">
+                        Two players take turns placing X and O. First to a line of three wins the
+                        round; best overall score wins.
+                      </p>
+                    </div>
+                  )}
+
+                  {selectedGame === "space-invaders" && (
+                    <div className="space-y-3">
+                      <h3 className="font-black text-purple-400 border-b border-purple-950/20 pb-1.5">Space Invaders Settings</h3>
+                      <p className="text-purple-300/50 text-[10px] leading-snug">
+                        Co-op survival. Everyone gets a ship — work together to clear waves of
+                        aliens. Don't let them reach the bottom! Catch power-ups to boost speed
+                        and firepower.
+                      </p>
+                    </div>
+                  )}
+
+                  {selectedGame === "fighter" && (
+                    <div className="space-y-3">
+                      <h3 className="font-black text-purple-400 border-b border-purple-950/20 pb-1.5">Fighter Settings</h3>
+                      <div className="grid grid-cols-2 gap-3">
+                        <label className="space-y-1 block">
+                          <span className="text-purple-300/70 block">Wins to Win Match</span>
+                          <select
+                            value={fighterWins}
+                            onChange={(e) => setFighterWins(e.target.value)}
+                            className="w-full bg-[#271533] border border-purple-900/40 rounded px-2 py-1.5 text-white focus:outline-none"
+                          >
+                            <option value="1">1</option>
+                            <option value="3">3</option>
+                            <option value="5">5</option>
+                          </select>
+                        </label>
+                      </div>
+                      <p className="text-purple-300/50 text-[10px] leading-snug">
+                        One-on-one duel. Drop the opponent's health to zero to win a round. First to
+                        the target wins the match. Need 2 players (or add a bot).
+                      </p>
                     </div>
                   )}
                 </div>
