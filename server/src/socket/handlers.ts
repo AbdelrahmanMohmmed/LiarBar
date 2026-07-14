@@ -20,6 +20,7 @@ import { SnakeGame } from "../games/snake/SnakeGame.js";
 import { SpaceInvadersGame } from "../games/space-invaders/SpaceInvadersGame.js";
 import { FighterGame } from "../games/fighter/FighterGame.js";
 import { LobbyRoom } from "../games/lobby/LobbyRoom.js";
+import { DominoGame } from "../games/domino/DominoGame.js";
 
 type Ack = ((response: unknown) => void) | undefined;
 
@@ -202,6 +203,24 @@ export function registerSocketHandlers(
       return { room: targetRoom, player: m.player };
     }
 
+    /** Narrow to the Domino engine. */
+    function dominoMembership(callback: Ack) {
+      const m = membership();
+      if (!m) {
+        fail(callback, "Not in a room");
+        return null;
+      }
+      let targetRoom = m.room;
+      if (targetRoom instanceof LobbyRoom && targetRoom.activeSubRoom) {
+        targetRoom = targetRoom.activeSubRoom;
+      }
+      if (!(targetRoom instanceof DominoGame)) {
+        fail(callback, "Action not supported by this game");
+        return null;
+      }
+      return { room: targetRoom, player: m.player };
+    }
+
     // ===== ROOM LIFECYCLE =====
 
     socket.on(
@@ -257,6 +276,15 @@ export function registerSocketHandlers(
           } else if (gameId === "lobby") {
             if (!Number.isInteger(maxPlayers) || maxPlayers < 2 || maxPlayers > 10) {
               fail(callback, "Players must be between 2 and 10");
+              return;
+            }
+          } else if (gameId === "domino") {
+            if (!Number.isInteger(maxPlayers) || maxPlayers < 2 || maxPlayers > 4) {
+              fail(callback, "Players must be between 2 and 4");
+              return;
+            }
+            if (data.gameMode === "teams" && maxPlayers !== 4) {
+              fail(callback, "Team mode requires exactly 4 players");
               return;
             }
           } else {
@@ -631,6 +659,68 @@ export function registerSocketHandlers(
         fail(callback, result.error ?? "Cannot start rematch");
         return;
       }
+      reply(callback, { success: true });
+    });
+
+    // ===== GAMEPLAY (Domino) =====
+
+    socket.on(
+      "domino_play_tile",
+      (data: { tile: { left: number; right: number }; end: "left" | "right" }, callback: Ack) => {
+        const m = dominoMembership(callback);
+        if (!m) return;
+
+        if (!data?.tile || typeof data.tile.left !== "number" || typeof data.tile.right !== "number" || !data.end) {
+          fail(callback, "Invalid play parameters");
+          return;
+        }
+
+        const result = m.room.playTile(m.player.id, data.tile, data.end);
+        if (!result.success) {
+          fail(callback, result.error ?? "Cannot play tile");
+          return;
+        }
+
+        reply(callback, { success: true });
+      }
+    );
+
+    socket.on("domino_draw_tile", (_data: unknown, callback: Ack) => {
+      const m = dominoMembership(callback);
+      if (!m) return;
+
+      const result = m.room.drawTile(m.player.id);
+      if (!result.success) {
+        fail(callback, result.error ?? "Cannot draw tile");
+        return;
+      }
+
+      reply(callback, { success: true, tile: result.tile });
+    });
+
+    socket.on("domino_pass", (_data: unknown, callback: Ack) => {
+      const m = dominoMembership(callback);
+      if (!m) return;
+
+      const result = m.room.passTurn(m.player.id);
+      if (!result.success) {
+        fail(callback, result.error ?? "Cannot pass turn");
+        return;
+      }
+
+      reply(callback, { success: true });
+    });
+
+    socket.on("domino_rematch", (_data: unknown, callback: Ack) => {
+      const m = dominoMembership(callback);
+      if (!m) return;
+
+      const result = m.room.rematch(m.player.id);
+      if (!result.success) {
+        fail(callback, result.error ?? "Cannot start rematch");
+        return;
+      }
+
       reply(callback, { success: true });
     });
 

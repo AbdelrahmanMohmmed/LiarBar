@@ -25,6 +25,9 @@ import FighterGame from "./pages/arcade/FighterGame";
 import JumperGame from "./pages/arcade/JumperGame";
 import SpaceInvadersGame from "./pages/arcade/SpaceInvadersGame";
 import SpaceAlienGame from "./pages/arcade/SpaceAlienGame";
+import DominoHome from "./pages/domino/DominoHome";
+import DominoRoom from "./pages/domino/DominoRoom";
+import DominoGame from "./pages/domino/DominoGame";
 
 const queryClient = new QueryClient();
 
@@ -79,6 +82,9 @@ const App = () => (
             <Route path="/higher-lower" element={<HigherLowerHome />} />
             <Route path="/higher-lower/room/:roomId" element={<HigherLowerRoom />} />
             <Route path="/higher-lower/game/:roomId" element={<HigherLowerGame />} />
+            <Route path="/domino" element={<DominoHome />} />
+            <Route path="/domino/room/:roomId" element={<DominoRoom />} />
+            <Route path="/domino/game/:roomId" element={<DominoGame />} />
             <Route path="/lobby" element={<LobbyHome />} />
             <Route path="/lobby/:roomId" element={<LobbyRoom />} />
             <Route path="/arcade" element={<ArcadeHub />} />

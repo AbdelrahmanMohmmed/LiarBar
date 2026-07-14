@@ -23,6 +23,9 @@ export function sendPrivateHands(io: Server, room: GameRoom): void {
       if (targetRoom.gameId === "higher-lower") {
         io.to(player.socketId).emit("higher_lower_private", targetRoom.toPlayerState(player.id));
       }
+      if (targetRoom.gameId === "domino") {
+        io.to(player.socketId).emit("domino_private", targetRoom.toPlayerState(player.id));
+      }
     }
   }
 }

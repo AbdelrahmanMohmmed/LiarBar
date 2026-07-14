@@ -251,6 +251,50 @@ export interface HigherLowerState {
   mySecretNumber?: number; // only populated for the owner
 }
 
+// ===== Domino =====
+
+export interface DominoPlayerState {
+  playerId: string;
+  score: number;
+  hand: Dominoe[];
+}
+
+export interface DominoRoundRecap {
+  winnerId: string | null;
+  winnerName: string | null;
+  winnerTeam: "A" | "B" | null;
+  pointsGained: number;
+  method: "domino" | "block" | "draw";
+  playerHands: Record<string, Dominoe[]>;
+  scores: Record<string, number>;
+  teamScores: { A: number; B: number };
+}
+
+export interface DominoState {
+  roomId: string;
+  gameId: "domino";
+  phase: "lobby" | "playing" | "round_recap" | "game_over";
+  maxPlayers: number;
+  players: (PlayerData & { score: number })[];
+  gameMode: "individual" | "teams";
+  targetScore: number;
+  turnTimeLimit: number;
+  tableTheme: string;
+  tileTheme: string;
+  board: Dominoe[];
+  leftEnd: number | null;
+  rightEnd: number | null;
+  boneyardCount: number;
+  activePlayerId: string | null;
+  turnDeadline: number | null;
+  roundNumber: number;
+  winnerId: string | null;
+  recap: DominoRoundRecap | null;
+  playerScores: Record<string, number>;
+  teamScores: { A: number; B: number };
+  hand?: Dominoe[];
+}
+
 export interface LobbyState {
   roomId: string;
   gameId: "lobby";

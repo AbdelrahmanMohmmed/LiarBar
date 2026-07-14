@@ -19,6 +19,8 @@ import type {
   CodenamesLang,
   HigherLowerState,
   LobbyState,
+  DominoState,
+  Dominoe,
 } from "./types";
 
 interface GameActions {
@@ -34,6 +36,11 @@ interface GameActions {
     challengeDuration?: number,
     gameId?: string,
     language?: CodenamesLang,
+    gameMode?: "individual" | "teams",
+    targetScore?: number,
+    turnTimeLimit?: number,
+    tableTheme?: string,
+    tileTheme?: string,
   ) => Promise<{ roomId: string; playerId: string }>;
   joinRoom: (
     roomId: string,
@@ -70,6 +77,10 @@ interface GameActions {
   higherLowerRematch: () => Promise<void>;
   lobbyStartGame: (gameId: string, options: any) => Promise<void>;
   lobbyReturnToLobby: () => Promise<void>;
+  dominoPlayTile: (tile: { left: number; right: number }, end: "left" | "right") => Promise<void>;
+  dominoDrawTile: () => Promise<void>;
+  dominoPass: () => Promise<void>;
+  dominoRematch: () => Promise<void>;
 }
 
 interface GameContextValue extends GameActions {
@@ -78,6 +89,7 @@ interface GameContextValue extends GameActions {
   gameState: GameState | null;
   codenamesState: CodenamesState | null;
   higherLowerState: HigherLowerState | null;
+  dominoState: DominoState | null;
   myHand: Card[];
   isConnected: boolean;
   myPlayerId: string | null;
@@ -96,6 +108,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [codenamesState, setCodenamesState] = useState<CodenamesState | null>(null);
   const [higherLowerState, setHigherLowerState] = useState<HigherLowerState | null>(null);
+  const [dominoState, setDominoState] = useState<DominoState | null>(null);
   const [myHand, setMyHand] = useState<Card[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [myPlayerId, setMyPlayerId] = useState<string | null>(null);
@@ -129,6 +142,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
     setGameState(null);
     setCodenamesState(null);
     setHigherLowerState(null);
+    setDominoState(null);
     setMyHand([]);
     setChatMessages([]);
     setToasts([]);
@@ -147,7 +161,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
       setIsConnected(false);
     };
 
-    const onGameState = (state: GameState | CodenamesState | HigherLowerState | LobbyState) => {
+    const onGameState = (state: GameState | CodenamesState | HigherLowerState | LobbyState | DominoState) => {
       if ((state as LobbyState).gameId === "lobby") {
         const next = state as LobbyState;
         setLobbyState(next);
@@ -155,6 +169,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
           setGameState(next.subGameState);
           setCodenamesState(null);
           setHigherLowerState(null);
+          setDominoState(null);
         } else if (next.activeGameId === "codenames") {
           setCodenamesState((prev) => {
             const nextSub = next.subGameState as CodenamesState;
@@ -162,6 +177,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
           });
           setGameState(null);
           setHigherLowerState(null);
+          setDominoState(null);
         } else if (next.activeGameId === "higher-lower") {
           setHigherLowerState((prev) => {
             const nextSub = next.subGameState as HigherLowerState;
@@ -169,10 +185,20 @@ export const [GameProvider, useGame] = createContextHook(() => {
           });
           setGameState(null);
           setCodenamesState(null);
+          setDominoState(null);
+        } else if (next.activeGameId === "domino") {
+          setDominoState((prev) => {
+            const nextSub = next.subGameState as DominoState;
+            return nextSub ? { ...nextSub, hand: prev?.hand } : null;
+          });
+          setGameState(null);
+          setCodenamesState(null);
+          setHigherLowerState(null);
         } else {
           setGameState(null);
           setCodenamesState(null);
           setHigherLowerState(null);
+          setDominoState(null);
         }
       } else if ((state as CodenamesState).gameId === "codenames") {
         const next = state as CodenamesState;
@@ -180,6 +206,9 @@ export const [GameProvider, useGame] = createContextHook(() => {
       } else if ((state as HigherLowerState).gameId === "higher-lower") {
         const next = state as HigherLowerState;
         setHigherLowerState((prev) => ({ ...next, mySecretNumber: prev?.mySecretNumber }));
+      } else if ((state as DominoState).gameId === "domino") {
+        const next = state as DominoState;
+        setDominoState((prev) => ({ ...next, hand: prev?.hand }));
       } else {
         setGameState(state as GameState);
       }
@@ -195,6 +224,10 @@ export const [GameProvider, useGame] = createContextHook(() => {
 
     const onHigherLowerPrivate = (state: HigherLowerState) => {
       setHigherLowerState(state);
+    };
+
+    const onDominoPrivate = (state: DominoState) => {
+      setDominoState(state);
     };
 
     const onChatMessage = (msg: ChatMessage) => {
@@ -224,6 +257,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
     socket.on("your_hand", onYourHand);
     socket.on("codenames_private", onCodenamesPrivate);
     socket.on("higher_lower_private", onHigherLowerPrivate);
+    socket.on("domino_private", onDominoPrivate);
     socket.on("chat_message", onChatMessage);
     socket.on("webrtc_signal", onWebRTCSignal);
     socket.on("error", onError);
@@ -244,6 +278,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
       socket.off("your_hand", onYourHand);
       socket.off("codenames_private", onCodenamesPrivate);
       socket.off("higher_lower_private", onHigherLowerPrivate);
+      socket.off("domino_private", onDominoPrivate);
       socket.off("chat_message", onChatMessage);
       socket.off("webrtc_signal", onWebRTCSignal);
       socket.off("error", onError);
@@ -266,7 +301,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
     [],
   );
 
-  const applyRoomState = useCallback((state: GameState | CodenamesState | HigherLowerState | LobbyState) => {
+  const applyRoomState = useCallback((state: GameState | CodenamesState | HigherLowerState | LobbyState | DominoState) => {
     if ((state as LobbyState).gameId === "lobby") {
       const next = state as LobbyState;
       setLobbyState(next);
@@ -274,29 +309,40 @@ export const [GameProvider, useGame] = createContextHook(() => {
         setGameState(next.subGameState);
         setCodenamesState(null);
         setHigherLowerState(null);
+        setDominoState(null);
       } else if (next.activeGameId === "codenames") {
         setCodenamesState(next.subGameState);
         setGameState(null);
         setHigherLowerState(null);
+        setDominoState(null);
       } else if (next.activeGameId === "higher-lower") {
         setHigherLowerState(next.subGameState);
         setGameState(null);
         setCodenamesState(null);
+        setDominoState(null);
+      } else if (next.activeGameId === "domino") {
+        setDominoState(next.subGameState);
+        setGameState(null);
+        setCodenamesState(null);
+        setHigherLowerState(null);
       } else {
         setGameState(null);
         setCodenamesState(null);
         setHigherLowerState(null);
+        setDominoState(null);
       }
     } else if ((state as CodenamesState).gameId === "codenames") {
       setCodenamesState(state as CodenamesState);
     } else if ((state as HigherLowerState).gameId === "higher-lower") {
       setHigherLowerState(state as HigherLowerState);
+    } else if ((state as DominoState).gameId === "domino") {
+      setDominoState(state as DominoState);
     } else {
       setGameState(state as GameState);
     }
   }, []);
 
-    const createRoom = useCallback(
+  const createRoom = useCallback(
     async (
       playerName: string,
       maxPlayers: number,
@@ -309,14 +355,36 @@ export const [GameProvider, useGame] = createContextHook(() => {
       challengeDuration?: number,
       gameId?: string,
       language?: CodenamesLang,
+      gameMode?: "individual" | "teams",
+      targetScore?: number,
+      turnTimeLimit?: number,
+      tableTheme?: string,
+      tileTheme?: string,
     ): Promise<{ roomId: string; playerId: string }> => {
       connectSocket();
       const res = await emitWithAck<{
         success: boolean;
         roomId: string;
         playerId: string;
-        state: GameState | CodenamesState;
-      }>("create_room", { playerName, maxPlayers, variant, deckCount, claimType, revealTime, theme, challengeMode, challengeDuration, gameId, language });
+        state: GameState | CodenamesState | DominoState;
+      }>("create_room", {
+        playerName,
+        maxPlayers,
+        variant,
+        deckCount,
+        claimType,
+        revealTime,
+        theme,
+        challengeMode,
+        challengeDuration,
+        gameId,
+        language,
+        gameMode,
+        targetScore,
+        turnTimeLimit,
+        tableTheme,
+        tileTheme,
+      });
 
       setMyRoomId(res.roomId);
       setMyPlayerId(res.playerId);
@@ -481,6 +549,29 @@ export const [GameProvider, useGame] = createContextHook(() => {
     await emitWithAck("lobby_return_to_lobby", {});
   }, [myRoomId, emitWithAck]);
 
+  const dominoPlayTile = useCallback(
+    async (tile: { left: number; right: number }, end: "left" | "right") => {
+      if (!myRoomId) throw new Error("Not in a room");
+      await emitWithAck("domino_play_tile", { tile, end });
+    },
+    [myRoomId, emitWithAck],
+  );
+
+  const dominoDrawTile = useCallback(async () => {
+    if (!myRoomId) throw new Error("Not in a room");
+    await emitWithAck("domino_draw_tile", {});
+  }, [myRoomId, emitWithAck]);
+
+  const dominoPass = useCallback(async () => {
+    if (!myRoomId) throw new Error("Not in a room");
+    await emitWithAck("domino_pass", {});
+  }, [myRoomId, emitWithAck]);
+
+  const dominoRematch = useCallback(async () => {
+    if (!myRoomId) throw new Error("Not in a room");
+    await emitWithAck("domino_rematch", {});
+  }, [myRoomId, emitWithAck]);
+
   const sendWebRTCSignal = useCallback(
     (targetId: string, signal: unknown) => {
       if (!myRoomId) return;
@@ -538,6 +629,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
     gameState,
     codenamesState,
     higherLowerState,
+    dominoState,
     myHand,
     isConnected,
     myPlayerId,
@@ -569,5 +661,9 @@ export const [GameProvider, useGame] = createContextHook(() => {
     higherLowerRematch,
     lobbyStartGame,
     lobbyReturnToLobby,
+    dominoPlayTile,
+    dominoDrawTile,
+    dominoPass,
+    dominoRematch,
   };
 });

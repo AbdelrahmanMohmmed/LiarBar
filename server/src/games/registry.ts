@@ -12,6 +12,7 @@ import { TicTacToeGame } from "./tictactoe/TicTacToeGame.js";
 import { SnakeGame } from "./snake/SnakeGame.js";
 import { SpaceInvadersGame } from "./space-invaders/SpaceInvadersGame.js";
 import { FighterGame } from "./fighter/FighterGame.js";
+import { DominoGame } from "./domino/DominoGame.js";
 import type { Lang } from "./codenames/board.js";
 
 /**
@@ -28,6 +29,12 @@ export interface CreateRoomOptions {
   challengeMode?: ChallengeMode;
   challengeDuration?: number;
   language?: Lang;
+  // Domino options
+  gameMode?: "individual" | "teams";
+  targetScore?: number;
+  turnTimeLimit?: number;
+  tableTheme?: string;
+  tileTheme?: string;
 }
 
 export type GameFactory = (
@@ -124,4 +131,22 @@ registerGame("space-invaders", (roomId, options, callbacks) => {
 
 registerGame("fighter", (roomId, options, callbacks) => {
   return new FighterGame(roomId, options, callbacks);
+});
+
+registerGame("domino", (roomId, options, callbacks) => {
+  const gameMode = options.gameMode === "teams" ? "teams" : "individual";
+  const targetScore = Number(options.targetScore) || 100;
+  const turnTimeLimit = Number(options.turnTimeLimit) !== undefined ? Number(options.turnTimeLimit) : 30;
+  const tableTheme = options.tableTheme || "green";
+  const tileTheme = options.tileTheme || "ivory";
+  return new DominoGame(
+    roomId,
+    options.maxPlayers,
+    gameMode,
+    targetScore,
+    turnTimeLimit,
+    callbacks,
+    tableTheme,
+    tileTheme
+  );
 });
