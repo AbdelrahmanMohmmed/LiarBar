@@ -608,7 +608,7 @@ export default function DominoGame() {
                 display: "flex",
                 flexWrap: "wrap",
                 alignItems: "center",
-                justifyContent: dominoState.board.length <= 5 ? "center" : "flex-start",
+                justifyContent: "flex-start",
                 alignContent: "center",
                 padding: "16px",
                 boxSizing: "border-box",
@@ -625,7 +625,7 @@ export default function DominoGame() {
                       right={tile.right}
                       isVertical={isDouble}
                       tileTheme={dominoState.tileTheme}
-                      scale={isMobile ? 0.7 : 0.85}
+                      scale={0.75}
                     />
                   </div>
                 );
