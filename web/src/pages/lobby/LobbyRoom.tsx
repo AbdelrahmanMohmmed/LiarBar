@@ -9,7 +9,11 @@ import HigherLowerGame from "../higher-lower/HigherLowerGame";
 import SnakeLobbyGame from "./games/SnakeLobbyGame";
 import TicTacToeLobbyGame from "./games/TicTacToeLobbyGame";
 import SpaceInvadersLobbyGame from "./games/SpaceInvadersLobbyGame";
-import FighterLobbyGame from "./games/FighterLobbyGame";
+import MemoryPuzzleLobbyGame from "./games/MemoryPuzzleLobbyGame";
+import TetrisLobbyGame from "./games/TetrisLobbyGame";
+import RentoLobbyGame from "./games/RentoLobbyGame";
+import SnakeLadderLobbyGame from "./games/SnakeLadderLobbyGame";
+import FighterGame from "../arcade/FighterGame";
 import {
   ArrowLeft,
   Crown,
@@ -21,6 +25,7 @@ import {
   Play,
   RotateCcw,
   Sparkles,
+  Bot,
 } from "lucide-react";
 
 export default function LobbyRoom() {
@@ -37,6 +42,7 @@ export default function LobbyRoom() {
     lobbyStartGame,
     lobbyReturnToLobby,
     addToast,
+    addBot,
   } = useGame();
   const { t, lang } = useLanguage();
 
@@ -46,7 +52,7 @@ export default function LobbyRoom() {
   const [isJoining, setIsJoining] = useState(false);
 
   // Selected game and settings in host options
-  const [selectedGame, setSelectedGame] = useState<"liars-bar" | "codenames" | "higher-lower" | "snake" | "tictactoe" | "space-invaders" | "fighter">("liars-bar");
+  const [selectedGame, setSelectedGame] = useState<"liars-bar" | "codenames" | "higher-lower" | "snake" | "tictactoe" | "space-invaders" | "fighter" | "memory-puzzle" | "tetris" | "rento" | "snake-ladder">("liars-bar");
   
   // Liar's Bar options
   const [lbMaxPlayers, setLbMaxPlayers] = useState("4");
@@ -67,8 +73,15 @@ export default function LobbyRoom() {
   // Snake options
   const [snakeDuration, setSnakeDuration] = useState("60");
 
+  // TicTacToe options
+  const [tttWinTarget, setTttWinTarget] = useState("3");
+
   // Fighter options
   const [fighterWins, setFighterWins] = useState("3");
+  const [fighterTheme, setFighterTheme] = useState<"default" | "night" | "sunset" | "cyber">("default");
+
+  // Rento options
+  const [rentoMaxPlayers, setRentoMaxPlayers] = useState("4");
 
   const isInRoom = myPlayerId && lobbyState?.players.some((p) => p.id === myPlayerId);
   const me = lobbyState?.players.find((p) => p.id === myPlayerId);
@@ -145,10 +158,15 @@ export default function LobbyRoom() {
         options = {
           duration: parseInt(snakeDuration),
         };
-      } else if (selectedGame === "tictactoe" || selectedGame === "space-invaders") {
+      } else if (selectedGame === "tictactoe" || selectedGame === "space-invaders" || selectedGame === "memory-puzzle" || selectedGame === "tetris" || selectedGame === "snake-ladder") {
         options = {};
+        if (selectedGame === "tictactoe") {
+          options = { winTarget: parseInt(tttWinTarget) };
+        }
+      } else if (selectedGame === "rento") {
+        options = { maxPlayers: parseInt(rentoMaxPlayers) };
       } else if (selectedGame === "fighter") {
-        options = { winTarget: parseInt(fighterWins) };
+        options = {};
       }
 
       await lobbyStartGame(selectedGame, options);
@@ -169,6 +187,8 @@ export default function LobbyRoom() {
     hlMaxPlayers,
     snakeDuration,
     fighterWins,
+    fighterTheme,
+    rentoMaxPlayers,
     lobbyStartGame,
     addToast,
   ]);
@@ -257,7 +277,11 @@ export default function LobbyRoom() {
         {lobbyState.activeGameId === "snake" && <SnakeLobbyGame />}
         {lobbyState.activeGameId === "tictactoe" && <TicTacToeLobbyGame />}
         {lobbyState.activeGameId === "space-invaders" && <SpaceInvadersLobbyGame />}
-        {lobbyState.activeGameId === "fighter" && <FighterLobbyGame />}
+        {lobbyState.activeGameId === "fighter" && <FighterGame />}
+        {lobbyState.activeGameId === "memory-puzzle" && <MemoryPuzzleLobbyGame />}
+        {lobbyState.activeGameId === "tetris" && <TetrisLobbyGame />}
+        {lobbyState.activeGameId === "rento" && <RentoLobbyGame />}
+        {lobbyState.activeGameId === "snake-ladder" && <SnakeLadderLobbyGame />}
       </div>
     );
   }
@@ -339,9 +363,17 @@ export default function LobbyRoom() {
                 </div>
               ))}
             </div>
-          </div>
 
-          {/* Center Column: Game Selection / Host Dashboard */}
+            {isHost && (
+              <button
+                onClick={() => addBot()}
+                className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-dashed border-purple-500/40 text-purple-300/70 hover:text-white hover:bg-purple-950/40 hover:border-purple-400/60 transition-all text-xs font-bold"
+              >
+                <Bot className="w-4 h-4" />
+                Add Bot
+              </button>
+            )}
+          </div>
           <div className="md:col-span-5 bg-[#180b20]/70 border border-purple-950/40 rounded-2xl p-5 flex flex-col gap-4 shadow-xl">
             <div className="flex items-center gap-2 border-b border-purple-950/30 pb-3">
               <Gamepad2 className="w-5 h-5 text-purple-400" />
@@ -354,7 +386,7 @@ export default function LobbyRoom() {
               <div className="flex-1 flex flex-col gap-4">
                 {/* Game Type Picker */}
                 <div className="grid grid-cols-4 gap-2">
-                  {(["liars-bar", "codenames", "higher-lower", "snake", "tictactoe", "space-invaders", "fighter"] as const).map((game) => (
+                  {(["liars-bar", "codenames", "higher-lower", "snake", "tictactoe", "space-invaders", "fighter", "memory-puzzle", "tetris", "rento", "snake-ladder"] as const).map((game) => (
                     <button
                       key={game}
                       onClick={() => setSelectedGame(game)}
@@ -544,9 +576,22 @@ export default function LobbyRoom() {
                   {selectedGame === "tictactoe" && (
                     <div className="space-y-3">
                       <h3 className="font-black text-purple-400 border-b border-purple-950/20 pb-1.5">Tic-Tac-Toe Settings</h3>
+                      <label className="space-y-1 block">
+                        <span className="text-purple-300/70 block">Wins to Win Match</span>
+                        <select
+                          value={tttWinTarget}
+                          onChange={(e) => setTttWinTarget(e.target.value)}
+                          className="w-full bg-[#271533] border border-purple-900/40 rounded px-2 py-1.5 text-white focus:outline-none"
+                        >
+                          <option value="1">1</option>
+                          <option value="3">3</option>
+                          <option value="5">5</option>
+                          <option value="10">10</option>
+                        </select>
+                      </label>
                       <p className="text-purple-300/50 text-[10px] leading-snug">
-                        Two players take turns placing X and O. First to a line of three wins the
-                        round; best overall score wins.
+                        Two players take turns placing X and O. First to reach the target number
+                        of round wins takes the match!
                       </p>
                     </div>
                   )}
@@ -565,23 +610,65 @@ export default function LobbyRoom() {
                   {selectedGame === "fighter" && (
                     <div className="space-y-3">
                       <h3 className="font-black text-purple-400 border-b border-purple-950/20 pb-1.5">Fighter Settings</h3>
+                      <p className="text-purple-300/50 text-[10px] leading-snug">
+                        Local 2-player brawl on the same screen. P1: A/D move, W jump, J hand, K kick, L block, I special.
+                        P2: Arrow keys, N jump, H hand, M kick, U block, O special.
+                      </p>
+                    </div>
+                  )}
+
+                  {selectedGame === "memory-puzzle" && (
+                    <div className="space-y-3">
+                      <h3 className="font-black text-purple-400 border-b border-purple-950/20 pb-1.5">Memory Puzzle Settings</h3>
+                      <p className="text-purple-300/50 text-[10px] leading-snug">
+                        Players take turns flipping cards to find matching pairs. The player
+                        with the most matches when all pairs are found wins!
+                      </p>
+                    </div>
+                  )}
+
+                  {selectedGame === "tetris" && (
+                    <div className="space-y-3">
+                      <h3 className="font-black text-purple-400 border-b border-purple-950/20 pb-1.5">Tetris Settings</h3>
+                      <p className="text-purple-300/50 text-[10px] leading-snug">
+                        Everyone plays their own Tetris board simultaneously. Score points by
+                        clearing lines. The last player standing wins!
+                      </p>
+                    </div>
+                  )}
+
+                  {selectedGame === "rento" && (
+                    <div className="space-y-3">
+                      <h3 className="font-black text-purple-400 border-b border-purple-950/20 pb-1.5">Rento Settings</h3>
                       <div className="grid grid-cols-2 gap-3">
                         <label className="space-y-1 block">
-                          <span className="text-purple-300/70 block">Wins to Win Match</span>
+                          <span className="text-purple-300/70 block">Max Players</span>
                           <select
-                            value={fighterWins}
-                            onChange={(e) => setFighterWins(e.target.value)}
+                            value={rentoMaxPlayers}
+                            onChange={(e) => setRentoMaxPlayers(e.target.value)}
                             className="w-full bg-[#271533] border border-purple-900/40 rounded px-2 py-1.5 text-white focus:outline-none"
                           >
-                            <option value="1">1</option>
+                            <option value="2">2</option>
                             <option value="3">3</option>
+                            <option value="4">4</option>
                             <option value="5">5</option>
+                            <option value="6">6</option>
                           </select>
                         </label>
                       </div>
                       <p className="text-purple-300/50 text-[10px] leading-snug">
-                        One-on-one duel. Drop the opponent's health to zero to win a round. First to
-                        the target wins the match. Need 2 players (or add a bot).
+                        Monopoly-style property trading with Middle Eastern cities. Roll dice, buy
+                        properties, collect rent. Bots play automatically! Last player with money wins.
+                      </p>
+                    </div>
+                  )}
+
+                  {selectedGame === "snake-ladder" && (
+                    <div className="space-y-3">
+                      <h3 className="font-black text-purple-400 border-b border-purple-950/20 pb-1.5">Snake & Ladder Settings</h3>
+                      <p className="text-purple-300/50 text-[10px] leading-snug">
+                        Classic board game. Roll dice, climb ladders, dodge snakes! First to reach
+                        square 100 wins.
                       </p>
                     </div>
                   )}

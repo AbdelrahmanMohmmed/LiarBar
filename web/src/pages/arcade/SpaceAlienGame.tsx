@@ -26,6 +26,7 @@ export default function SpaceAlienGame() {
   const highRef = useRef(high);
   const livesRef = useRef(lives);
   const levelRef = useRef(level);
+  const keysRef = useRef(new Set<string>());
   phaseRef.current = phase;
   scoreRef.current = score;
   highRef.current = high;
@@ -44,7 +45,7 @@ export default function SpaceAlienGame() {
   useEffect(() => {
     const canvas = canvasRef.current!;
     const ctx = canvas.getContext("2d")!;
-    const keys = new Set<string>();
+    const keys = keysRef.current;
 
     const shipImg = new Image();
     shipImg.src = "/arcade-assets/space-alien/image/space-ship.png";
@@ -282,6 +283,62 @@ export default function SpaceAlienGame() {
           className="w-full rounded-xl border border-white/10 touch-none"
           style={{ aspectRatio: `${W} / ${H}` }}
         />
+        {/* Mobile touch controls - only show on touch devices */}
+        <div className="absolute bottom-4 left-0 right-0 flex flex-col items-center gap-2 sm:hidden animate-fade-in">
+          <button
+            className="w-20 h-14 rounded-full bg-cyan-600/20 active:bg-cyan-500/30 border border-cyan-500/40 flex items-center justify-center font-bold text-white text-lg"
+            onTouchStart={() => keysRef.current.add("arrowleft")}
+            onTouchEnd={() => keysRef.current.delete("arrowleft")}
+            onMouseDown={() => keysRef.current.add("arrowleft")}
+            onMouseUp={() => keysRef.current.delete("arrowleft")}
+            onMouseLeave={() => keysRef.current.delete("arrowleft")}
+          >
+            ←
+          </button>
+          <div className="flex gap-2 items-center">
+            <button
+              className="w-20 h-14 rounded-lg bg-emerald-600/20 active:bg-emerald-500/30 border border-emerald-500/40 flex items-center justify-center font-bold text-white text-sm"
+              onTouchStart={() => keysRef.current.add("arrowleft")}
+              onTouchEnd={() => keysRef.current.delete("arrowleft")}
+              onMouseDown={() => keysRef.current.add("arrowleft")}
+              onMouseUp={() => keysRef.current.delete("arrowleft")}
+              onMouseLeave={() => keysRef.current.delete("arrowleft")}
+            >
+              Left
+            </button>
+            <button
+              className="w-20 h-14 rounded-lg bg-emerald-600/20 active:bg-emerald-500/30 border border-emerald-500/40 flex items-center justify-center font-bold text-white text-sm"
+              onTouchStart={() => keysRef.current.add("arrowright")}
+              onTouchEnd={() => keysRef.current.delete("arrowright")}
+              onMouseDown={() => keysRef.current.add("arrowright")}
+              onMouseUp={() => keysRef.current.delete("arrowright")}
+              onMouseLeave={() => keysRef.current.delete("arrowright")}
+            >
+              Right
+            </button>
+            <button
+              className="w-20 h-14 rounded-lg bg-rose-600/20 active:bg-rose-500/30 border border-rose-500/40 flex items-center justify-center font-bold text-white text-sm"
+              onTouchStart={() => keysRef.current.add(" ")}
+              onTouchEnd={() => keysRef.current.delete(" ")}
+              onMouseDown={() => keysRef.current.add(" ")}
+              onMouseUp={() => keysRef.current.delete(" ")}
+              onMouseLeave={() => keysRef.current.delete(" ")}
+            >
+              Fire
+            </button>
+            <button
+              className="w-20 h-14 rounded-lg bg-violet-600/20 active:bg-violet-500/30 border border-violet-500/40 flex items-center justify-center font-bold text-white text-sm"
+              onTouchStart={() => keysRef.current.add("c")}
+              onTouchEnd={() => keysRef.current.delete("c")}
+              onMouseDown={() => keysRef.current.add("c")}
+              onMouseUp={() => keysRef.current.delete("c")}
+              onMouseLeave={() => keysRef.current.delete("c")}
+            >
+              Beam
+            </button>
+          </div>
+          <p className="text-xs text-white/60">{i18n.move}</p>
+        </div>
         {phase !== "playing" && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/70 rounded-xl text-center px-6">
             {phase === "start" ? (

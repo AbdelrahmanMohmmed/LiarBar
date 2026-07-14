@@ -21,6 +21,10 @@ import { SpaceInvadersGame } from "../games/space-invaders/SpaceInvadersGame.js"
 import { FighterGame } from "../games/fighter/FighterGame.js";
 import { LobbyRoom } from "../games/lobby/LobbyRoom.js";
 import { DominoGame } from "../games/domino/DominoGame.js";
+import { MemoryPuzzleGame } from "../games/memory-puzzle/MemoryPuzzleGame.js";
+import { TetrisGame } from "../games/tetris/TetrisGame.js";
+import { RentoGame } from "../games/rento/RentoGame.js";
+import { SnakeLadderGame } from "../games/snake-ladder/SnakeLadderGame.js";
 
 type Ack = ((response: unknown) => void) | undefined;
 
@@ -221,6 +225,78 @@ export function registerSocketHandlers(
       return { room: targetRoom, player: m.player };
     }
 
+    /** Narrow to the Memory Puzzle engine. */
+    function memoryPuzzleMembership(callback: Ack) {
+      const m = membership();
+      if (!m) {
+        fail(callback, "Not in a room");
+        return null;
+      }
+      let targetRoom = m.room;
+      if (targetRoom instanceof LobbyRoom && targetRoom.activeSubRoom) {
+        targetRoom = targetRoom.activeSubRoom;
+      }
+      if (!(targetRoom instanceof MemoryPuzzleGame)) {
+        fail(callback, "Action not supported by this game");
+        return null;
+      }
+      return { room: targetRoom, player: m.player };
+    }
+
+    /** Narrow to the Tetris engine. */
+    function tetrisMembership(callback: Ack) {
+      const m = membership();
+      if (!m) {
+        fail(callback, "Not in a room");
+        return null;
+      }
+      let targetRoom = m.room;
+      if (targetRoom instanceof LobbyRoom && targetRoom.activeSubRoom) {
+        targetRoom = targetRoom.activeSubRoom;
+      }
+      if (!(targetRoom instanceof TetrisGame)) {
+        fail(callback, "Action not supported by this game");
+        return null;
+      }
+      return { room: targetRoom, player: m.player };
+    }
+
+    /** Narrow to the Rento engine. */
+    function rentoMembership(callback: Ack) {
+      const m = membership();
+      if (!m) {
+        fail(callback, "Not in a room");
+        return null;
+      }
+      let targetRoom = m.room;
+      if (targetRoom instanceof LobbyRoom && targetRoom.activeSubRoom) {
+        targetRoom = targetRoom.activeSubRoom;
+      }
+      if (!(targetRoom instanceof RentoGame)) {
+        fail(callback, "Action not supported by this game");
+        return null;
+      }
+      return { room: targetRoom, player: m.player };
+    }
+
+    /** Narrow to the Snake & Ladder engine. */
+    function snakeLadderMembership(callback: Ack) {
+      const m = membership();
+      if (!m) {
+        fail(callback, "Not in a room");
+        return null;
+      }
+      let targetRoom = m.room;
+      if (targetRoom instanceof LobbyRoom && targetRoom.activeSubRoom) {
+        targetRoom = targetRoom.activeSubRoom;
+      }
+      if (!(targetRoom instanceof SnakeLadderGame)) {
+        fail(callback, "Action not supported by this game");
+        return null;
+      }
+      return { room: targetRoom, player: m.player };
+    }
+
     // ===== ROOM LIFECYCLE =====
 
     socket.on(
@@ -287,6 +363,36 @@ export function registerSocketHandlers(
               fail(callback, "Team mode requires exactly 4 players");
               return;
             }
+          } else if (gameId === "rento") {
+            if (!Number.isInteger(maxPlayers) || maxPlayers < 2 || maxPlayers > 6) {
+              fail(callback, "Players must be between 2 and 6");
+              return;
+            }
+            if (data.startingBalance !== undefined) {
+              const bal = Number(data.startingBalance);
+              if (!Number.isFinite(bal) || bal < 200 || bal > 10000) {
+                fail(callback, "Starting balance must be between 200 and 10000");
+                return;
+              }
+            }
+            if (data.turnTimer !== undefined) {
+              const t = Number(data.turnTimer);
+              if (!Number.isFinite(t) || t < 5000 || t > 60000) {
+                fail(callback, "Turn timer must be between 5000 and 60000 ms");
+                return;
+              }
+            }
+            if (data.freeParkingBonus !== undefined) {
+              const f = Number(data.freeParkingBonus);
+              if (!Number.isFinite(f) || f < 0 || f > 2000) {
+                fail(callback, "Free parking bonus must be between 0 and 2000");
+                return;
+              }
+            }
+            if (data.aiDifficulty !== undefined && !["easy", "medium", "hard"].includes(data.aiDifficulty)) {
+              fail(callback, "Invalid AI difficulty");
+              return;
+            }
           } else {
             fail(callback, `Unknown game: ${gameId}`);
             return;
@@ -310,7 +416,7 @@ export function registerSocketHandlers(
             return;
           }
 
-          const player = room.addPlayer(playerName, socket.id, true);
+          const player = room.addPlayer(playerName, socket.id, true, undefined, (data as any).flag);
           registry.add(room);
           socket.join(roomId);
           registry.bindSocket(socket.id, { roomId, playerId: player.id });
@@ -358,7 +464,7 @@ export function registerSocketHandlers(
             return;
           }
 
-          const player = room.addPlayer(playerName, socket.id);
+          const player = room.addPlayer(playerName, socket.id, false, undefined, (data as any).flag);
           socket.join(room.roomId);
           registry.bindSocket(socket.id, { roomId: room.roomId, playerId: player.id });
 
@@ -792,6 +898,163 @@ export function registerSocketHandlers(
       },
     );
 
+    // ===== GAMEPLAY (Memory Puzzle) =====
+
+    socket.on(
+      "memory_puzzle_flip",
+      (data: { x: number; y: number }, callback: Ack) => {
+        const m = memoryPuzzleMembership(callback);
+        if (!m) return;
+        const result = m.room.flip(m.player.id, Number(data?.x), Number(data?.y));
+        if (!result.success) {
+          fail(callback, result.error ?? "Invalid flip");
+          return;
+        }
+        reply(callback, { success: true });
+      },
+    );
+
+    // ===== GAMEPLAY (Tetris) =====
+
+    socket.on(
+      "tetris_input",
+      (data: { action: "left" | "right" | "rotate" | "rotateCCW" | "down" | "drop" }, callback: Ack) => {
+        const m = tetrisMembership(callback);
+        if (!m) return;
+        const result = m.room.input(m.player.id, data?.action);
+        if (!result.success) {
+          fail(callback, result.error ?? "Invalid input");
+          return;
+        }
+        reply(callback, { success: true });
+      },
+    );
+
+    // ===== GAMEPLAY (Rento) =====
+
+    socket.on("rento_roll", (_data: unknown, callback: Ack) => {
+      const m = rentoMembership(callback);
+      if (!m) return;
+      const result = m.room.rollDice(m.player.id);
+      if (!result.success) {
+        fail(callback, result.error ?? "Cannot roll");
+        return;
+      }
+      reply(callback, { success: true, dice: result.dice });
+    });
+
+    socket.on("rento_buy", (_data: unknown, callback: Ack) => {
+      const m = rentoMembership(callback);
+      if (!m) return;
+      const result = m.room.buyProperty(m.player.id);
+      if (!result.success) {
+        fail(callback, result.error ?? "Cannot buy");
+        return;
+      }
+      reply(callback, { success: true });
+    });
+
+    socket.on("rento_end_turn", (_data: unknown, callback: Ack) => {
+      const m = rentoMembership(callback);
+      if (!m) return;
+      const result = m.room.endTurn(m.player.id);
+      if (!result.success) {
+        fail(callback, result.error ?? "Cannot end turn");
+        return;
+      }
+      reply(callback, { success: true });
+    });
+
+    socket.on("rento_trade", (data: unknown, callback: Ack) => {
+      const m = rentoMembership(callback);
+      if (!m) return;
+      const d = data as {
+        toPlayerId?: string;
+        offerProperties?: number[];
+        offerMoney?: number;
+        requestProperties?: number[];
+        requestMoney?: number;
+      };
+      if (!d.toPlayerId) {
+        fail(callback, "Missing toPlayerId");
+        return;
+      }
+      const result = m.room.proposeTrade(
+        m.player.id,
+        d.toPlayerId,
+        d.offerProperties ?? [],
+        d.offerMoney ?? 0,
+        d.requestProperties ?? [],
+        d.requestMoney ?? 0
+      );
+      if (!result.success) {
+        fail(callback, result.error ?? "Cannot trade");
+        return;
+      }
+      reply(callback, { success: true, tradeId: result.tradeId });
+    });
+
+    socket.on("rento_accept_trade", (data: unknown, callback: Ack) => {
+      const m = rentoMembership(callback);
+      if (!m) return;
+      const d = data as { tradeId?: string };
+      if (!d.tradeId) {
+        fail(callback, "Missing tradeId");
+        return;
+      }
+      const result = m.room.acceptTrade(m.player.id, d.tradeId);
+      if (!result.success) {
+        fail(callback, result.error ?? "Cannot accept trade");
+        return;
+      }
+      reply(callback, { success: true });
+    });
+
+    socket.on("rento_reject_trade", (data: unknown, callback: Ack) => {
+      const m = rentoMembership(callback);
+      if (!m) return;
+      const d = data as { tradeId?: string };
+      if (!d.tradeId) {
+        fail(callback, "Missing tradeId");
+        return;
+      }
+      const result = m.room.rejectTrade(m.player.id, d.tradeId);
+      if (!result.success) {
+        fail(callback, result.error ?? "Cannot reject trade");
+        return;
+      }
+      reply(callback, { success: true });
+    });
+
+    socket.on("rento_cancel_trade", (data: unknown, callback: Ack) => {
+      const m = rentoMembership(callback);
+      if (!m) return;
+      const d = data as { tradeId?: string };
+      if (!d.tradeId) {
+        fail(callback, "Missing tradeId");
+        return;
+      }
+      const result = m.room.cancelTrade(m.player.id, d.tradeId);
+      if (!result.success) {
+        fail(callback, result.error ?? "Cannot cancel trade");
+        return;
+      }
+      reply(callback, { success: true });
+    });
+
+    // ===== GAMEPLAY (Snake & Ladder) =====
+
+    socket.on("snl_roll", (_data: unknown, callback: Ack) => {
+      const m = snakeLadderMembership(callback);
+      if (!m) return;
+      const result = m.room.rollDice(m.player.id);
+      if (!result.success) {
+        fail(callback, result.error ?? "Cannot roll");
+        return;
+      }
+      reply(callback, { success: true, dice: result.dice });
+    });
+
     // ===== LOBBY MODE SUB-GAMES =====
 
     socket.on(
@@ -849,6 +1112,7 @@ export function registerSocketHandlers(
         playerId: m.player.id,
         playerName: m.player.name,
         message,
+        flag: m.player.flag,
         timestamp: Date.now(),
       });
     });

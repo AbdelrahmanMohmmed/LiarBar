@@ -51,11 +51,11 @@ let voiceIceLogged = false;
 export const VoiceControls = memo(function VoiceControls({
   roomId,
 }: VoiceControlsProps) {
-  const { lobbyState, gameState, codenamesState, higherLowerState, myPlayerId, sendWebRTCSignal, addToast } = useGame();
+  const { lobbyState, gameState, codenamesState, higherLowerState, rentoState, myPlayerId, sendWebRTCSignal, addToast } = useGame();
 
   const activePlayers = lobbyState
     ? lobbyState.players
-    : (gameState || codenamesState || higherLowerState)?.players ?? [];
+    : (rentoState || gameState || codenamesState || higherLowerState)?.players ?? [];
   const [isMuted, setIsMuted] = useState(true);
   const [isConnecting, setIsConnecting] = useState(false);
 

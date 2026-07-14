@@ -240,8 +240,16 @@ export class SnakeGame implements GameRoom {
 
   private botSteer(s: SnakeState) {
     const options: Dir[] = [s.dir, { x: -s.dir.x, y: -s.dir.y }, { x: s.dir.y, y: s.dir.x }, { x: -s.dir.y, y: s.dir.x }];
-    // prefer toward food, avoid reverse
     const head = s.body[0];
+
+    // Build occupied set from ALL snakes (not just self)
+    const occupied = new Set<string>();
+    for (const other of this.snakes) {
+      for (let i = 0; i < other.body.length - 1; i++) {
+        occupied.add(other.body[i].x + "," + other.body[i].y);
+      }
+    }
+
     let best: Dir | null = null;
     let bestScore = -Infinity;
     for (const d of options) {
@@ -249,9 +257,20 @@ export class SnakeGame implements GameRoom {
       const nx = head.x + d.x;
       const ny = head.y + d.y;
       if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS) continue;
-      if (s.body.some((c, i) => i < s.body.length - 1 && c.x === nx && c.y === ny)) continue;
+      if (occupied.has(nx + "," + ny)) continue;
+
+      // Score: prefer food, penalize cells near walls/occupied, add randomness
       const dist = Math.abs(nx - this.food.x) + Math.abs(ny - this.food.y);
-      const score = -dist + (Math.random() * 2);
+      let score = -dist * 2 + (Math.random() * 3);
+
+      // Lookahead: check if next cell has exits (avoid dead ends)
+      let exits = 0;
+      for (const nd of [{ x: 0, y: -1 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 1, y: 0 }]) {
+        const ax = nx + nd.x, ay = ny + nd.y;
+        if (ax >= 0 && ax < COLS && ay >= 0 && ay < ROWS && !occupied.has(ax + "," + ay)) exits++;
+      }
+      score += exits * 3;
+
       if (score > bestScore) { bestScore = score; best = d; }
     }
     if (best) s.dir = best;

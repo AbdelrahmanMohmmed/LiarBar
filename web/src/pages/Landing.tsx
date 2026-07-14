@@ -40,6 +40,10 @@ const COPY = {
     arcadeSubtitle: "Arcade",
     arcadeDesc: "مجموعة ألعاب أركيد أحادية اللاعب تلعبها مباشرة في المتصفح — أفعى، تيك تاك تو، نزال، وغزاة الفضاء!",
     arcadePlayLabel: "ادخل الصالة",
+    rentoTitle: "رينتو",
+    rentoSubtitle: "Rento",
+    rentoDesc: "لعبة صفقات عقارية多人. ارمِ النرد واشترِ الملكيات وافلس خصومك!",
+    rentoPlayLabel: "العب الآن",
     footerText: "© 2026 ألعاب سفريات — العب في أي وقت، في أي مكان.",
   },
   en: {
@@ -71,6 +75,10 @@ const COPY = {
     arcadeSubtitle: "Arcade",
     arcadeDesc: "A collection of single-player arcade games you can play right in your browser — Snake, Tic-Tac-Toe, Fighter, and Space Invaders!",
     arcadePlayLabel: "Enter Arcade",
+    rentoTitle: "Rento",
+    rentoSubtitle: "Rento",
+    rentoDesc: "Multiplayer property trading. Roll dice, buy properties, and bankrupt your rivals!",
+    rentoPlayLabel: "Play now",
     footerText: "© 2026 Safariyat Games — play anytime, anywhere.",
   },
 } as const;
@@ -95,6 +103,7 @@ export default function Landing() {
   const goToDomino = useCallback(() => navigate("/domino"), [navigate]);
   const goToLobby = useCallback(() => navigate("/lobby"), [navigate]);
   const goToArcade = useCallback(() => navigate("/arcade"), [navigate]);
+  const goToRento = useCallback(() => navigate("/rento"), [navigate]);
 
   return (
     <>
@@ -783,6 +792,122 @@ export default function Landing() {
                 }}
               >
                 {c.lobbyPlayLabel}
+              </button>
+            </div>
+          </article>
+
+          {/* Rento — available */}
+          <article
+            style={{
+              animation: "dc-pop-in 0.5s ease 0.35s both",
+              background: "#FFFFFF",
+              borderRadius: 24,
+              border: "3px solid #2B2420",
+              overflow: "hidden",
+              boxShadow: "6px 6px 0 #2B2420",
+            }}
+          >
+            <div
+              style={{
+                height: 140,
+                background: "#FEF3C7",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 14,
+                position: "relative",
+              }}
+            >
+              <div
+                style={{
+                  width: 54,
+                  height: 54,
+                  borderRadius: 12,
+                  background: "#F4C89A",
+                  border: "3px solid #2B2420",
+                  boxShadow: "3px 3px 0 #2B2420",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 24,
+                  transform: "rotate(-6deg)",
+                }}
+              >
+                🏠
+              </div>
+              <div
+                style={{
+                  width: 54,
+                  height: 54,
+                  borderRadius: 12,
+                  background: "#3AA6A6",
+                  border: "3px solid #2B2420",
+                  boxShadow: "3px 3px 0 #2B2420",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 24,
+                  transform: "rotate(6deg)",
+                }}
+              >
+                🎲
+              </div>
+              <span
+                style={{
+                  position: "absolute",
+                  top: 10,
+                  [badgeSide]: 10,
+                  background: "#3AA6A6",
+                  color: "#FDF6EC",
+                  fontFamily: BUTTON_FONT,
+                  fontWeight: 700,
+                  fontSize: 12,
+                  padding: "5px 12px",
+                  borderRadius: 999,
+                  animation: "dc-float-badge 2.4s ease-in-out infinite",
+                }}
+              >
+                {c.availableLabel}
+              </span>
+            </div>
+            <div
+              style={{
+                padding: "16px 20px 20px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 10,
+                textAlign,
+              }}
+            >
+              <div>
+                <div style={{ fontFamily: font, fontWeight: 800, fontSize: 22, color: "#2B2420" }}>
+                  {c.rentoTitle}
+                </div>
+                <div style={{ fontFamily: font, fontSize: 14, color: "#8A7F73", marginTop: 2 }}>
+                  {c.rentoSubtitle}
+                </div>
+              </div>
+              <p style={{ fontFamily: font, fontSize: 14, lineHeight: 1.6, color: "#5B5147", margin: 0 }}>
+                {c.rentoDesc}
+              </p>
+              <button
+                onClick={goToRento}
+                className="dc-play-btn"
+                style={{
+                  alignSelf: buttonAlign,
+                  marginTop: 4,
+                  background: "#E8574A",
+                  color: "#FDF6EC",
+                  border: "none",
+                  fontFamily: BUTTON_FONT,
+                  fontWeight: 700,
+                  fontSize: 15,
+                  padding: "10px 22px",
+                  borderRadius: 999,
+                  cursor: "pointer",
+                }}
+              >
+                {c.rentoPlayLabel}
               </button>
             </div>
           </article>

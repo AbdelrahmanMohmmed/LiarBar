@@ -25,9 +25,14 @@ import FighterGame from "./pages/arcade/FighterGame";
 import JumperGame from "./pages/arcade/JumperGame";
 import SpaceInvadersGame from "./pages/arcade/SpaceInvadersGame";
 import SpaceAlienGame from "./pages/arcade/SpaceAlienGame";
+import MemoryPuzzleGame from "./pages/arcade/MemoryPuzzleGame";
+import TetrisGame from "./pages/arcade/TetrisGame";
 import DominoHome from "./pages/domino/DominoHome";
 import DominoRoom from "./pages/domino/DominoRoom";
 import DominoGame from "./pages/domino/DominoGame";
+import RentoHome from "./pages/rento/RentoHome";
+import RentoRoom from "./pages/rento/RentoRoom";
+import RentoGame from "./pages/rento/RentoGame";
 
 const queryClient = new QueryClient();
 
@@ -85,6 +90,10 @@ const App = () => (
             <Route path="/domino" element={<DominoHome />} />
             <Route path="/domino/room/:roomId" element={<DominoRoom />} />
             <Route path="/domino/game/:roomId" element={<DominoGame />} />
+
+            <Route path="/rento" element={<RentoHome />} />
+            <Route path="/rento/room/:roomId" element={<RentoRoom />} />
+            <Route path="/rento/game/:roomId" element={<RentoGame />} />
             <Route path="/lobby" element={<LobbyHome />} />
             <Route path="/lobby/:roomId" element={<LobbyRoom />} />
             <Route path="/arcade" element={<ArcadeHub />} />
@@ -94,6 +103,8 @@ const App = () => (
             <Route path="/arcade/jumper" element={<JumperGame />} />
             <Route path="/arcade/space-invaders" element={<SpaceInvadersGame />} />
             <Route path="/arcade/space-alien" element={<SpaceAlienGame />} />
+            <Route path="/arcade/memory-puzzle" element={<MemoryPuzzleGame />} />
+            <Route path="/arcade/tetris" element={<TetrisGame />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

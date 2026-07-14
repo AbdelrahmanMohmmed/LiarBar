@@ -21,6 +21,7 @@ import type {
   LobbyState,
   DominoState,
   Dominoe,
+  RentoState,
 } from "./types";
 
 interface GameActions {
@@ -41,6 +42,11 @@ interface GameActions {
     turnTimeLimit?: number,
     tableTheme?: string,
     tileTheme?: string,
+    startingBalance?: number,
+    jailEnabled?: boolean,
+    freeParkingBonus?: number,
+    turnTimer?: number,
+    aiDifficulty?: "easy" | "medium" | "hard",
   ) => Promise<{ roomId: string; playerId: string }>;
   joinRoom: (
     roomId: string,
@@ -90,6 +96,7 @@ interface GameContextValue extends GameActions {
   codenamesState: CodenamesState | null;
   higherLowerState: HigherLowerState | null;
   dominoState: DominoState | null;
+  rentoState: RentoState | null;
   myHand: Card[];
   isConnected: boolean;
   myPlayerId: string | null;
@@ -109,6 +116,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
   const [codenamesState, setCodenamesState] = useState<CodenamesState | null>(null);
   const [higherLowerState, setHigherLowerState] = useState<HigherLowerState | null>(null);
   const [dominoState, setDominoState] = useState<DominoState | null>(null);
+  const [rentoState, setRentoState] = useState<RentoState | null>(null);
   const [myHand, setMyHand] = useState<Card[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [myPlayerId, setMyPlayerId] = useState<string | null>(null);
@@ -143,6 +151,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
     setCodenamesState(null);
     setHigherLowerState(null);
     setDominoState(null);
+    setRentoState(null);
     setMyHand([]);
     setChatMessages([]);
     setToasts([]);
@@ -161,7 +170,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
       setIsConnected(false);
     };
 
-    const onGameState = (state: GameState | CodenamesState | HigherLowerState | LobbyState | DominoState) => {
+    const onGameState = (state: GameState | CodenamesState | HigherLowerState | LobbyState | DominoState | RentoState) => {
       if ((state as LobbyState).gameId === "lobby") {
         const next = state as LobbyState;
         setLobbyState(next);
@@ -199,6 +208,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
           setCodenamesState(null);
           setHigherLowerState(null);
           setDominoState(null);
+          setRentoState(null);
         }
       } else if ((state as CodenamesState).gameId === "codenames") {
         const next = state as CodenamesState;
@@ -209,6 +219,12 @@ export const [GameProvider, useGame] = createContextHook(() => {
       } else if ((state as DominoState).gameId === "domino") {
         const next = state as DominoState;
         setDominoState((prev) => ({ ...next, hand: prev?.hand }));
+      } else if ((state as RentoState).gameId === "rento") {
+        setRentoState(state as RentoState);
+        setGameState(null);
+        setCodenamesState(null);
+        setHigherLowerState(null);
+        setDominoState(null);
       } else {
         setGameState(state as GameState);
       }
@@ -301,7 +317,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
     [],
   );
 
-  const applyRoomState = useCallback((state: GameState | CodenamesState | HigherLowerState | LobbyState | DominoState) => {
+  const applyRoomState = useCallback((state: GameState | CodenamesState | HigherLowerState | LobbyState | DominoState | RentoState) => {
     if ((state as LobbyState).gameId === "lobby") {
       const next = state as LobbyState;
       setLobbyState(next);
@@ -330,6 +346,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
         setCodenamesState(null);
         setHigherLowerState(null);
         setDominoState(null);
+        setRentoState(null);
       }
     } else if ((state as CodenamesState).gameId === "codenames") {
       setCodenamesState(state as CodenamesState);
@@ -337,6 +354,8 @@ export const [GameProvider, useGame] = createContextHook(() => {
       setHigherLowerState(state as HigherLowerState);
     } else if ((state as DominoState).gameId === "domino") {
       setDominoState(state as DominoState);
+    } else if ((state as RentoState).gameId === "rento") {
+      setRentoState(state as RentoState);
     } else {
       setGameState(state as GameState);
     }
@@ -360,6 +379,12 @@ export const [GameProvider, useGame] = createContextHook(() => {
       turnTimeLimit?: number,
       tableTheme?: string,
       tileTheme?: string,
+      startingBalance?: number,
+      jailEnabled?: boolean,
+      freeParkingBonus?: number,
+      turnTimer?: number,
+      aiDifficulty?: "easy" | "medium" | "hard",
+      flag?: string,
     ): Promise<{ roomId: string; playerId: string }> => {
       connectSocket();
       const res = await emitWithAck<{
@@ -384,6 +409,12 @@ export const [GameProvider, useGame] = createContextHook(() => {
         turnTimeLimit,
         tableTheme,
         tileTheme,
+        startingBalance,
+        jailEnabled,
+        freeParkingBonus,
+        turnTimer,
+        aiDifficulty,
+        flag,
       });
 
       setMyRoomId(res.roomId);
@@ -400,13 +431,14 @@ export const [GameProvider, useGame] = createContextHook(() => {
     async (
       roomId: string,
       playerName: string,
+      flag?: string,
     ): Promise<{ playerId: string }> => {
       connectSocket();
       const res = await emitWithAck<{
         success: boolean;
         playerId: string;
         state: GameState | CodenamesState;
-      }>("join_room", { roomId: roomId.toUpperCase(), playerName });
+      }>("join_room", { roomId: roomId.toUpperCase(), playerName, flag });
 
       setMyRoomId(roomId.toUpperCase());
       setMyPlayerId(res.playerId);
@@ -630,6 +662,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
     codenamesState,
     higherLowerState,
     dominoState,
+    rentoState,
     myHand,
     isConnected,
     myPlayerId,

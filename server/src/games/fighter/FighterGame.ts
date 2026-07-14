@@ -42,8 +42,9 @@ class Fighter {
   cooldown = 0;
   parryTimer = 0;
   parryActive = false;
-  parryCd = 0;
   parryFlash = 0;
+  parryStamina = 100;
+  guardBreak = false;
   specialMeter = 0;
   specialFlash = 0;
   stun = 0;
@@ -74,8 +75,9 @@ class Fighter {
     this.cooldown = 0;
     this.parryTimer = 0;
     this.parryActive = false;
-    this.parryCd = 0;
     this.parryFlash = 0;
+    this.parryStamina = 100;
+    this.guardBreak = false;
     this.specialMeter = 0;
     this.specialFlash = 0;
     this.stun = 0;
@@ -97,16 +99,27 @@ class Fighter {
     const dx = Math.abs(this.x - target.x);
     const dy = Math.abs(this.y - target.y);
     if (dx < 130 && dy < 120) {
-      if (target.parryActive) {
+      if (target.parryActive && target.parryStamina > 0) {
+        // Blocked! Cost stamina
+        const cost = dmg * 0.6;
+        target.parryStamina = Math.max(0, target.parryStamina - cost);
         target.parryFlash = 14;
         this.attacking = false;
         this.stun = 26;
+        // Guard break if stamina depleted
+        if (target.parryStamina <= 0) {
+          target.guardBreak = true;
+          target.stun = 40;
+          target.parryActive = false;
+          target.parryTimer = 0;
+          target.parryFlash = 20;
+        }
         return;
       }
       target.health = Math.max(0, target.health - dmg);
       target.hit = true;
       target.hitTimer = 14;
-      this.specialMeter = Math.min(100, this.specialMeter + 22);
+      this.specialMeter = Math.min(100, this.specialMeter + 30);
       if (target.health <= 0) target.alive = false;
     }
   }
@@ -114,11 +127,14 @@ class Fighter {
   update(opponent: Fighter, f: number) {
     if (this.cooldown > 0) this.cooldown -= f;
     if (this.stun > 0) this.stun -= f;
-    if (this.parryCd > 0) this.parryCd -= f;
     if (this.parryTimer > 0) {
       this.parryTimer -= f;
-      if (this.parryTimer <= 0) { this.parryActive = false; this.parryCd = 36; }
+      if (this.parryTimer <= 0) { this.parryActive = false; }
       else if (this.parryTimer < 10) this.parryActive = false;
+    }
+    // Stamina recharge when not blocking
+    if (!this.parryActive && this.parryStamina < 100) {
+      this.parryStamina = Math.min(100, this.parryStamina + 0.8 * f);
     }
     if (this.parryFlash > 0) this.parryFlash -= f;
     if (this.specialFlash > 0) this.specialFlash -= f;
@@ -129,6 +145,10 @@ class Fighter {
     if (this.attackTimer > 0) {
       this.attackTimer -= f;
       if (this.attackTimer <= 0) this.attacking = false;
+    }
+    if (this.guardBreak) {
+      this.guardBreak = false;
+      this.stun = 40;
     }
 
     if (!this.alive) { this.action = "dead"; return; }
@@ -141,20 +161,30 @@ class Fighter {
       if (this.input.left) move -= 10;
       if (this.input.right) move += 10;
       if (this.input.jump && !this.jumping) { this.vy = -40; this.jumping = true; }
-      if (this.input.parry && this.parryCd <= 0) {
-        this.parryTimer = 26;
-        this.parryActive = true;
-      } else if (this.input.special && this.specialMeter >= 100 && this.cooldown <= 0) {
-        this.attacking = true;
-        this.attackStyle = 3;
-        this.attackTimer = 26;
-        this.cooldown = 50;
-        this.specialMeter = 0;
-        this.specialFlash = 14;
-        this.resolveHit(opponent, 45);
-      } else if ((this.input.attack1 || this.input.attack2) && this.cooldown <= 0) {
-        this.tryAttack(this.input.attack2 ? 2 : 1);
-        this.resolveHit(opponent, 20);
+
+      // Auto-block when walking AWAY from enemy (block stance)
+      if (move !== 0 && this.parryStamina > 0) {
+        const awayFromEnemy = (opponent.x > this.x && move < 0) || (opponent.x < this.x && move > 0);
+        if (awayFromEnemy) {
+          this.parryTimer = 26;
+          this.parryActive = true;
+          move = 0;
+        }
+      }
+
+      if (!this.parryActive) {
+        if (this.input.special && this.specialMeter >= 100 && this.cooldown <= 0) {
+          this.attacking = true;
+          this.attackStyle = 3;
+          this.attackTimer = 26;
+          this.cooldown = 50;
+          this.specialMeter = 0;
+          this.specialFlash = 14;
+          this.resolveHit(opponent, 45);
+        } else if ((this.input.attack1 || this.input.attack2) && this.cooldown <= 0) {
+          this.tryAttack(this.input.attack2 ? 2 : 1);
+          this.resolveHit(opponent, 20);
+        }
       }
     }
 
@@ -198,12 +228,14 @@ export class FighterGame implements GameRoom {
   private matchWinner: string | null = null;
   private scores: Record<string, number> = {};
   private winTarget = 3;
+  private theme = "default";
   private roundTimer: any = null;
 
   constructor(roomId: string, options: any, callbacks: GameRoomCallbacks) {
     this.roomId = roomId;
     this.maxPlayers = options.maxPlayers ?? 4;
     this.winTarget = Math.max(1, Number(options?.winTarget) || 3);
+    this.theme = options?.theme || "default";
     this.callbacks = callbacks;
   }
 
@@ -401,6 +433,7 @@ export class FighterGame implements GameRoom {
         special: fi.specialMeter,
         parryActive: fi.parryActive,
         parryFlash: fi.parryFlash,
+        parryStamina: fi.parryStamina,
         specialFlash: fi.specialFlash,
         isBot: fi.isBot,
       })),
@@ -409,6 +442,7 @@ export class FighterGame implements GameRoom {
       matchWinner: this.matchWinner,
       scores: this.scores,
       winTarget: this.winTarget,
+      theme: this.theme,
       maxHealth: 160,
     };
   }

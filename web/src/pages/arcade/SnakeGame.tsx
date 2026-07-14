@@ -16,6 +16,7 @@ export default function SnakeGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [phase, setPhase] = useState<Phase>("start");
   const [score, setScore] = useState(0);
+  const [hiScore, setHiScore] = useState(0);
 
   const phaseRef = useRef<Phase>(phase);
   const scoreRef = useRef(score);
@@ -40,6 +41,9 @@ export default function SnakeGame() {
     let stepInterval = 130;
     let raf = 0;
     let last = performance.now();
+    let animT = 0;
+    let deathFlash = 0;
+    let scorePopups: { x: number; y: number; t: number }[] = [];
 
     const placeFood = () => {
       do {
@@ -58,6 +62,8 @@ export default function SnakeGame() {
       setScore(0);
       acc = 0;
       stepInterval = 130;
+      deathFlash = 0;
+      scorePopups = [];
       placeFood();
     };
 
@@ -77,10 +83,12 @@ export default function SnakeGame() {
       else head.x += 1;
 
       if (head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS) {
+        deathFlash = 1;
         setPhase("over");
         return;
       }
       if (snake.some((s) => s.x === head.x && s.y === head.y)) {
+        deathFlash = 1;
         setPhase("over");
         return;
       }
@@ -90,6 +98,7 @@ export default function SnakeGame() {
         const s = scoreRef.current + 1;
         scoreRef.current = s;
         setScore(s);
+        scorePopups.push({ x: food.x * CELL + CELL / 2, y: food.y * CELL, t: 1 });
         stepInterval = Math.max(45, 130 - s * 2);
         placeFood();
       } else {
@@ -97,9 +106,70 @@ export default function SnakeGame() {
       }
     };
 
+    const drawSnakeHead = (x: number, y: number, d: Dir) => {
+      const cx = x * CELL + CELL / 2;
+      const cy = y * CELL + CELL / 2;
+      const r = CELL / 2 - 1;
+
+      ctx.fillStyle = "#5ee08a";
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fill();
+
+      // eyes
+      const eyeOff = 3.5;
+      const pupilOff = 1.5;
+      let e1x: number, e1y: number, e2x: number, e2y: number;
+      let p1x: number, p1y: number, p2x: number, p2y: number;
+      if (d === "up") {
+        e1x = cx - eyeOff; e1y = cy - eyeOff;
+        e2x = cx + eyeOff; e2y = cy - eyeOff;
+        p1x = e1x; p1y = e1y - pupilOff;
+        p2x = e2x; p2y = e2y - pupilOff;
+      } else if (d === "down") {
+        e1x = cx - eyeOff; e1y = cy + eyeOff;
+        e2x = cx + eyeOff; e2y = cy + eyeOff;
+        p1x = e1x; p1y = e1y + pupilOff;
+        p2x = e2x; p2y = e2y + pupilOff;
+      } else if (d === "left") {
+        e1x = cx - eyeOff; e1y = cy - eyeOff;
+        e2x = cx - eyeOff; e2y = cy + eyeOff;
+        p1x = e1x - pupilOff; p1y = e1y;
+        p2x = e2x - pupilOff; p2y = e2y;
+      } else {
+        e1x = cx + eyeOff; e1y = cy - eyeOff;
+        e2x = cx + eyeOff; e2y = cy + eyeOff;
+        p1x = e1x + pupilOff; p1y = e1y;
+        p2x = e2x + pupilOff; p2y = e2y;
+      }
+
+      ctx.fillStyle = "#fff";
+      ctx.beginPath();
+      ctx.arc(e1x, e1y, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(e2x, e2y, 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = "#111";
+      ctx.beginPath();
+      ctx.arc(p1x, p1y, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(p2x, p2y, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    };
+
     const render = () => {
-      ctx.fillStyle = "#0a0a12";
-      ctx.fillRect(0, 0, SIZE, SIZE);
+      // bg
+      if (deathFlash > 0) {
+        ctx.fillStyle = `rgba(255,50,50,${deathFlash * 0.3})`;
+        ctx.fillRect(0, 0, SIZE, SIZE);
+        deathFlash = Math.max(0, deathFlash - 0.03);
+      } else {
+        ctx.fillStyle = "#0a0a12";
+        ctx.fillRect(0, 0, SIZE, SIZE);
+      }
 
       // subtle grid
       ctx.strokeStyle = "rgba(255,255,255,0.04)";
@@ -115,23 +185,49 @@ export default function SnakeGame() {
         ctx.stroke();
       }
 
-      // food
+      // food (pulsing)
+      const pulse = 1 + 0.15 * Math.sin(animT * 0.006);
+      const foodR = (CELL / 2 - 2) * pulse;
       ctx.fillStyle = "#ff4d4d";
       ctx.beginPath();
-      ctx.arc(food.x * CELL + CELL / 2, food.y * CELL + CELL / 2, CELL / 2 - 2, 0, Math.PI * 2);
+      ctx.arc(food.x * CELL + CELL / 2, food.y * CELL + CELL / 2, foodR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "rgba(255,77,77,0.25)";
+      ctx.beginPath();
+      ctx.arc(food.x * CELL + CELL / 2, food.y * CELL + CELL / 2, foodR + 4, 0, Math.PI * 2);
       ctx.fill();
 
-      // snake
-      snake.forEach((s, i) => {
-        ctx.fillStyle = i === 0 ? "#5ee08a" : "#2faa5a";
-        const pad = 1;
-        ctx.fillRect(s.x * CELL + pad, s.y * CELL + pad, CELL - pad * 2, CELL - pad * 2);
+      // snake body with gradient
+      if (snake.length > 0) {
+        const head = snake[0];
+        drawSnakeHead(head.x, head.y, dir);
+      }
+      for (let i = 1; i < snake.length; i++) {
+        const t = i / Math.max(1, snake.length - 1);
+        const r = Math.round(46 + (42 - 46) * t);
+        const g = Math.round(224 + (170 - 224) * t);
+        const b = Math.round(138 + (90 - 138) * t);
+        ctx.fillStyle = `rgb(${r},${g},${b})`;
+        const pad = 1.5;
+        ctx.fillRect(snake[i].x * CELL + pad, snake[i].y * CELL + pad, CELL - pad * 2, CELL - pad * 2);
+      }
+
+      // score popups
+      scorePopups = scorePopups.filter((p) => {
+        p.t -= 0.02;
+        if (p.t <= 0) return false;
+        ctx.fillStyle = `rgba(255,255,255,${p.t})`;
+        ctx.font = "bold 14px 'Baloo 2', sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("+1", p.x, p.y - (1 - p.t) * 30);
+        return true;
       });
     };
 
     const loop = (now: number) => {
       const dt = now - last;
       last = now;
+      animT += dt;
       if (phaseRef.current === "playing") {
         acc += dt;
         while (acc >= stepInterval) {
@@ -139,6 +235,8 @@ export default function SnakeGame() {
           step();
           if (phaseRef.current !== "playing") break;
         }
+        render();
+      } else {
         render();
       }
       raf = requestAnimationFrame(loop);
@@ -157,6 +255,7 @@ export default function SnakeGame() {
       if (phaseRef.current === "over") {
         if (k === " " || k === "enter") {
           e.preventDefault();
+          if (scoreRef.current > hiScore) setHiScore(scoreRef.current);
           reset();
           start();
         }
@@ -215,12 +314,12 @@ export default function SnakeGame() {
   }, []);
 
   const i18n = {
-    ar: { sub: "Snake", score: "النقاط", start: "انقر أو اضغط سهماً للبدء", over: "انتهت اللعبة", again: "إعادة (مسافة)" },
-    en: { sub: "Snake", score: "Score", start: "Tap or press an arrow to start", over: "Game Over", again: "Restart (Space)" },
+    ar: { sub: "Snake", score: "النقاط", hi: "الأفضل", start: "انقر أو اضغط سهماً للبدء", over: "انتهت اللعبة", again: "إعادة (مسافة)" },
+    en: { sub: "Snake", score: "Score", hi: "Best", start: "Tap or press an arrow to start", over: "Game Over", again: "Restart (Space)" },
   }[isAr ? "ar" : "en"];
 
   return (
-    <ArcadeShell title={i18n.sub} subtitle={`${i18n.score}: ${score}`}>
+    <ArcadeShell title={i18n.sub} subtitle={`${i18n.score}: ${score}  •  ${i18n.hi}: ${hiScore}`}>
       <div className="relative" style={{ width: SIZE, maxWidth: "92vw" }}>
         <canvas
           ref={canvasRef}
@@ -234,7 +333,7 @@ export default function SnakeGame() {
             <div className="text-2xl font-bold">{phase === "start" ? i18n.start : i18n.over}</div>
             {phase === "over" && <div className="text-fuchsia-300">{i18n.score}: {score}</div>}
             <button
-              onClick={restart}
+              onClick={() => { if (score > hiScore) setHiScore(score); restart(); }}
               className="mt-2 px-5 py-2 rounded-lg bg-fuchsia-600 hover:bg-fuchsia-500 font-semibold transition-all"
             >
               {phase === "start" ? (isAr ? "ابدأ" : "Start") : i18n.again}

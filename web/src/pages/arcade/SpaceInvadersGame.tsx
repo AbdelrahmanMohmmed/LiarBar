@@ -26,6 +26,7 @@ export default function SpaceInvadersGame() {
   phaseRef.current = phase;
   scoreRef.current = score;
   shipRef.current = shipType;
+  const keysRef = useRef(new Set<string>());
 
   const start = () => setPhase("playing");
   const restart = () => { setScore(0); setPhase("playing"); };
@@ -33,7 +34,7 @@ export default function SpaceInvadersGame() {
   useEffect(() => {
     const canvas = canvasRef.current!;
     const ctx = canvas.getContext("2d")!;
-    const keys = new Set<string>();
+    const keys = keysRef.current;
     const pointer = { x: W / 2, y: H - 80, active: false };
 
     const IMG = (src: string) => { const i = new Image(); i.src = src; return i; };
@@ -211,9 +212,9 @@ export default function SpaceInvadersGame() {
         if (k === " " || k === "enter" || k === "p") { e.preventDefault(); reset(); setScore(0); start(); }
         return;
       }
-      keys.add(k);
+      keysRef.current.add(k);
     };
-    const onKeyUp = (e: KeyboardEvent) => keys.delete(e.key.toLowerCase());
+    const onKeyUp = (e: KeyboardEvent) => keysRef.current.delete(e.key.toLowerCase());
     const onMove = (e: PointerEvent) => {
       const rect = canvas.getBoundingClientRect();
       pointer.x = ((e.clientX - rect.left) / rect.width) * W;
