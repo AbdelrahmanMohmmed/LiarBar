@@ -589,10 +589,8 @@ export default function DominoGame() {
             borderRadius: 32,
             margin: "0 0 20px 0",
             padding: 16,
-            overflowY: "auto",
             position: "relative",
-            minHeight: 220,
-            maxHeight: "55vh",
+            overflow: "hidden",
           }}
         >
           {dominoState.board.length === 0 ? (
@@ -606,14 +604,16 @@ export default function DominoGame() {
             <div
               style={{
                 width: "100%",
+                maxHeight: "100%",
                 display: "flex",
                 flexWrap: "wrap",
                 alignItems: "center",
-                justifyContent: "center",
+                justifyContent: dominoState.board.length <= 5 ? "center" : "flex-start",
                 alignContent: "center",
                 padding: "16px",
                 boxSizing: "border-box",
                 gap: 8,
+                overflowY: "auto",
               }}
             >
               {dominoState.board.map((tile, idx) => {
