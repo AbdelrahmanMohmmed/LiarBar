@@ -28,6 +28,9 @@ const COPY = {
     game3Title: "أعلى أو أقل",
     game3Subtitle: "Higher or Lower",
     game3Desc: "لعبة تخمين رقمك السري، شارك تخميناتك واعرف من يقترب للرقم السري أولاً!",
+    game4Title: "الدومينو الكلاسيكية",
+    game4Subtitle: "Classic Dominoes",
+    game4Desc: "العب الدومينو الكلاسيكية مع أصدقائك زوجي أو فردي مع البوتات وتحديد النقاط وعداد الوقت!",
     notifyLabel: "العب الآن",
     gameLobbyTitle: "وضع اللوبي",
     gameLobbySubtitle: "غرفة تجمع الألعاب",
@@ -56,6 +59,9 @@ const COPY = {
     game3Title: "Higher or Lower",
     game3Subtitle: "أعلى أو أقل",
     game3Desc: "A fun number guessing game. Compare ranges with others and see who finds their secret number first!",
+    game4Title: "Classic Dominoes",
+    game4Subtitle: "الدومينو الكلاسيكية",
+    game4Desc: "Play the traditional Domino game online with friends! Supports Solo or 2v2 Teams mode with bots and turn timers.",
     notifyLabel: "Play now",
     gameLobbyTitle: "Lobby Mode",
     gameLobbySubtitle: "Game Party Hub",
@@ -86,6 +92,7 @@ export default function Landing() {
   const goToPlay = useCallback(() => navigate("/play"), [navigate]);
   const goToCodenames = useCallback(() => navigate("/codenames"), [navigate]);
   const goToHigherLower = useCallback(() => navigate("/higher-lower"), [navigate]);
+  const goToDomino = useCallback(() => navigate("/domino"), [navigate]);
   const goToLobby = useCallback(() => navigate("/lobby"), [navigate]);
   const goToArcade = useCallback(() => navigate("/arcade"), [navigate]);
 
@@ -537,6 +544,117 @@ export default function Landing() {
                   alignSelf: buttonAlign,
                   marginTop: 4,
                   background: "#E8574A",
+                  color: "#FDF6EC",
+                  border: "none",
+                  fontFamily: BUTTON_FONT,
+                  fontWeight: 700,
+                  fontSize: 15,
+                  padding: "10px 22px",
+                  borderRadius: 999,
+                  cursor: "pointer",
+                }}
+              >
+                {c.playLabel}
+              </button>
+            </div>
+          </article>
+
+          {/* Dominoes — available */}
+          <article
+            style={{
+              animation: "dc-pop-in 0.5s ease 0.25s both",
+              background: "#FFFFFF",
+              borderRadius: 24,
+              border: "3px solid #2B2420",
+              overflow: "hidden",
+              boxShadow: "6px 6px 0 #2B2420",
+            }}
+          >
+            <div
+              style={{
+                height: 140,
+                background: "#D1FAE5", // Soft mint green
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 12,
+                position: "relative",
+              }}
+            >
+              <div style={{ display: "flex", gap: 10, transform: "rotate(-4deg)" }}>
+                {/* Mini Domino 1 */}
+                <div style={{ width: 44, height: 76, background: "#FCFBF7", border: "2.5px solid #2B2420", borderRadius: 6, display: "flex", flexDirection: "column", position: "relative", boxShadow: "2px 2px 0 #2B2420" }}>
+                  <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", borderBottom: "1.5px solid #2B2420" }}>
+                    <div style={{ width: 5, height: 5, background: "#2B2420", borderRadius: "50%" }} />
+                  </div>
+                  <div style={{ flex: 1, display: "flex", flexWrap: "wrap", padding: 4, gap: 3, alignItems: "center", justifyContent: "center" }}>
+                    <div style={{ width: 4, height: 4, background: "#2B2420", borderRadius: "50%" }} />
+                    <div style={{ width: 4, height: 4, background: "#2B2420", borderRadius: "50%" }} />
+                    <div style={{ width: 4, height: 4, background: "#2B2420", borderRadius: "50%" }} />
+                    <div style={{ width: 4, height: 4, background: "#2B2420", borderRadius: "50%" }} />
+                  </div>
+                  <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: 4, height: 4, background: "#D4AF37", borderRadius: "50%", border: "0.5px solid #9A7B1C" }} />
+                </div>
+                {/* Mini Domino 2 */}
+                <div style={{ width: 44, height: 76, background: "#FCFBF7", border: "2.5px solid #2B2420", borderRadius: 6, display: "flex", flexDirection: "column", position: "relative", boxShadow: "2px 2px 0 #2B2420", transform: "translateY(8px) rotate(8deg)" }}>
+                  <div style={{ flex: 1, display: "flex", flexWrap: "wrap", padding: 4, gap: 3, alignItems: "center", justifyContent: "center", borderBottom: "1.5px solid #2B2420" }}>
+                    <div style={{ width: 4, height: 4, background: "#2B2420", borderRadius: "50%" }} />
+                    <div style={{ width: 4, height: 4, background: "#2B2420", borderRadius: "50%" }} />
+                    <div style={{ width: 4, height: 4, background: "#2B2420", borderRadius: "50%" }} />
+                  </div>
+                  <div style={{ flex: 1, display: "flex", flexWrap: "wrap", padding: 4, gap: 3, alignItems: "center", justifyContent: "center" }}>
+                    <div style={{ width: 4, height: 4, background: "#2B2420", borderRadius: "50%" }} />
+                    <div style={{ width: 4, height: 4, background: "#2B2420", borderRadius: "50%" }} />
+                    <div style={{ width: 4, height: 4, background: "#2B2420", borderRadius: "50%" }} />
+                  </div>
+                  <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: 4, height: 4, background: "#D4AF37", borderRadius: "50%", border: "0.5px solid #9A7B1C" }} />
+                </div>
+              </div>
+              <span
+                style={{
+                  position: "absolute",
+                  top: 10,
+                  [badgeSide]: 10,
+                  background: "#3AA6A6",
+                  color: "#FDF6EC",
+                  fontFamily: BUTTON_FONT,
+                  fontWeight: 700,
+                  fontSize: 12,
+                  padding: "5px 12px",
+                  borderRadius: 999,
+                  animation: "dc-float-badge 2.4s ease-in-out infinite",
+                }}
+              >
+                {c.availableLabel}
+              </span>
+            </div>
+            <div
+              style={{
+                padding: "16px 20px 20px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 10,
+                textAlign,
+              }}
+            >
+              <div>
+                <div style={{ fontFamily: font, fontWeight: 800, fontSize: 22, color: "#2B2420" }}>
+                  {c.game4Title}
+                </div>
+                <div style={{ fontFamily: font, fontSize: 14, color: "#8A7F73", marginTop: 2 }}>
+                  {c.game4Subtitle}
+                </div>
+              </div>
+              <p style={{ fontFamily: font, fontSize: 14, lineHeight: 1.6, color: "#5B5147", margin: 0 }}>
+                {c.game4Desc}
+              </p>
+              <button
+                onClick={goToDomino}
+                className="dc-play-btn"
+                style={{
+                  alignSelf: buttonAlign,
+                  marginTop: 4,
+                  background: "#3AA6A6",
                   color: "#FDF6EC",
                   border: "none",
                   fontFamily: BUTTON_FONT,

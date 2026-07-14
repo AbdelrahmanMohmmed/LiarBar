@@ -86,3 +86,42 @@ export function playTimeoutSfx() {
     console.error("Audio error:", e);
   }
 }
+
+export function playTileSfx() {
+  try {
+    const ctx = getAudioContext();
+    const now = ctx.currentTime;
+    
+    // Impact click (sharp click)
+    const clickOsc = ctx.createOscillator();
+    const clickGain = ctx.createGain();
+    clickOsc.type = "sine";
+    clickOsc.frequency.setValueAtTime(2500, now);
+    clickOsc.frequency.exponentialRampToValueAtTime(100, now + 0.015);
+    
+    clickGain.gain.setValueAtTime(0.2, now);
+    clickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.015);
+    
+    clickOsc.connect(clickGain);
+    clickGain.connect(ctx.destination);
+    clickOsc.start(now);
+    clickOsc.stop(now + 0.015);
+    
+    // Resonance body (wood thud)
+    const bodyOsc = ctx.createOscillator();
+    const bodyGain = ctx.createGain();
+    bodyOsc.type = "triangle";
+    bodyOsc.frequency.setValueAtTime(280, now);
+    
+    bodyGain.gain.setValueAtTime(0.15, now);
+    bodyGain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+    
+    bodyOsc.connect(bodyGain);
+    bodyGain.connect(ctx.destination);
+    bodyOsc.start(now);
+    bodyOsc.stop(now + 0.08);
+  } catch (e) {
+    console.error("Audio error:", e);
+  }
+}
+
