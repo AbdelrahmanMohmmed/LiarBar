@@ -9,6 +9,8 @@ export default function SnakeLobbyGame() {
   const isAr = lang === "ar";
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const state = (lobbyState?.subGameState ?? null) as any;
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
   useEffect(() => {
     const socket = getSocket();
@@ -45,18 +47,54 @@ export default function SnakeLobbyGame() {
       ctx.beginPath(); ctx.moveTo(0, i * cell); ctx.lineTo(canvas.width, i * cell); ctx.stroke();
     }
 
-    // food
+    // food (with pulse)
+    const pulse = 1 + 0.15 * Math.sin(Date.now() * 0.006);
+    const foodR = (cell / 2 - 2) * pulse;
     ctx.fillStyle = "#ff4d4d";
     ctx.beginPath();
-    ctx.arc(state.food.x * cell + cell / 2, state.food.y * cell + cell / 2, cell / 2 - 2, 0, Math.PI * 2);
+    ctx.arc(state.food.x * cell + cell / 2, state.food.y * cell + cell / 2, foodR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(255,77,77,0.25)";
+    ctx.beginPath();
+    ctx.arc(state.food.x * cell + cell / 2, state.food.y * cell + cell / 2, foodR + 4, 0, Math.PI * 2);
     ctx.fill();
 
     // snakes
     for (const s of state.snakes) {
       s.body.forEach((c: any, i: number) => {
-        ctx.fillStyle = i === 0 ? s.color : shade(s.color, 0.7);
-        const pad = 1;
-        ctx.fillRect(c.x * cell + pad, c.y * cell + pad, cell - pad * 2, cell - pad * 2);
+        if (i === 0) {
+          // head with eyes
+          const cx = c.x * cell + cell / 2;
+          const cy = c.y * cell + cell / 2;
+          ctx.fillStyle = s.color;
+          ctx.beginPath();
+          ctx.arc(cx, cy, cell / 2 - 1, 0, Math.PI * 2);
+          ctx.fill();
+
+          const dirObj = s.dir || { x: 0, y: 1 };
+          let d = "down";
+          if (dirObj.x === 0 && dirObj.y === -1) d = "up";
+          else if (dirObj.x === 0 && dirObj.y === 1) d = "down";
+          else if (dirObj.x === -1 && dirObj.y === 0) d = "left";
+          else if (dirObj.x === 1 && dirObj.y === 0) d = "right";
+          const off = 3;
+          let e1x: number, e1y: number, e2x: number, e2y: number;
+          if (d === "up") { e1x = cx - off; e1y = cy - off; e2x = cx + off; e2y = cy - off; }
+          else if (d === "down") { e1x = cx - off; e1y = cy + off; e2x = cx + off; e2y = cy + off; }
+          else if (d === "left") { e1x = cx - off; e1y = cy - off; e2x = cx - off; e2y = cy + off; }
+          else { e1x = cx + off; e1y = cy - off; e2x = cx + off; e2y = cy + off; }
+          ctx.fillStyle = "#fff";
+          ctx.beginPath(); ctx.arc(e1x, e1y, 2.5, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(e2x, e2y, 2.5, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = "#111";
+          ctx.beginPath(); ctx.arc(e1x, e1y, 1.2, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(e2x, e2y, 1.2, 0, Math.PI * 2); ctx.fill();
+        } else {
+          const t = i / Math.max(1, s.body.length - 1);
+          ctx.fillStyle = shade(s.color, 1 - t * 0.4);
+          const pad = 1;
+          ctx.fillRect(c.x * cell + pad, c.y * cell + pad, cell - pad * 2, cell - pad * 2);
+        }
       });
       if (!s.alive) {
         ctx.fillStyle = "rgba(0,0,0,0.35)";

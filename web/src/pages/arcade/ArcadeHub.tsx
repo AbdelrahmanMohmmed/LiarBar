@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useLanguage } from "@/lib/languageContext";
-import { Gamepad2, Bug, Swords, PersonStanding, Rocket, Sparkles } from "lucide-react";
+import { Gamepad2, Bug, Swords, PersonStanding, Rocket, Sparkles, Brain, Grid3x3, Building2 } from "lucide-react";
 
 const GAMES = [
   {
@@ -56,6 +56,33 @@ const GAMES = [
     ring: "group-hover:shadow-fuchsia-900/40",
     ar: { title: "غزو الفضائيين", sub: "Alien Fleet", desc: "دافع عن الأرض ضد أسطول فضائي منظم يهبط رويداً رويداً." },
     en: { title: "Alien Fleet", sub: "Alien Fleet", desc: "Defend Earth from a marching alien fleet that descends row by row." },
+  },
+  {
+    key: "memory-puzzle",
+    to: "/arcade/memory-puzzle",
+    icon: Brain,
+    color: "from-violet-500 to-violet-700",
+    ring: "group-hover:shadow-violet-900/40",
+    ar: { title: "لغز الذاكرة", sub: "Memory Puzzle", desc: "اقلب البطاقات وابحث عن الأزواج المتطابقة قبل نفاد المحاولات!" },
+    en: { title: "Memory Puzzle", sub: "Memory Puzzle", desc: "Flip cards and find matching pairs — test your memory skills!" },
+  },
+  {
+    key: "tetris",
+    to: "/arcade/tetris",
+    icon: Grid3x3,
+    color: "from-teal-500 to-teal-700",
+    ring: "group-hover:shadow-teal-900/40",
+    ar: { title: "تيتريس", sub: "Tetris", desc: "arrange the falling blocks to complete lines and score points!" },
+    en: { title: "Tetris", sub: "Tetris", desc: "Arrange falling blocks to complete lines and score points!" },
+  },
+  {
+    key: "rento",
+    to: "/rento",
+    icon: Building2,
+    color: "from-amber-500 to-amber-700",
+    ring: "group-hover:shadow-amber-900/40",
+    ar: { title: "رينتو", sub: "Rento Online", desc: "لعبة صفقات عقارية多人. ارمِ النرد واشترِ الملكيات وافلس خصومك!" },
+    en: { title: "Rento", sub: "Rento Online", desc: "Multiplayer property trading. Roll dice, buy properties, and bankrupt your rivals!" },
   },
 ] as const;
 

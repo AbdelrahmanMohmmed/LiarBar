@@ -9,6 +9,7 @@ export interface PlayerData {
   cardCount: number;
   isConnected: boolean;
   avatarUrl?: string;
+  flag?: string;
   stats?: PlayerStats;
 }
 
@@ -30,6 +31,7 @@ export class Player {
   hand: Card[];
   isConnected: boolean;
   avatarUrl?: string;
+  flag?: string;
   socketId?: string;
   stats: PlayerStats;
   consecutiveTimeouts: number;
@@ -127,6 +129,7 @@ export class Player {
       cardCount: this.cardCount,
       isConnected: this.isConnected,
       avatarUrl: this.avatarUrl,
+      flag: this.flag,
       stats: this.stats,
     };
   }
@@ -142,6 +145,7 @@ export class Player {
       cardCount: this.cardCount,
       isConnected: this.isConnected,
       avatarUrl: this.avatarUrl,
+      flag: this.flag,
       stats: this.stats,
     };
   }

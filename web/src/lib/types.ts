@@ -119,6 +119,7 @@ export interface ChatMessage {
   playerId: string;
   playerName: string;
   message: string;
+  flag?: string;
   timestamp: number;
 }
 
@@ -338,4 +339,62 @@ export function parseCardString(cardStr: string): Card | null {
     }
   }
   return null;
+}
+
+export interface RentoPlayerState {
+  id: string;
+  name: string;
+  isBot: boolean;
+  isHost: boolean;
+  isConnected: boolean;
+  position: number;
+  money: number;
+  properties: number[];
+  inJail: boolean;
+  bankrupt: boolean;
+  token: string;
+  flag?: string;
+}
+
+export interface RentoTradeProposal {
+  tradeId: string;
+  fromPlayerId: string;
+  toPlayerId: string;
+  offerProperties: number[];
+  offerMoney: number;
+  requestProperties: number[];
+  requestMoney: number;
+  status: "pending" | "accepted" | "rejected" | "cancelled";
+}
+
+export interface RentoCell {
+  id: number;
+  name: string;
+  nameAr: string;
+  color: string;
+  price: number;
+  rent: number[];
+  type: string;
+}
+
+export interface RentoState {
+  roomId: string;
+  gameId: "rento";
+  phase: "lobby" | "playing" | "finished";
+  maxPlayers: number;
+  board: RentoCell[];
+  players: RentoPlayerState[];
+  currentPlayerId: string | null;
+  dice: [number, number] | null;
+  lastAction: string;
+  hasRolled: boolean;
+  canRoll: boolean;
+  turnDeadline: number | null;
+  winnerId: string | null;
+  tradeProposals: RentoTradeProposal[];
+  jailEnabled: boolean;
+  freeParkingBonus: number;
+  turnTimerMs: number;
+  startingBalance: number;
+  aiDifficulty: "easy" | "medium" | "hard";
 }

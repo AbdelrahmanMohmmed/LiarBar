@@ -57,6 +57,12 @@ let voiceIceLogged = false;
  */
 const AUDIO_SINK_ID = "voice-audio-sink";
 
+/**
+ * The only player fields voice needs. Games model players differently
+ * (`PlayerData`, `RentoPlayerState`, ...), so match structurally.
+ */
+type VoicePeer = { id: string; isBot: boolean; isConnected: boolean };
+
 function getAudioSink(): HTMLElement {
   let sink = document.getElementById(AUDIO_SINK_ID);
   if (!sink) {
@@ -75,6 +81,7 @@ export const [VoiceProvider, useVoice] = createContextHook(() => {
     codenamesState,
     higherLowerState,
     dominoState,
+    rentoState,
     myPlayerId,
     myRoomId,
     sendWebRTCSignal,
@@ -310,9 +317,16 @@ export const [VoiceProvider, useVoice] = createContextHook(() => {
 
   // The set of human peers to hold connections with, as a stable string so the
   // mesh effect re-runs when players join/leave rather than on every game tick.
-  const activePlayers = lobbyState
+  // Every room-level game state must be listed here or its rooms get no voice.
+  const activePlayers: VoicePeer[] = lobbyState
     ? lobbyState.players
-    : (gameState || codenamesState || higherLowerState || dominoState)?.players ?? [];
+    : (
+        gameState ||
+        codenamesState ||
+        higherLowerState ||
+        dominoState ||
+        rentoState
+      )?.players ?? [];
 
   const peerKey = useMemo(
     () =>

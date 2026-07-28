@@ -24,15 +24,18 @@ export class TicTacToeGame implements GameRoom {
   winner: Sym | "tie" | null = null;
   winningLine: number[] | null = null;
   scores: { X: number; O: number; ties: number } = { X: 0, O: 0, ties: 0 };
+  winTarget: number;
+  matchWinner: Sym | null = null;
 
   private callbacks: GameRoomCallbacks;
   private symbolOf = new Map<string, Sym>();
   private botTimer: NodeJS.Timeout | null = null;
 
-  constructor(roomId: string, maxPlayers: number, callbacks: GameRoomCallbacks) {
+  constructor(roomId: string, maxPlayers: number, callbacks: GameRoomCallbacks, winTarget = 3) {
     this.roomId = roomId;
     this.maxPlayers = Math.max(2, Math.min(10, maxPlayers || 2));
     this.callbacks = callbacks;
+    this.winTarget = Math.max(1, Math.min(20, winTarget));
   }
 
   private symbolFor(playerId: string): Sym | null {
@@ -144,6 +147,13 @@ export class TicTacToeGame implements GameRoom {
       this.phase = "finished";
       if (res.winner === "tie") this.scores.ties += 1;
       else this.scores[res.winner] += 1;
+
+      // Check for match winner
+      if (res.winner !== "tie") {
+        if (this.scores[res.winner] >= this.winTarget) {
+          this.matchWinner = res.winner;
+        }
+      }
     } else {
       this.turn = sym === "X" ? "O" : "X";
       this.maybeBotMove();
@@ -208,6 +218,8 @@ export class TicTacToeGame implements GameRoom {
       winner: this.winner,
       winningLine: this.winningLine,
       scores: this.scores,
+      winTarget: this.winTarget,
+      matchWinner: this.matchWinner,
       players: this.players.map((p) => ({
         id: p.id,
         name: p.name,

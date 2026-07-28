@@ -13,6 +13,10 @@ import { SnakeGame } from "./snake/SnakeGame.js";
 import { SpaceInvadersGame } from "./space-invaders/SpaceInvadersGame.js";
 import { FighterGame } from "./fighter/FighterGame.js";
 import { DominoGame } from "./domino/DominoGame.js";
+import { MemoryPuzzleGame } from "./memory-puzzle/MemoryPuzzleGame.js";
+import { TetrisGame } from "./tetris/TetrisGame.js";
+import { RentoGame } from "./rento/RentoGame.js";
+import { SnakeLadderGame } from "./snake-ladder/SnakeLadderGame.js";
 import type { Lang } from "./codenames/board.js";
 
 /**
@@ -35,6 +39,12 @@ export interface CreateRoomOptions {
   turnTimeLimit?: number;
   tableTheme?: string;
   tileTheme?: string;
+  // Rento options
+  startingBalance?: number;
+  jailEnabled?: boolean;
+  freeParkingBonus?: number;
+  turnTimer?: number;
+  aiDifficulty?: "easy" | "medium" | "hard";
 }
 
 export type GameFactory = (
@@ -117,7 +127,8 @@ registerGame("lobby", (roomId, options, callbacks) => {
 });
 
 registerGame("tictactoe", (roomId, options, callbacks) => {
-  return new TicTacToeGame(roomId, options.maxPlayers, callbacks);
+  const winTarget = Number((options as any).winTarget) || 3;
+  return new TicTacToeGame(roomId, options.maxPlayers, callbacks, winTarget);
 });
 
 registerGame("snake", (roomId, options, callbacks) => {
@@ -149,4 +160,31 @@ registerGame("domino", (roomId, options, callbacks) => {
     tableTheme,
     tileTheme
   );
+});
+
+registerGame("memory-puzzle", (roomId, options, callbacks) => {
+  return new MemoryPuzzleGame(roomId, options.maxPlayers, callbacks);
+});
+
+registerGame("tetris", (roomId, options, callbacks) => {
+  return new TetrisGame(roomId, options.maxPlayers, callbacks);
+});
+
+registerGame("rento", (roomId, options, callbacks) => {
+  return new RentoGame(
+    roomId,
+    {
+      maxPlayers: options.maxPlayers,
+      startingBalance: Number(options.startingBalance) || 1500,
+      jailEnabled: options.jailEnabled !== false,
+      freeParkingBonus: Number(options.freeParkingBonus) || 0,
+      turnTimer: Number(options.turnTimer) || 15000,
+      aiDifficulty: options.aiDifficulty === "easy" || options.aiDifficulty === "hard" ? options.aiDifficulty : "medium",
+    },
+    callbacks,
+  );
+});
+
+registerGame("snake-ladder", (roomId, options, callbacks) => {
+  return new SnakeLadderGame(roomId, options.maxPlayers, callbacks);
 });

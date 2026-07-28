@@ -19,11 +19,27 @@ export default function TicTacToeLobbyGame() {
   };
 
   const i18n = {
-    ar: { title: "تيك تاك تو", turn: "دور", you: "أنت", win: "فاز", tie: "تعادل", x: "س", o: "ص" },
-    en: { title: "Tic-Tac-Toe", turn: "Turn", you: "(You)", win: "wins!", tie: "It's a tie!", x: "X", o: "O" },
+    ar: { title: "تيك تاك تو", turn: "دور", you: "أنت", win: "فاز", tie: "تعادل", x: "س", o: "ص", target: "هدف", matchWin: "فاز بالمباراة!" },
+    en: { title: "Tic-Tac-Toe", turn: "Turn", you: "(You)", win: "wins!", tie: "It's a tie!", x: "X", o: "O", target: "Target", matchWin: "Wins the match!" },
   }[isAr ? "ar" : "en"];
 
   if (!state) return null;
+
+  // Match winner check
+  if (state.matchWinner) {
+    const winnerName = state.players?.find((p: any) => p.symbol === state.matchWinner)?.name;
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-4 bg-[#0b0710]">
+        <div className="text-3xl font-black text-fuchsia-300">
+          {winnerName} {i18n.matchWin}
+        </div>
+        <div className="flex gap-4 text-lg text-white/80">
+          <span>{i18n.x}: {state.scores?.X ?? 0} / {state.winTarget}</span>
+          <span>{i18n.o}: {state.scores?.O ?? 0} / {state.winTarget}</span>
+        </div>
+      </div>
+    );
+  }
 
   const status = state.phase === "finished"
     ? state.winner === "tie"
@@ -62,8 +78,8 @@ export default function TicTacToeLobbyGame() {
       </div>
 
       <div className="flex gap-4 text-sm text-white/60">
-        <span>{i18n.x}: {state.scores?.X ?? 0}</span>
-        <span>{i18n.o}: {state.scores?.O ?? 0}</span>
+        <span>{i18n.x}: {state.scores?.X ?? 0}{state.winTarget ? ` / ${state.winTarget}` : ""}</span>
+        <span>{i18n.o}: {state.scores?.O ?? 0}{state.winTarget ? ` / ${state.winTarget}` : ""}</span>
         <span>{i18n.tie}: {state.scores?.ties ?? 0}</span>
       </div>
     </div>
