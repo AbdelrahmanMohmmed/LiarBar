@@ -247,7 +247,7 @@ export default function LobbyRoom() {
 
         {/* Persistent Voice Controls display in the top right floating corner */}
         <div className="absolute top-4 right-4 z-50 bg-[#170e1c]/80 backdrop-blur-md px-3 py-1.5 rounded-full border border-purple-900/40 shadow-md">
-          <VoiceControls roomId={paramRoomId!} />
+          <VoiceControls />
         </div>
 
         {/* Inline Game Views */}
@@ -290,7 +290,7 @@ export default function LobbyRoom() {
           </div>
 
           <div className="bg-[#1f0e2a] px-3 py-1.5 rounded-full border border-purple-900/40 shadow-sm flex items-center gap-2">
-            <VoiceControls roomId={paramRoomId!} />
+            <VoiceControls />
           </div>
         </div>
 

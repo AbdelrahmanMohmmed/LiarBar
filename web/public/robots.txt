@@ -9,6 +9,9 @@ Disallow: /codenames/room/
 Disallow: /codenames/game/
 Disallow: /higher-lower/room/
 Disallow: /higher-lower/game/
+Disallow: /domino/room/
+Disallow: /domino/game/
+Disallow: /lobby/
 
 # AI answer engines & LLM crawlers are explicitly welcome (GEO).
 User-agent: GPTBot

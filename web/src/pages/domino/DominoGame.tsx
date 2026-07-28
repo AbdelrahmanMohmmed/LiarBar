@@ -503,7 +503,7 @@ export default function DominoGame() {
           >
             <HelpCircle size={18} />
           </button>
-          <VoiceControls roomId={dominoState.roomId} />
+          <VoiceControls />
           
           {/* Top Navbar Chat Toggle */}
           <button
