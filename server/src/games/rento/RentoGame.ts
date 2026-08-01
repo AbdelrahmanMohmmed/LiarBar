@@ -109,6 +109,7 @@ export class RentoGame implements GameRoom {
   turnDeadline: number | null = null;
   winnerId: string | null = null;
   tradeProposals: Map<string, TradeProposal> = new Map();
+  kickVotes: Map<string, Set<string>> = new Map();
 
   // Configurable options
   startingBalance: number;
@@ -532,6 +533,68 @@ export class RentoGame implements GameRoom {
     this.scheduleBotTurn();
   }
 
+  private eliminatePlayer(playerId: string, message: string) {
+    const ps = this.playerStates.get(playerId);
+    if (!ps || ps.bankrupt) return;
+    const wasCurrent = this.getCurrentPlayerId() === playerId;
+    ps.properties = [];
+    ps.bankrupt = true;
+    this.lastAction = message;
+    this.kickVotes.delete(playerId);
+
+    if (wasCurrent && this.phase === "playing") {
+      this.doublesCount = 0;
+      this.rolledThisTurn = 0;
+      this.pendingDoublesRoll = false;
+      this.nextTurn();
+    } else {
+      this.checkWinner();
+      this.broadcast();
+    }
+  }
+
+  declareBankrupt(playerId: string): { success: boolean; error?: string } {
+    if (this.phase !== "playing") return { success: false, error: "Game not active" };
+    const ps = this.playerStates.get(playerId);
+    if (!ps) return { success: false, error: "No player state" };
+    if (ps.bankrupt) return { success: false, error: "Already bankrupt" };
+
+    this.eliminatePlayer(playerId, `${this.getPlayerName(playerId)} declared bankruptcy!`);
+    this.lastActivityAt = Date.now();
+    return { success: true };
+  }
+
+  voteKick(voterId: string, targetPlayerId: string): { success: boolean; error?: string } {
+    if (this.phase !== "playing") return { success: false, error: "Game not active" };
+    if (voterId === targetPlayerId) return { success: false, error: "Cannot vote for yourself" };
+
+    const voter = this.getPlayer(voterId);
+    const target = this.getPlayer(targetPlayerId);
+    if (!voter || !target) return { success: false, error: "Invalid player" };
+
+    const targetPs = this.playerStates.get(targetPlayerId);
+    if (!targetPs || targetPs.bankrupt) return { success: false, error: "Player already out" };
+
+    let votes = this.kickVotes.get(targetPlayerId);
+    if (!votes) {
+      votes = new Set();
+      this.kickVotes.set(targetPlayerId, votes);
+    }
+    if (votes.has(voterId)) votes.delete(voterId);
+    else votes.add(voterId);
+
+    const eligible = this.players.filter((p) => !p.isBot && p.id !== targetPlayerId);
+    const threshold = Math.floor(eligible.length / 2) + 1;
+
+    if (eligible.length > 0 && votes.size >= threshold) {
+      this.eliminatePlayer(targetPlayerId, `${this.getPlayerName(targetPlayerId)} was voted out!`);
+    } else {
+      this.lastActivityAt = Date.now();
+      this.broadcast();
+    }
+    return { success: true };
+  }
+
   proposeTrade(
     fromPlayerId: string,
     toPlayerId: string,
@@ -778,6 +841,9 @@ export class RentoGame implements GameRoom {
       turnDeadline: this.turnDeadline,
       winnerId: this.winnerId,
       tradeProposals: Array.from(this.tradeProposals.values()),
+      kickVotes: Object.fromEntries(
+        Array.from(this.kickVotes.entries()).map(([id, set]) => [id, Array.from(set)])
+      ),
       jailEnabled: this.jailEnabled,
       freeParkingBonus: this.freeParkingBonus,
       turnTimerMs: this.turnTimerMs,

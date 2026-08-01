@@ -1042,6 +1042,33 @@ export function registerSocketHandlers(
       reply(callback, { success: true });
     });
 
+    socket.on("rento_bankrupt", (_data: unknown, callback: Ack) => {
+      const m = rentoMembership(callback);
+      if (!m) return;
+      const result = m.room.declareBankrupt(m.player.id);
+      if (!result.success) {
+        fail(callback, result.error ?? "Cannot declare bankruptcy");
+        return;
+      }
+      reply(callback, { success: true });
+    });
+
+    socket.on("rento_votekick", (data: unknown, callback: Ack) => {
+      const m = rentoMembership(callback);
+      if (!m) return;
+      const d = data as { targetPlayerId?: string };
+      if (!d.targetPlayerId) {
+        fail(callback, "Missing targetPlayerId");
+        return;
+      }
+      const result = m.room.voteKick(m.player.id, d.targetPlayerId);
+      if (!result.success) {
+        fail(callback, result.error ?? "Cannot vote");
+        return;
+      }
+      reply(callback, { success: true });
+    });
+
     // ===== GAMEPLAY (Snake & Ladder) =====
 
     socket.on("snl_roll", (_data: unknown, callback: Ack) => {

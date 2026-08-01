@@ -1,9 +1,9 @@
-import { useCallback, useRef, useEffect, useState } from "react";
+import { useCallback, useRef, useEffect, useState, useMemo } from "react";
 import { useGame } from "@/lib/gameContext";
 import { getSocket } from "@/lib/socket";
 import { useLanguage } from "@/lib/languageContext";
 import { VoiceControls } from "@/components/VoiceControls";
-import { MessageCircle, Send } from "lucide-react";
+import { MessageCircle, Send, Crown, UserX } from "lucide-react";
 import { codeToEmoji } from "@/lib/utils";
 
 const CELL_SIZE = 100;      // each tile is 100×100
@@ -11,8 +11,10 @@ const CORNER = CELL_SIZE;   // corners are square
 const INNER_TILES = 9;      // tiles between corners on each side
 const BOARD_W = CORNER + INNER_TILES * CELL_SIZE + CORNER; // 1100
 const BOARD_H = CORNER + INNER_TILES * CELL_SIZE + CORNER; // 1100 square
-const CANVAS_W = BOARD_W + 260;              // extra space for sidebar
-const CANVAS_H = BOARD_H + 40;               // padding
+const CANVAS_W = BOARD_W + 40;               // board padding only (sidebar is now DOM, not canvas)
+const CANVAS_H = BOARD_H + 40;
+
+const PLAYER_COLORS = ["#2dd4bf", "#f5a524", "#38bdf8", "#c084fc", "#fb7185", "#a3e635"];
 
 // Map each cell id to a 2-letter country code for the flag
 const CELL_COUNTRIES: Record<number, string> = {
@@ -178,15 +180,79 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
   const [requestProperties, setRequestProperties] = useState<number[]>([]);
   const [requestMoney, setRequestMoney] = useState(0);
 
+  // Bankrupt confirm state
+  const [showBankruptConfirm, setShowBankruptConfirm] = useState(false);
+
+  // Trades tip dismissal (persisted)
+  const [tipDismissed, setTipDismissed] = useState(() => {
+    try { return localStorage.getItem("rento_trades_tip_dismissed") === "1"; } catch { return false; }
+  });
+  const dismissTip = () => {
+    setTipDismissed(true);
+    try { localStorage.setItem("rento_trades_tip_dismissed", "1"); } catch { /* ignore */ }
+  };
+
   const me = state?.players?.find((p: any) => p.id === myPlayerId);
-  const otherPlayers = state?.players?.filter((p: any) => p.id !== myPlayerId && !p.bankrupt) ?? [];
+  const otherPlayers = state?.players?.filter((p: any) => p.id !== myPlayerId) ?? [];
+  const otherAlivePlayers = otherPlayers.filter((p: any) => !p.bankrupt);
   const pendingTrades = state?.tradeProposals?.filter((t: any) => t.status === "pending") ?? [];
   const myPendingTrades = pendingTrades.filter((t: any) => t.toPlayerId === myPlayerId);
   const sentTrades = pendingTrades.filter((t: any) => t.fromPlayerId === myPlayerId);
 
+  // Stable color per player, based on join order (players array order is stable)
+  const playerColors = useMemo(() => {
+    const map: Record<string, string> = {};
+    (state?.players ?? []).forEach((p: any, i: number) => {
+      map[p.id] = PLAYER_COLORS[i % PLAYER_COLORS.length];
+    });
+    return map;
+  }, [state?.players]);
+
+  // Money delta popups (e.g. "-$50" / "+$300") next to each player's balance
+  const prevMoneyRef = useRef<Record<string, number>>({});
+  const [deltas, setDeltas] = useState<Record<string, { amount: number; key: number }>>({});
+  useEffect(() => {
+    if (!state?.players) return;
+    const next: Record<string, { amount: number; key: number }> = {};
+    let changed = false;
+    for (const p of state.players) {
+      const prev = prevMoneyRef.current[p.id];
+      if (prev !== undefined && prev !== p.money) {
+        next[p.id] = { amount: p.money - prev, key: Date.now() + Math.random() };
+        changed = true;
+      }
+      prevMoneyRef.current[p.id] = p.money;
+    }
+    if (changed) {
+      setDeltas((old) => ({ ...old, ...next }));
+      const ids = Object.keys(next);
+      const t = setTimeout(() => {
+        setDeltas((old) => {
+          const copy = { ...old };
+          for (const id of ids) delete copy[id];
+          return copy;
+        });
+      }, 1600);
+      return () => clearTimeout(t);
+    }
+  }, [state?.players]);
+
+  // Rolling log of recent lastAction messages
+  const [actionLog, setActionLog] = useState<string[]>([]);
+  const lastLoggedRef = useRef<string>("");
+  useEffect(() => {
+    const la = state?.lastAction;
+    if (la && la !== lastLoggedRef.current) {
+      lastLoggedRef.current = la;
+      setActionLog((prev) => [...prev.slice(-4), la]);
+    }
+  }, [state?.lastAction]);
+
   const rollDice = () => { getSocket().emit("rento_roll"); };
   const buyProperty = () => { getSocket().emit("rento_buy"); };
   const endTurn = () => { getSocket().emit("rento_end_turn"); };
+  const declareBankrupt = () => { getSocket().emit("rento_bankrupt"); setShowBankruptConfirm(false); };
+  const voteKick = (targetPlayerId: string) => { getSocket().emit("rento_votekick", { targetPlayerId }); };
 
   const proposeTrade = () => {
     if (!tradeTarget) return;
@@ -255,13 +321,31 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
       roundRect(ctx, ox + CELL_SIZE, oy + CELL_SIZE, BOARD_W - CELL_SIZE * 2, BOARD_H - CELL_SIZE * 2, 8);
       ctx.stroke();
 
-      // Center text
-      ctx.fillStyle = "rgba(168,85,247,0.12)";
-      ctx.font = "bold 36px 'Baloo 2', sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText("RENTO", ox + BOARD_W / 2, oy + BOARD_H / 2);
-      ctx.font = "14px 'Baloo 2', sans-serif";
-      ctx.fillText(isAr ? "رينتو — لعبة الم_properties" : "Property Trading Game", ox + BOARD_W / 2, oy + BOARD_H / 2 + 30);
+      const centerX = ox + BOARD_W / 2;
+      const centerY = oy + BOARD_H / 2;
+
+      if (st.dice && st.dice[0] > 0) {
+        // Dice, centered in the board interior
+        for (let d = 0; d < 2; d++) {
+          const dx = centerX - 52 + d * 64;
+          const dy = centerY - 32;
+          ctx.fillStyle = "#fff";
+          roundRect(ctx, dx, dy, 48, 48, 10);
+          ctx.fill();
+          ctx.fillStyle = "#0e0b16";
+          ctx.font = "bold 30px 'Baloo 2', sans-serif";
+          ctx.textAlign = "center";
+          ctx.fillText(String(st.dice[d]), dx + 24, dy + 34);
+        }
+      } else {
+        // Idle wordmark before the first roll
+        ctx.fillStyle = "rgba(168,85,247,0.15)";
+        ctx.font = "bold 36px 'Baloo 2', sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("RENTO", centerX, centerY);
+        ctx.font = "14px 'Baloo 2', sans-serif";
+        ctx.fillText(isAr ? "رينتو — لعبة تبادل الملكيات" : "Property Trading Game", centerX, centerY + 30);
+      }
 
       // Draw all tiles
       for (let i = 0; i < board.length; i++) {
@@ -404,85 +488,6 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
         }
       }
 
-      // Sidebar
-      const sbx = BOARD_W + 40;
-      let sby = 30;
-
-      // Dice
-      if (st.dice && st.dice[0] > 0) {
-        for (let d = 0; d < 2; d++) {
-          const dx = sbx + d * 50;
-          ctx.fillStyle = "#fff";
-          roundRect(ctx, dx, sby, 42, 42, 8);
-          ctx.fill();
-          ctx.fillStyle = "#0e0b16";
-          ctx.font = "bold 36px 'Baloo 2', sans-serif";
-          ctx.textAlign = "center";
-          ctx.fillText(String(st.dice[d]), dx + 21, sby + 30);
-        }
-      }
-      sby += 60;
-
-      // Players list
-      ctx.fillStyle = "#a78bfa";
-      ctx.font = "bold 16px 'Baloo 2', sans-serif";
-      ctx.textAlign = "left";
-      ctx.fillText(isAr ? "اللاعبون" : "Players", sbx, sby);
-      sby += 24;
-
-      for (const p of st.players ?? []) {
-        const me = p.id === myPlayerId;
-        const current = p.id === st.currentPlayerId;
-
-        // Highlight bar
-        if (current) {
-          ctx.fillStyle = "rgba(34,197,94,0.15)";
-          roundRect(ctx, sbx - 5, sby - 14, 240, 26, 4);
-          ctx.fill();
-        }
-
-        ctx.fillStyle = p.bankrupt ? "#6b7280" : me ? "#fbbf24" : current ? "#22c55e" : "#d8b4fe";
-        ctx.font = `${me || current ? "bold " : ""}14px 'Baloo 2', sans-serif`;
-        ctx.textAlign = "left";
-        if (p.flag) drawFlag(ctx, p.flag, sbx, sby - 13, 20, 13);
-        ctx.fillText(`${p.token} ${p.name}${p.bankrupt ? " 💀" : ""}`, sbx + 26, sby);
-
-        ctx.fillStyle = "#9ca3af";
-        ctx.font = "13px 'Baloo 2', sans-serif";
-        ctx.textAlign = "right";
-        ctx.fillText(`$${p.money}`, sbx + 220, sby);
-
-        sby += 26;
-      }
-
-      // Properties owned
-      sby += 10;
-      ctx.fillStyle = "#a78bfa";
-      ctx.font = "bold 12px 'Baloo 2', sans-serif";
-      ctx.textAlign = "left";
-      ctx.fillText(isAr ? "ملكياتك" : "Your Properties", sbx, sby);
-      sby += 18;
-
-      const me = st.players?.find((p: any) => p.id === myPlayerId);
-      if (me?.properties?.length > 0) {
-        for (const pid of me.properties) {
-          const cell = board[pid];
-          if (!cell) continue;
-          ctx.fillStyle = cell.color;
-          ctx.fillRect(sbx, sby - 8, 10, 10);
-          ctx.fillStyle = "#d1d5db";
-          ctx.font = "9px 'Baloo 2', sans-serif";
-          ctx.textAlign = "left";
-          ctx.fillText(isAr ? cell.nameAr : cell.name, sbx + 14, sby);
-          sby += 14;
-        }
-      } else {
-        ctx.fillStyle = "#6b7280";
-        ctx.font = "10px 'Baloo 2', sans-serif";
-        ctx.fillText(isAr ? "لا ملكيات بعد" : "No properties yet", sbx, sby);
-        sby += 14;
-      }
-
       // Particles
       for (let i = particles.length - 1; i >= 0; i--) {
         const p = particles[i];
@@ -503,165 +508,336 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
   }, [myPlayerId, isAr]);
 
   const i18n = {
-    ar: { title: "رينتو", roll: "ارمي النرد", buy: "شراء الملكية", endTurn: "انتهاء الدور", turn: "دورك", notTurn: "انتظر...", dice: "النرد", trade: "تبادل", tradeTitle: "اقتراح تبادل", selectPlayer: "اختر لاعب", offerProperties: "ملكيات تقدمها", offerMoney: "مال تقدمه", requestProperties: "ملكيات تطلبها", requestMoney: "مال تطلبه", propose: "اقتراح", cancel: "إلغاء", accept: "قبول", reject: "رفض", pendingTrades: "تبادل معلق", sentTrades: "تبادل مرسل" },
-    en: { title: "Rento", roll: "Roll Dice", buy: "Buy Property", endTurn: "End Turn", turn: "Your turn", notTurn: "Waiting...", dice: "Dice", trade: "Trade", tradeTitle: "Propose Trade", selectPlayer: "Select player", offerProperties: "Properties you offer", offerMoney: "Money you offer", requestProperties: "Properties you request", requestMoney: "Money you request", propose: "Propose", cancel: "Cancel", accept: "Accept", reject: "Reject", pendingTrades: "Pending Trades", sentTrades: "Sent Trades" },
+    ar: {
+      title: "رينتو", roll: "ارمي النرد", buy: "شراء الملكية", endTurn: "انتهاء الدور", turn: "دورك", notTurn: "انتظر...",
+      dice: "النرد", trade: "تبادل", tradeTitle: "اقتراح تبادل", selectPlayer: "اختر لاعب", offerProperties: "ملكيات تقدمها",
+      offerMoney: "مال تقدمه", requestProperties: "ملكيات تطلبها", requestMoney: "مال تطلبه", propose: "اقتراح", cancel: "إلغاء",
+      accept: "قبول", reject: "رفض", pendingTrades: "تبادل معلق", sentTrades: "تبادل مرسل",
+      players: "اللاعبون", myProperties: "ملكياتي", noProperties: "لا ملكيات بعد", trades: "التبادلات", create: "إنشاء",
+      tradesDesc: "قم بالتبادل مع اللاعبين الآخرين لمبادلة الملكيات والمال.", gotIt: "فهمت",
+      votekick: "طرد بالتصويت", bankrupt: "إفلاس", bankruptConfirmTitle: "إعلان الإفلاس؟",
+      bankruptConfirmBody: "ستفقد جميع ممتلكاتك وتخرج من اللعبة نهائياً. هل أنت متأكد؟",
+      isPlaying: "يلعب الآن...", waitingTurn: "بانتظار دوره...",
+    },
+    en: {
+      title: "Rento", roll: "Roll Dice", buy: "Buy Property", endTurn: "End Turn", turn: "Your turn", notTurn: "Waiting...",
+      dice: "Dice", trade: "Trade", tradeTitle: "Propose Trade", selectPlayer: "Select player", offerProperties: "Properties you offer",
+      offerMoney: "Money you offer", requestProperties: "Properties you request", requestMoney: "Money you request", propose: "Propose", cancel: "Cancel",
+      accept: "Accept", reject: "Reject", pendingTrades: "Pending Trades", sentTrades: "Sent Trades",
+      players: "Players", myProperties: "My properties", noProperties: "No properties yet", trades: "Trades", create: "Create",
+      tradesDesc: "Make trades with other players to exchange properties and money.", gotIt: "Got it",
+      votekick: "Votekick", bankrupt: "Bankrupt", bankruptConfirmTitle: "Declare bankruptcy?",
+      bankruptConfirmBody: "You'll lose all your properties and be eliminated from the game. Are you sure?",
+      isPlaying: "is playing...", waitingTurn: "is waiting...",
+    },
   }[isAr ? "ar" : "en"];
 
   const currentCell = me ? state?.board?.[me.position] : null;
+  const currentPlayer = state?.players?.find((p: any) => p.id === state?.currentPlayerId);
 
   return (
     <div className="min-h-screen flex flex-col items-center gap-3 p-4 bg-[#0b0710]">
-      {/* Top bar: title + mic + chat */}
+      {/* Top bar: title + mic */}
       <div className="w-full flex items-center justify-between gap-3" style={{ maxWidth: "98vw" }}>
         <div className="text-white font-bold text-2xl">{i18n.title}</div>
         <div className="flex items-center gap-2">
           {state?.roomId && <VoiceControls roomId={state.roomId} />}
-          <button
-            onClick={() => setChatOpen(!chatOpen)}
-            className="flex items-center gap-1 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-white font-bold text-sm"
-            style={{ color: chatOpen ? "#2B2420" : "#fff", background: chatOpen ? "#FED23F" : "rgba(255,255,255,0.1)" }}
-          >
-            <MessageCircle size={14} />
-            {isAr ? "دردشة" : "Chat"}
-            {chatMessages.length > 0 && !chatOpen && (
-              <span className="rounded-full bg-[#E8574A] px-1.5 text-[9px] text-white">{chatMessages.length}</span>
-            )}
-          </button>
         </div>
       </div>
 
-      <div className="relative w-full overflow-x-auto" style={{ maxWidth: "100vw" }}>
-        <canvas
-          ref={canvasRef}
-          width={CANVAS_W}
-          height={CANVAS_H}
-          className="rounded-xl border border-white/10 touch-none"
-          style={{ width: "100%", maxWidth: CANVAS_W, imageRendering: "auto", background: "#0e0b16", display: "block" }}
-        />
-      </div>
+      <div className="w-full flex flex-col lg:flex-row gap-4 items-start justify-center" style={{ maxWidth: "98vw" }}>
+        {/* Board column */}
+        <div className="flex-1 min-w-0 flex flex-col items-center gap-2">
+          <div className="relative w-full overflow-x-auto">
+            <canvas
+              ref={canvasRef}
+              width={CANVAS_W}
+              height={CANVAS_H}
+              className="rounded-xl border border-white/10 touch-none"
+              style={{ width: "100%", maxWidth: CANVAS_W, imageRendering: "auto", background: "#0e0b16", display: "block" }}
+            />
 
-      {/* Action banner (clear, no board overlap) */}
-      {state?.lastAction && (
-        <div
-          className="w-full max-w-3xl rounded-xl border border-fuchsia-500/30 bg-black/70 px-4 py-3 text-center"
-          style={{ maxWidth: "min(98vw, 1100px)" }}
-        >
-          <span className="text-amber-300 font-extrabold" style={{ fontSize: 26, lineHeight: 1.3 }}>
-            {state.lastAction}
-          </span>
+            {/* Speech-bubble notification + status/log, overlaid on the board */}
+            <div
+              className="absolute flex flex-col items-center text-center"
+              style={{ top: "20%", left: "50%", transform: "translateX(-50%)", width: "min(80%, 420px)", pointerEvents: "none" }}
+            >
+              {state?.lastAction && (
+                <div
+                  className="relative rounded-2xl px-4 py-3 text-white font-bold shadow-lg"
+                  style={{
+                    background: "linear-gradient(135deg, #7c3aed, #4f46e5)",
+                    fontSize: "clamp(12px, 1.6vw, 15px)",
+                    lineHeight: 1.3,
+                  }}
+                >
+                  {state.lastAction}
+                  <div
+                    style={{
+                      position: "absolute", bottom: -8, left: "50%", transform: "translateX(-50%) rotate(45deg)",
+                      width: 14, height: 14, background: "#4f46e5",
+                    }}
+                  />
+                </div>
+              )}
+
+              {state?.phase === "playing" && currentPlayer && (
+                <div className="mt-4 text-white/90 font-bold" style={{ fontSize: "clamp(11px, 1.4vw, 14px)" }}>
+                  {currentPlayer.token} {currentPlayer.name} {i18n.isPlaying}
+                </div>
+              )}
+
+              {actionLog.length > 1 && (
+                <div className="mt-2 flex flex-col gap-0.5">
+                  {actionLog.slice(0, -1).slice(-4).map((line, i) => (
+                    <div key={i} className="text-white/40" style={{ fontSize: "clamp(9px, 1.1vw, 11px)" }}>
+                      {line}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Branding wordmark */}
+          <div className="w-full flex items-center justify-start">
+            <span className="text-white/30 font-extrabold tracking-wider text-xs">RENTO</span>
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex gap-3 flex-wrap justify-center">
+            {isMyTurn && state?.phase === "playing" && (
+              <>
+                {state?.canRoll && (
+                  <button
+                    onClick={rollDice}
+                    className="px-6 py-2 rounded-full font-bold transition-all text-sm active:scale-95 text-[#0e0b16]"
+                    style={{ background: "#2dd4bf" }}
+                  >
+                    🎲 {i18n.roll}
+                  </button>
+                )}
+                {!!state?.hasRolled && currentCell && (currentCell.type === "property" || currentCell.type === "utility") && !state.players.some((p: any) => p.properties?.includes(currentCell.id)) && me && me.money >= currentCell.price && (
+                  <button
+                    onClick={buyProperty}
+                    className="px-6 py-2 rounded-full font-bold transition-all text-sm active:scale-95 text-[#0e0b16]"
+                    style={{ background: "#f5a524" }}
+                  >
+                    🏠 {i18n.buy} (${currentCell.price})
+                  </button>
+                )}
+                {!!state?.hasRolled && (
+                  <button
+                    onClick={endTurn}
+                    className="px-6 py-2 rounded-full font-bold transition-all text-sm active:scale-95 text-white"
+                    style={{ background: "#8b5cf6" }}
+                  >
+                    ⏭ {i18n.endTurn}
+                  </button>
+                )}
+              </>
+            )}
+            {state?.phase === "finished" && (
+              <div className="text-fuchsia-300 font-bold text-lg">
+                🎉 {state.players?.find((p: any) => p.id === state.winnerId)?.name} wins!
+              </div>
+            )}
+          </div>
+
+          <p className="text-white/40 text-xs text-center max-w-lg">
+            {isAr
+              ? "ارمي النرد واشترِ الملكيات. اجمع الإيجار واجعل الخصوم يُفلسون! اللاعبون الآليون يلعبون تلقائياً."
+              : "Roll dice, buy properties, collect rent, and bankrupt your opponents! Bots play automatically."}
+          </p>
         </div>
-      )}
 
-      {/* Action buttons */}
-      <div className="flex gap-3 flex-wrap justify-center">
-        {isMyTurn && state?.phase === "playing" && (
-          <>
-            {state?.canRoll && (
-              <button
-                onClick={rollDice}
-                className="px-6 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 font-bold transition-all text-sm active:scale-95"
-              >
-                🎲 {i18n.roll}
-              </button>
-            )}
-            {!!state?.hasRolled && currentCell && (currentCell.type === "property" || currentCell.type === "utility") && !state.players.some((p: any) => p.properties?.includes(currentCell.id)) && me && me.money >= currentCell.price && (
-              <button
-                onClick={buyProperty}
-                className="px-6 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 font-bold transition-all text-sm active:scale-95"
-              >
-                🏠 {i18n.buy} (${currentCell.price})
-              </button>
-            )}
-            {!!state?.hasRolled && (
-              <button
-                onClick={endTurn}
-                className="px-6 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 font-bold transition-all text-sm active:scale-95"
-              >
-                ⏭ {i18n.endTurn}
-              </button>
-            )}
-            {!!state?.hasRolled && otherPlayers.length > 0 && (
+        {/* Sidebar column */}
+        <div className="w-full lg:w-[340px] flex-shrink-0 flex flex-col gap-3">
+          {/* Player list */}
+          <div className="rounded-xl border border-white/10 bg-white/5 overflow-hidden">
+            {state?.players?.map((p: any) => {
+              const isMe = p.id === myPlayerId;
+              const isCurrent = p.id === state?.currentPlayerId;
+              const votes: string[] = state?.kickVotes?.[p.id] ?? [];
+              const eligible = state?.players?.filter((pp: any) => !pp.isBot && pp.id !== p.id) ?? [];
+              const threshold = Math.floor(eligible.length / 2) + 1;
+              const myVote = votes.includes(myPlayerId ?? "");
+              const delta = deltas[p.id];
+
+              return (
+                <div
+                  key={p.id}
+                  className="flex items-center gap-2 px-3 py-2.5 border-b border-white/5 last:border-b-0"
+                  style={{
+                    background: isCurrent ? "rgba(34,197,94,0.08)" : "transparent",
+                    borderLeft: `3px solid ${playerColors[p.id] ?? "#666"}`,
+                    opacity: p.bankrupt || !p.isConnected ? 0.45 : 1,
+                  }}
+                >
+                  <div
+                    className="flex items-center justify-center rounded-full flex-shrink-0"
+                    style={{ width: 30, height: 30, background: playerColors[p.id] ?? "#666", fontSize: 15 }}
+                  >
+                    {p.token}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1 text-white text-sm font-bold truncate">
+                      {p.isHost && <Crown size={12} color="#fbbf24" />}
+                      <span className="truncate">{p.name}</span>
+                      {p.bankrupt && <span>💀</span>}
+                    </div>
+                    {votes.length > 0 && !p.bankrupt && (
+                      <div className="text-[10px] text-rose-400 font-bold">{votes.length}/{threshold} {i18n.votekick.toLowerCase()}</div>
+                    )}
+                  </div>
+                  <div className="relative flex items-center gap-2">
+                    {delta && (
+                      <span
+                        className="absolute -top-4 right-0 text-[11px] font-bold"
+                        style={{ color: delta.amount >= 0 ? "#4ade80" : "#f87171" }}
+                      >
+                        {delta.amount >= 0 ? "+" : ""}{delta.amount}
+                      </span>
+                    )}
+                    <span className="text-white/80 text-sm font-semibold">${p.money}</span>
+                    {!isMe && !p.bankrupt && state?.phase === "playing" && (
+                      <button
+                        onClick={() => voteKick(p.id)}
+                        title={i18n.votekick}
+                        className="p-1 rounded transition-colors"
+                        style={{ color: myVote ? "#f87171" : "rgba(255,255,255,0.35)" }}
+                      >
+                        <UserX size={14} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Bankrupt action */}
+          {me && !me.bankrupt && state?.phase === "playing" && (
+            <button
+              onClick={() => setShowBankruptConfirm(true)}
+              className="w-full py-2 rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-300 font-bold text-xs hover:bg-rose-500/20 transition-colors"
+            >
+              {i18n.bankrupt}
+            </button>
+          )}
+
+          {/* Trades panel */}
+          <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-white font-bold text-sm">{i18n.trades}</span>
               <button
                 onClick={() => setShowTradeModal(true)}
-                className="px-6 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 font-bold transition-all text-sm active:scale-95"
+                disabled={state?.phase !== "playing" || otherAlivePlayers.length === 0}
+                className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold"
               >
-                🔄 {i18n.trade}
+                {i18n.create}
               </button>
-            )}
-          </>
-        )}
-        {state?.phase === "finished" && (
-          <div className="text-fuchsia-300 font-bold text-lg">
-            🎉 {state.players?.find((p: any) => p.id === state.winnerId)?.name} wins!
-          </div>
-        )}
-      </div>
-
-      {/* Pending trades (received) */}
-      {myPendingTrades.length > 0 && (
-        <div className="w-full max-w-lg space-y-2">
-          <div className="text-amber-400 font-bold text-sm">{i18n.pendingTrades}</div>
-          {myPendingTrades.map((trade: any) => {
-            const fromPlayer = state.players?.find((p: any) => p.id === trade.fromPlayerId);
-            return (
-              <div key={trade.id} className="bg-white/5 border border-white/10 rounded-lg p-3 flex items-center justify-between gap-2">
-                <div className="text-white text-sm">
-                  <span className="font-bold">{fromPlayer?.name}</span>
-                  {trade.offerMoney > 0 && <span className="text-amber-400"> offers ${trade.offerMoney}</span>}
-                  {trade.offerProperties.length > 0 && (
-                    <span className="text-emerald-400">
-                      {" "}+ {trade.offerProperties.length} {isAr ? "ملكيات" : "properties"}
-                    </span>
-                  )}
-                  {" → "}
-                  {trade.requestMoney > 0 && <span className="text-amber-400">asks ${trade.requestMoney}</span>}
-                  {trade.requestProperties.length > 0 && (
-                    <span className="text-rose-400">
-                      {" "}+ {trade.requestProperties.length} {isAr ? "ملكيات" : "properties"}
-                    </span>
-                  )}
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => acceptTrade(trade.id)}
-                    className="px-3 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold"
-                  >
-                    {i18n.accept}
-                  </button>
-                  <button
-                    onClick={() => rejectTrade(trade.id)}
-                    className="px-3 py-1 rounded bg-red-600 hover:bg-red-500 text-white text-xs font-bold"
-                  >
-                    {i18n.reject}
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Sent trades (waiting for response) */}
-      {sentTrades.length > 0 && (
-        <div className="w-full max-w-lg space-y-2">
-          <div className="text-blue-400 font-bold text-sm">{i18n.sentTrades}</div>
-          {sentTrades.map((trade: any) => {
-            const toPlayer = state.players?.find((p: any) => p.id === trade.toPlayerId);
-            return (
-              <div key={trade.id} className="bg-white/5 border border-white/10 rounded-lg p-3 flex items-center justify-between gap-2">
-                <div className="text-white text-sm">
-                  <span className="font-bold">{toPlayer?.name}</span>
-                  <span className="text-gray-400"> {isAr ? "ينتظر..." : "pending..."}</span>
-                </div>
+            </div>
+            {!tipDismissed && (
+              <div className="rounded-lg bg-white/5 p-2 mb-2">
+                <p className="text-white/50 text-[11px] leading-snug mb-1.5">{i18n.tradesDesc}</p>
                 <button
-                  onClick={() => cancelTrade(trade.id)}
-                  className="px-3 py-1 rounded bg-gray-600 hover:bg-gray-500 text-white text-xs font-bold"
+                  onClick={dismissTip}
+                  className="text-[11px] font-bold text-purple-300 hover:text-purple-200"
                 >
-                  {i18n.cancel}
+                  ✓ {i18n.gotIt}
                 </button>
               </div>
-            );
-          })}
+            )}
+
+            {/* Pending trades (received) */}
+            {myPendingTrades.length > 0 && (
+              <div className="space-y-2 mb-2">
+                <div className="text-amber-400 font-bold text-[11px]">{i18n.pendingTrades}</div>
+                {myPendingTrades.map((trade: any) => {
+                  const fromPlayer = state.players?.find((p: any) => p.id === trade.fromPlayerId);
+                  return (
+                    <div key={trade.id} className="bg-white/5 border border-white/10 rounded-lg p-2 flex items-center justify-between gap-2">
+                      <div className="text-white text-[11px]">
+                        <span className="font-bold">{fromPlayer?.name}</span>
+                        {trade.offerMoney > 0 && <span className="text-amber-400"> ${trade.offerMoney}</span>}
+                        {trade.offerProperties.length > 0 && (
+                          <span className="text-emerald-400"> +{trade.offerProperties.length} {isAr ? "ملكيات" : "props"}</span>
+                        )}
+                        {" → "}
+                        {trade.requestMoney > 0 && <span className="text-amber-400">${trade.requestMoney}</span>}
+                        {trade.requestProperties.length > 0 && (
+                          <span className="text-rose-400"> +{trade.requestProperties.length} {isAr ? "ملكيات" : "props"}</span>
+                        )}
+                      </div>
+                      <div className="flex gap-1 flex-shrink-0">
+                        <button onClick={() => acceptTrade(trade.id)} className="px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold">{i18n.accept}</button>
+                        <button onClick={() => rejectTrade(trade.id)} className="px-2 py-1 rounded bg-red-600 hover:bg-red-500 text-white text-[10px] font-bold">{i18n.reject}</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Sent trades (waiting for response) */}
+            {sentTrades.length > 0 && (
+              <div className="space-y-2">
+                <div className="text-blue-400 font-bold text-[11px]">{i18n.sentTrades}</div>
+                {sentTrades.map((trade: any) => {
+                  const toPlayer = state.players?.find((p: any) => p.id === trade.toPlayerId);
+                  return (
+                    <div key={trade.id} className="bg-white/5 border border-white/10 rounded-lg p-2 flex items-center justify-between gap-2">
+                      <div className="text-white text-[11px]">
+                        <span className="font-bold">{toPlayer?.name}</span>
+                        <span className="text-gray-400"> {isAr ? "ينتظر..." : "pending..."}</span>
+                      </div>
+                      <button onClick={() => cancelTrade(trade.id)} className="px-2 py-1 rounded bg-gray-600 hover:bg-gray-500 text-white text-[10px] font-bold">{i18n.cancel}</button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {myPendingTrades.length === 0 && sentTrades.length === 0 && tipDismissed && (
+              <p className="text-white/30 text-[11px] text-center py-1">{isAr ? "لا توجد تبادلات نشطة" : "No active trades"}</p>
+            )}
+          </div>
+
+          {/* My properties panel */}
+          <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+            <div className="text-white font-bold text-sm mb-2">{i18n.myProperties} ({me?.properties?.length ?? 0})</div>
+            {me?.properties?.length > 0 ? (
+              <div className="flex flex-col gap-1.5">
+                {me.properties.map((pid: number) => {
+                  const cell = state.board?.[pid];
+                  if (!cell) return null;
+                  return (
+                    <div key={pid} className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: cell.color }} />
+                      <span className="text-white/70 text-xs truncate">{isAr ? cell.nameAr : cell.name}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-white/30 text-xs">{i18n.noProperties}</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Bankrupt confirm modal */}
+      {showBankruptConfirm && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setShowBankruptConfirm(false)}>
+          <div className="bg-[#1d0d29] border border-rose-500/30 rounded-xl p-6 w-full max-w-sm space-y-4" onClick={(e) => e.stopPropagation()}>
+            <div className="text-white font-bold text-lg">{i18n.bankruptConfirmTitle}</div>
+            <p className="text-white/60 text-sm">{i18n.bankruptConfirmBody}</p>
+            <div className="flex gap-3 justify-end">
+              <button onClick={() => setShowBankruptConfirm(false)} className="px-4 py-2 rounded-lg bg-gray-600 hover:bg-gray-500 font-bold text-sm text-white">{i18n.cancel}</button>
+              <button onClick={declareBankrupt} className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 font-bold text-sm text-white">{i18n.bankrupt}</button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -680,7 +856,7 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
                 className="w-full mt-1 p-2 rounded bg-white/10 border border-white/20 text-white"
               >
                 <option value="">{isAr ? "اختر لاعب..." : "Select player..."}</option>
-                {otherPlayers.map((p: any) => (
+                {otherAlivePlayers.map((p: any) => (
                   <option key={p.id} value={p.id}>{p.token} {p.name} (${p.money})</option>
                 ))}
               </select>
@@ -806,11 +982,29 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
         </div>
       )}
 
-      <p className="text-white/40 text-xs text-center max-w-lg">
-        {isAr
-          ? "ارمي النرد واشترِ الملكيات. اجمع الإيجار واجعل الخصوم يُفلسون! اللاعبون الآليون يلعبون تلقائياً."
-          : "Roll dice, buy properties, collect rent, and bankrupt your opponents! Bots play automatically."}
-      </p>
+      {/* Floating chat bubble */}
+      <button
+        onClick={() => setChatOpen(!chatOpen)}
+        className="fixed bottom-5 flex items-center justify-center rounded-full shadow-lg z-40"
+        style={{
+          [isAr ? "left" : "right"]: 20,
+          width: 52,
+          height: 52,
+          background: chatOpen ? "#FED23F" : "#7c3aed",
+          color: chatOpen ? "#2B2420" : "#fff",
+        } as React.CSSProperties}
+        aria-label="Chat"
+      >
+        <MessageCircle size={22} />
+        {chatMessages.length > 0 && !chatOpen && (
+          <span
+            className="absolute -top-1 -right-1 rounded-full bg-[#E8574A] text-white text-[10px] font-bold flex items-center justify-center"
+            style={{ minWidth: 18, height: 18, padding: "0 4px" }}
+          >
+            {chatMessages.length}
+          </span>
+        )}
+      </button>
 
       {/* Slide-out Chat Drawer */}
       {chatOpen && (
