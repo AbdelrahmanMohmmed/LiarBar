@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useGame } from "@/lib/gameContext";
 import { useLanguage } from "@/lib/languageContext";
@@ -134,6 +134,121 @@ function DominoTile({
   );
 }
 
+// Face-down domino tile (tile back)
+function TileBack({
+  width = 64,
+  height = 40,
+  scale = 1,
+  borderRadius = 6,
+}: {
+  width?: number;
+  height?: number;
+  scale?: number;
+  borderRadius?: number;
+}) {
+  return (
+    <div
+      style={{
+        width: width * scale,
+        height: height * scale,
+        borderRadius: borderRadius * scale,
+        background: "linear-gradient(135deg, #3b5b92 0%, #2c4470 100%)",
+        border: `${1.5 * scale}px solid #1f2f4d`,
+        boxShadow: "0 2px 5px rgba(0,0,0,0.35)",
+        position: "relative",
+        overflow: "hidden",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+      }}
+    >
+      <div
+        style={{
+          width: "72%",
+          height: "72%",
+          borderRadius: "50%",
+          border: "1.5px dashed rgba(255,255,255,0.45)",
+        }}
+      />
+      <div style={{ position: "absolute", fontSize: Math.max(8, 10 * scale), color: "rgba(255,255,255,0.65)", fontWeight: 800 }}>
+        ◆
+      </div>
+    </div>
+  );
+}
+
+// A single tile animating from one point to another on the screen
+interface Rect { x: number; y: number; w: number; h: number }
+interface Point { x: number; y: number }
+interface Flight {
+  id: number;
+  from: Point;
+  to: Point;
+  faceUp: boolean;
+  tile?: Dominoe;
+  tileTheme?: string;
+  isVertical?: boolean;
+  scale?: number;
+  duration: number;
+  shake?: boolean;
+  onDone?: () => void;
+}
+
+function FlyingTile({ flight }: { flight: Flight }) {
+  const [arrived, setArrived] = useState(false);
+
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => setArrived(true));
+    const t = window.setTimeout(() => flight.onDone?.(), flight.duration + 40);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.clearTimeout(t);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const dx = flight.to.x - flight.from.x;
+  const dy = flight.to.y - flight.from.y;
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        left: flight.from.x,
+        top: flight.from.y,
+        zIndex: 60,
+        pointerEvents: "none",
+        transform: `translate(${arrived ? dx : 0}px, ${arrived ? dy : 0}px) translate(-50%, -50%)`,
+        transition: `transform ${flight.duration}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+        willChange: "transform",
+      }}
+    >
+      <div
+        style={{
+          animation: flight.shake
+            ? "dominoInvalidShake 0.28s ease"
+            : flight.faceUp
+            ? "dominoTilePop 0.3s ease"
+            : undefined,
+        }}
+      >
+        {flight.faceUp && flight.tile ? (
+          <DominoTile
+            left={flight.tile.left}
+            right={flight.tile.right}
+            tileTheme={flight.tileTheme ?? "ivory"}
+            isVertical={flight.isVertical ?? false}
+            scale={flight.scale ?? 1}
+          />
+        ) : (
+          <TileBack width={64} height={40} />
+        )}
+      </div>
+    </div>
+  );
+}
+
 const COPY = {
   ar: {
     back: "مغادرة",
@@ -213,6 +328,15 @@ const COPY = {
   },
 } as const;
 
+// Helpers
+const tileKey = (t: { left: number; right: number }) => `${t.left}-${t.right}`;
+const toRect = (el: Element): Rect => {
+  const r = el.getBoundingClientRect();
+  return { x: r.left, y: r.top, w: r.width, h: r.height };
+};
+const rectCenter = (r: Rect): Point => ({ x: r.x + r.w / 2, y: r.y + r.h / 2 });
+const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
+
 export default function DominoGame() {
   const { roomId: paramRoomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
@@ -236,8 +360,82 @@ export default function DominoGame() {
   const [isPortrait, setIsPortrait] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
+  // ---- Animation & interaction state ----
+  const [flying, setFlying] = useState<Flight[]>([]);
+  const [dealing, setDealing] = useState(false);
+  const [dealSteps, setDealSteps] = useState<{ playerId: string; myIndex: number }[]>([]);
+  const [seatCounts, setSeatCounts] = useState<Record<string, number>>({});
+  const [boneyardVisualCount, setBoneyardVisualCount] = useState(0);
+  const [hiddenTiles, setHiddenTiles] = useState<Record<string, boolean>>({});
+  const [hiddenBoardTiles, setHiddenBoardTiles] = useState<Record<string, boolean>>({});
+  const [drag, setDrag] = useState<{
+    tile: Dominoe;
+    pos: Point;
+    returning?: boolean;
+    returnTo?: Point;
+  } | null>(null);
+  const [hoverEnd, setHoverEnd] = useState<"left" | "right" | null>(null);
+
   const chatEndRef = useRef<HTMLDivElement>(null);
   const boardEndRef = useRef<HTMLDivElement>(null);
+  const boardAreaRef = useRef<HTMLDivElement>(null);
+  const boneyardRef = useRef<HTMLDivElement>(null);
+  const seatRefs = useRef<Record<string, HTMLDivElement>>({});
+  const handTileEls = useRef<Record<string, HTMLDivElement | null>>({});
+  const boardTileEls = useRef<Record<string, HTMLDivElement | null>>({});
+  const handTileRects = useRef<Record<string, Rect>>({});
+  const boardTileRects = useRef<Record<string, Rect>>({});
+  const handRectsPrev = useRef<Record<string, Rect>>({});
+  const flightIdRef = useRef(0);
+  const prevRoundKeyRef = useRef<string | null>(null);
+  const dealtRoundKeyRef = useRef<string | null>(null);
+  const prevHandKeysRef = useRef<string[] | null>(null);
+  const prevBoardKeysRef = useRef<string[] | null>(null);
+  const prevCardCountsRef = useRef<Record<string, number> | null>(null);
+  const pendingDrawRef = useRef<string[]>([]);
+  const dealingRef = useRef(false);
+  const hiddenTilesRef = useRef<Record<string, boolean>>({});
+  const didDragRef = useRef(false);
+  const dragStateRef = useRef<{
+    tile: Dominoe;
+    startRect: Rect;
+    offsetX: number;
+    offsetY: number;
+    dragging: boolean;
+    startX: number;
+    startY: number;
+  } | null>(null);
+
+  const stateRef = useRef(dominoState);
+  const myPlayerIdRef = useRef(myPlayerId);
+  const tileThemeRef = useRef(dominoState?.tileTheme);
+  const isArRef = useRef(isAr);
+
+  stateRef.current = dominoState;
+  myPlayerIdRef.current = myPlayerId;
+  tileThemeRef.current = dominoState?.tileTheme;
+  isArRef.current = isAr;
+  hiddenTilesRef.current = hiddenTiles;
+
+  // Launch a flying tile and auto-remove it when done
+  const launchFlight = useCallback(
+    (data: Omit<Flight, "id" | "onDone"> & { onFinish?: () => void }) => {
+      const id = ++flightIdRef.current;
+      const onFinish = data.onFinish;
+      setFlying((prev) => [
+        ...prev,
+        {
+          ...data,
+          id,
+          onDone: () => {
+            setFlying((prev2) => prev2.filter((f) => f.id !== id));
+            onFinish?.();
+          },
+        },
+      ]);
+    },
+    [],
+  );
 
   // SFX play on board state change (placing tile sound)
   const lastBoardLength = useRef(dominoState?.board?.length ?? 0);
@@ -290,6 +488,284 @@ export default function DominoGame() {
     return () => clearInterval(interval);
   }, [dominoState?.turnDeadline, dominoState?.phase]);
 
+  // ---- Detect a fresh round start and trigger the dealing animation ----
+  useEffect(() => {
+    const st = dominoState;
+    if (!st) return;
+    const key = `${st.phase}_${st.roundNumber}`;
+    const prev = prevRoundKeyRef.current;
+    prevRoundKeyRef.current = key;
+
+    if (!prev) return; // First mount / reconnect: skip animation
+    if (st.phase !== "playing") {
+      dealtRoundKeyRef.current = null;
+      return;
+    }
+    if (dealtRoundKeyRef.current === key) return; // Already dealt this round
+    if (st.board.length > 0) return;
+    const hand = st.hand;
+    if (!hand || hand.length === 0) return;
+
+    // The public broadcast may arrive before the private hand for a new round.
+    // Only deal once the hand is actually the fresh set (not the previous round's).
+    const handKeys = hand.map(tileKey).join(",");
+    const prevHand = prevHandKeysRef.current;
+    if (prevHand && prevHand.join(",") === handKeys) return;
+
+    dealtRoundKeyRef.current = key;
+    dealingRef.current = true;
+    setDealing(true);
+    setHiddenBoardTiles({});
+    setSelectedTile(null);
+
+    const hidden: Record<string, boolean> = {};
+    hand.forEach((t) => (hidden[tileKey(t)] = true));
+    setHiddenTiles(hidden);
+
+    const players = st.players;
+    const myIdx = players.findIndex((p) => p.id === myPlayerId);
+    const steps: { playerId: string; myIndex: number }[] = [];
+    for (let k = 0; k < 7; k++) {
+      players.forEach((p, i) => steps.push({ playerId: p.id, myIndex: i === myIdx ? k : -1 }));
+    }
+    setDealSteps(steps);
+    setSeatCounts({});
+    setBoneyardVisualCount(28);
+  }, [dominoState]);
+
+  // ---- Process dealing steps one tile at a time ----
+  useEffect(() => {
+    if (!dealSteps.length) return;
+
+    let i = 0;
+    const interval = window.setInterval(() => {
+      if (i >= dealSteps.length) {
+        window.clearInterval(interval);
+        dealingRef.current = false;
+        setDealing(false);
+        setHiddenTiles({});
+        setSeatCounts({});
+        setDealSteps([]);
+        setBoneyardVisualCount(stateRef.current?.boneyardCount ?? 0);
+        return;
+      }
+
+      const step = dealSteps[i++];
+      setBoneyardVisualCount((v) => Math.max(0, v - 1));
+      setSeatCounts((prev) => ({ ...prev, [step.playerId]: (prev[step.playerId] ?? 0) + 1 }));
+
+      const fromEl = boneyardRef.current;
+      const from = fromEl ? rectCenter(toRect(fromEl)) : { x: window.innerWidth / 2, y: 80 };
+
+      if (step.playerId === myPlayerIdRef.current && step.myIndex >= 0) {
+        const st = stateRef.current;
+        const tile = st?.hand?.[step.myIndex];
+        if (tile) {
+          const key = tileKey(tile);
+          const target = handTileRects.current[key];
+          launchFlight({
+            from,
+            to: target ? rectCenter(target) : { x: window.innerWidth / 2, y: window.innerHeight - 60 },
+            faceUp: true,
+            tile,
+            tileTheme: tileThemeRef.current,
+            isVertical: tile.left === tile.right,
+            duration: 300,
+            onFinish: () =>
+              setHiddenTiles((prev) => {
+                if (!prev[key]) return prev;
+                const n = { ...prev };
+                delete n[key];
+                return n;
+              }),
+          });
+        }
+      } else {
+        const seatEl = seatRefs.current[step.playerId];
+        const to = seatEl ? rectCenter(toRect(seatEl)) : { x: window.innerWidth / 2, y: 60 };
+        launchFlight({ from, to, faceUp: false, duration: 300 });
+      }
+    }, 155);
+
+    return () => window.clearInterval(interval);
+  }, [dealSteps]);
+
+  // ---- Detect newly drawn tiles (from boneyard into my hand) ----
+  useEffect(() => {
+    const st = dominoState;
+    if (!st) return;
+    const hand = st.hand ?? [];
+    const keys = hand.map(tileKey);
+    const prevKeys = prevHandKeysRef.current;
+
+    if (prevKeys === null) {
+      prevHandKeysRef.current = keys;
+      return;
+    }
+    prevHandKeysRef.current = keys;
+
+    if (dealingRef.current || st.phase !== "playing") return;
+
+    const prevSet = new Set(prevKeys);
+    const added = keys.filter((k) => !prevSet.has(k));
+    if (!added.length) return;
+
+    const hidden = { ...hiddenTilesRef.current };
+    added.forEach((k) => (hidden[k] = true));
+    setHiddenTiles(hidden);
+    pendingDrawRef.current = added;
+  }, [dominoState?.hand]);
+
+  // ---- Launch draw flights once the newly drawn tiles are hidden in the hand ----
+  useEffect(() => {
+    if (!pendingDrawRef.current.length) return;
+    const keys = pendingDrawRef.current;
+    pendingDrawRef.current = [];
+
+    const fromEl = boneyardRef.current;
+    const from = fromEl ? rectCenter(toRect(fromEl)) : { x: window.innerWidth / 2, y: 80 };
+    const st = stateRef.current;
+    const hand = st?.hand ?? [];
+
+    keys.forEach((key) => {
+      const tile = hand.find((t) => tileKey(t) === key);
+      const target = handTileRects.current[key];
+      launchFlight({
+        from,
+        to: target ? rectCenter(target) : { x: window.innerWidth / 2, y: window.innerHeight - 60 },
+        faceUp: true,
+        tile,
+        tileTheme: tileThemeRef.current,
+        isVertical: tile ? tile.left === tile.right : false,
+        duration: 340,
+        onFinish: () =>
+          setHiddenTiles((prev) => {
+            if (!prev[key]) return prev;
+            const n = { ...prev };
+            delete n[key];
+            return n;
+          }),
+      });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hiddenTiles]);
+
+  // ---- Detect a tile being played (board grows) and animate it onto the board ----
+  useEffect(() => {
+    const st = dominoState;
+    if (!st) return;
+    const board = st.board;
+    const keys = board.map(tileKey);
+    const prevKeys = prevBoardKeysRef.current;
+    prevBoardKeysRef.current = keys;
+
+    if (prevKeys === null) return;
+    if (dealingRef.current || st.phase !== "playing") return;
+    if (board.length <= prevKeys.length) return;
+
+    const newKey = keys[0] !== prevKeys[0] ? keys[0] : keys[keys.length - 1];
+    const newTile = board.find((t) => tileKey(t) === newKey);
+
+    // Which player played? (their card count decreased)
+    const prevCounts = prevCardCountsRef.current ?? {};
+    let playedBy: string | null = null;
+    for (const p of st.players) {
+      if (prevCounts[p.id] !== undefined && p.cardCount < prevCounts[p.id]) playedBy = p.id;
+    }
+
+    setHiddenBoardTiles((prev) => (prev[newKey] ? prev : { ...prev, [newKey]: true }));
+
+    let from: Point | null = null;
+    const myRect = handTileRects.current[newKey];
+    if (myRect) {
+      from = rectCenter(myRect);
+    } else if (playedBy && seatRefs.current[playedBy]) {
+      from = rectCenter(toRect(seatRefs.current[playedBy]));
+    } else {
+      const be = boneyardRef.current;
+      from = be ? rectCenter(toRect(be)) : null;
+    }
+
+    requestAnimationFrame(() => {
+      if (!from || !newTile) return;
+      const target = boardTileRects.current[newKey];
+      launchFlight({
+        from,
+        to: target ? rectCenter(target) : { x: window.innerWidth / 2, y: window.innerHeight / 2 },
+        faceUp: true,
+        tile: newTile,
+        tileTheme: tileThemeRef.current,
+        isVertical: newTile.left === newTile.right,
+        duration: 320,
+        onFinish: () =>
+          setHiddenBoardTiles((prev) => {
+            if (!prev[newKey]) return prev;
+            const n = { ...prev };
+            delete n[newKey];
+            return n;
+          }),
+      });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dominoState?.board]);
+
+  // ---- Track previous card counts for detecting who played ----
+  useEffect(() => {
+    if (!dominoState) return;
+    const counts: Record<string, number> = {};
+    dominoState.players.forEach((p) => (counts[p.id] = p.cardCount));
+    prevCardCountsRef.current = counts;
+  }, [dominoState?.players]);
+
+  // ---- Measure tile rects + FLIP animation for the player's hand reflow ----
+  useLayoutEffect(() => {
+    const st = dominoState;
+    if (!st) return;
+
+    for (const key of Object.keys(boardTileEls.current)) {
+      const el = boardTileEls.current[key];
+      if (el) boardTileRects.current[key] = toRect(el);
+    }
+
+    const hand = st.hand;
+    if (hand) {
+      const prev = handRectsPrev.current;
+      const next: Record<string, Rect> = {};
+      const moved: { el: HTMLDivElement; dx: number; dy: number }[] = [];
+
+      hand.forEach((t) => {
+        const key = tileKey(t);
+        const el = handTileEls.current[key];
+        if (!el) return;
+        const cur = toRect(el);
+        next[key] = cur;
+        handTileRects.current[key] = cur;
+        const old = prev[key];
+        if (old && (Math.abs(old.x - cur.x) > 1 || Math.abs(old.y - cur.y) > 1)) {
+          moved.push({ el, dx: old.x - cur.x, dy: old.y - cur.y });
+        }
+      });
+
+      handRectsPrev.current = next;
+
+      if (moved.length) {
+        document.body.offsetHeight; // reflow
+        moved.forEach((m) => {
+          m.el.style.transition = "none";
+          m.el.style.transform = `translate(${m.dx}px, ${m.dy}px)`;
+        });
+        document.body.offsetHeight; // reflow
+        moved.forEach((m) => {
+          m.el.style.transition = "transform 320ms cubic-bezier(0.22, 1, 0.36, 1)";
+          m.el.style.transform = "";
+        });
+        window.setTimeout(() => {
+          moved.forEach((m) => (m.el.style.transition = ""));
+        }, 340);
+      }
+    }
+  }, [dominoState?.hand, dominoState?.board, hiddenTiles]);
+
   if (!dominoState) {
     return (
       <div style={{ minHeight: "100vh", background: COLORS.cream, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
@@ -317,7 +793,7 @@ export default function DominoGame() {
   };
 
   const handleTileClick = (tile: Dominoe) => {
-    if (!isMyTurn) return;
+    if (!isMyTurn || dealing) return;
 
     const playDirection = getPlayableEnd(tile);
     if (!playDirection) return;
@@ -385,6 +861,142 @@ export default function DominoGame() {
     return COLORS.tableGreen;
   };
 
+  // ---- Drag & drop helpers ----
+  const getDropZones = (tile: Dominoe): { end: "left" | "right"; rect: Rect }[] => {
+    if (dominoState.board.length === 0) {
+      const r = boardAreaRef.current ? toRect(boardAreaRef.current) : null;
+      if (!r) return [];
+      return [
+        {
+          end: "right",
+          rect: { x: r.x + r.w * 0.22, y: r.y + r.h * 0.25, w: r.w * 0.56, h: r.h * 0.5 },
+        },
+      ];
+    }
+
+    const res: { end: "left" | "right"; rect: Rect }[] = [];
+    const first = boardTileRects.current[tileKey(dominoState.board[0])];
+    const last = boardTileRects.current[tileKey(dominoState.board[dominoState.board.length - 1])];
+    const canLeft = tile.left === dominoState.leftEnd || tile.right === dominoState.leftEnd;
+    const canRight = tile.left === dominoState.rightEnd || tile.right === dominoState.rightEnd;
+    const w = 80;
+    const h = 46;
+    const gap = 10;
+
+    if (first && canLeft) {
+      res.push({ end: "left", rect: { x: first.x - w - gap, y: first.y + first.h / 2 - h / 2, w, h } });
+    }
+    if (last && canRight) {
+      res.push({ end: "right", rect: { x: last.x + last.w + gap, y: last.y + last.h / 2 - h / 2, w, h } });
+    }
+    return res;
+  };
+
+  const computeDropEnd = (x: number, y: number, tile: Dominoe): "left" | "right" | null => {
+    const zones = getDropZones(tile);
+    const margin = 30;
+    for (const z of zones) {
+      if (
+        x >= z.rect.x - margin && x <= z.rect.x + z.rect.w + margin &&
+        y >= z.rect.y - margin && y <= z.rect.y + z.rect.h + margin
+      ) {
+        return z.end;
+      }
+    }
+    return null;
+  };
+
+  const handlePointerDown = (e: React.PointerEvent, tile: Dominoe) => {
+    if (!isMyTurn || dealing || dominoState.phase !== "playing") return;
+    const el = e.currentTarget;
+    const rect = el.getBoundingClientRect();
+    dragStateRef.current = {
+      tile,
+      startRect: toRect(el),
+      offsetX: e.clientX - rect.left,
+      offsetY: e.clientY - rect.top,
+      dragging: false,
+      startX: e.clientX,
+      startY: e.clientY,
+    };
+    try {
+      el.setPointerCapture(e.pointerId);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    const d = dragStateRef.current;
+    if (!d) return;
+    if (!d.dragging) {
+      if (Math.hypot(e.clientX - d.startX, e.clientY - d.startY) > 6) {
+        d.dragging = true;
+        setDrag({ tile: d.tile, pos: { x: e.clientX, y: e.clientY } });
+      }
+    } else {
+      setDrag((prev) => (prev ? { ...prev, pos: { x: e.clientX, y: e.clientY } } : prev));
+      const end = computeDropEnd(e.clientX, e.clientY, d.tile);
+      setHoverEnd((prev) => (prev === end ? prev : end));
+    }
+  };
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    const d = dragStateRef.current;
+    if (!d) return;
+    dragStateRef.current = null;
+    if (!d.dragging) return; // plain click handled by onClick
+
+    didDragRef.current = true;
+    const end = computeDropEnd(e.clientX, e.clientY, d.tile);
+    setHoverEnd(null);
+
+    if (end) {
+      setDrag(null);
+      handlePlayTile(d.tile, end);
+    } else {
+      const from = { x: e.clientX - d.offsetX, y: e.clientY - d.offsetY };
+      const to = { x: d.startRect.x, y: d.startRect.y };
+      setDrag((prev) => (prev ? { ...prev, returning: true, returnTo: to } : prev));
+      launchFlight({
+        from,
+        to,
+        faceUp: true,
+        tile: d.tile,
+        tileTheme: dominoState.tileTheme,
+        isVertical: d.tile.left === d.tile.right,
+        shake: true,
+        duration: 280,
+        onFinish: () => setDrag(null),
+      });
+    }
+  };
+
+  const handlePointerCancel = () => {
+    const d = dragStateRef.current;
+    if (!d) return;
+    dragStateRef.current = null;
+    if (!d.dragging) return;
+    setHoverEnd(null);
+    const pos = drag?.pos ?? { x: d.startX, y: d.startY };
+    const to = { x: d.startRect.x, y: d.startRect.y };
+    setDrag((prev) => (prev ? { ...prev, returning: true, returnTo: to } : prev));
+    launchFlight({
+      from: pos,
+      to,
+      faceUp: true,
+      tile: d.tile,
+      tileTheme: dominoState.tileTheme,
+      isVertical: d.tile.left === d.tile.right,
+      duration: 260,
+      onFinish: () => setDrag(null),
+    });
+  };
+
+  const displayBoneyardCount = dealing ? boneyardVisualCount : (dominoState.boneyardCount ?? 0);
+  const dropZones = drag && !drag.returning ? getDropZones(drag.tile) : [];
+  const previewZone = dropZones.find((z) => z.end === hoverEnd);
+
   return (
     <div
       dir={dir}
@@ -399,6 +1011,21 @@ export default function DominoGame() {
         overflow: "hidden",
       }}
     >
+      <style>{`
+        @keyframes dominoTilePop {
+          0% { transform: scale(0.55); }
+          60% { transform: scale(1.12); }
+          100% { transform: scale(1); }
+        }
+        @keyframes dominoInvalidShake {
+          0%, 100% { transform: translate(0, 0) rotate(0deg); }
+          20% { transform: translate(-5px, 0) rotate(-4deg); }
+          40% { transform: translate(5px, 0) rotate(3deg); }
+          60% { transform: translate(-3px, 0) rotate(-2deg); }
+          80% { transform: translate(3px, 0) rotate(1deg); }
+        }
+      `}</style>
+
       {/* Device Rotation Warning */}
       {isPortrait && (
         <div style={{
@@ -533,10 +1160,66 @@ export default function DominoGame() {
         </div>
       </div>
 
-
+      {/* Opponent Seats Strip */}
+      {dominoState.phase === "playing" && (
+        <div style={{ display: "flex", justifyContent: "center", gap: 14, flexWrap: "wrap", padding: "10px 16px 4px" }}>
+          {dominoState.players.map((p) => {
+            if (p.id === myPlayerId) return null;
+            const count = dealing ? (seatCounts[p.id] ?? 0) : p.cardCount;
+            const isActive = dominoState.activePlayerId === p.id;
+            return (
+              <div
+                key={p.id}
+                ref={(el) => {
+                  if (el) seatRefs.current[p.id] = el;
+                }}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 3,
+                  padding: "6px 12px",
+                  borderRadius: 12,
+                  background: "rgba(0,0,0,0.35)",
+                  border: `1.5px solid ${isActive ? COLORS.gold : "rgba(255,255,255,0.12)"}`,
+                  boxShadow: isActive ? "0 0 14px rgba(254,210,63,0.4)" : "none",
+                  minWidth: 72,
+                  transition: "border-color .25s ease, box-shadow .25s ease",
+                }}
+              >
+                <div
+                  style={{
+                    width: 26,
+                    height: 26,
+                    borderRadius: "50%",
+                    background: isActive ? COLORS.gold : "rgba(255,255,255,0.2)",
+                    color: isActive ? COLORS.ink : COLORS.white,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 12,
+                    fontWeight: 800,
+                  }}
+                >
+                  {p.name.slice(0, 1).toUpperCase()}
+                </div>
+                <span style={{ fontSize: 11, fontWeight: 700, opacity: 0.9, maxWidth: 90, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {p.name}
+                </span>
+                <div style={{ display: "flex", alignItems: "center", gap: 2, minHeight: 14 }}>
+                  {Array.from({ length: clamp(count, 0, 7) }).map((_, i) => (
+                    <TileBack key={i} width={11} height={8} borderRadius={2} />
+                  ))}
+                  <span style={{ fontSize: 10, opacity: 0.7, marginLeft: 3, fontWeight: 700 }}>{count}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Main Game Screen */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "16px 20px", position: "relative" }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "12px 20px 16px", position: "relative" }}>
         
         {/* Scores Board HUD Card */}
         {dominoState.phase !== "playing" && (
@@ -578,6 +1261,7 @@ export default function DominoGame() {
 
         {/* Center: Scrollless Winding Snake Wrapping Board */}
         <div
+          ref={boardAreaRef}
           style={{
             flex: 1,
             display: "flex",
@@ -587,7 +1271,7 @@ export default function DominoGame() {
             background: "rgba(0,0,0,0.15)",
             border: "3px dashed rgba(255,255,255,0.06)",
             borderRadius: 32,
-            margin: "0 0 20px 0",
+            margin: "0 0 16px 0",
             padding: 16,
             overflowY: "auto",
             position: "relative",
@@ -595,6 +1279,50 @@ export default function DominoGame() {
             maxHeight: "55vh",
           }}
         >
+          {/* Draw pile / Boneyard */}
+          <div
+            ref={boneyardRef}
+            style={{
+              position: "absolute",
+              top: 12,
+              right: 16,
+              zIndex: 5,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 3,
+              pointerEvents: "none",
+            }}
+          >
+            <div
+              style={{
+                width: 52,
+                height: 16 + Math.min(displayBoneyardCount, 14) * 3,
+                position: "relative",
+                transition: "height .25s ease",
+              }}
+            >
+              {Array.from({ length: Math.min(displayBoneyardCount, 14) }).map((_, i) => (
+                <div key={i} style={{ position: "absolute", left: 0, right: 0, bottom: i * 3 }}>
+                  <TileBack width={52} height={34} />
+                </div>
+              ))}
+            </div>
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 800,
+                background: "rgba(0,0,0,0.5)",
+                padding: "2px 8px",
+                borderRadius: 999,
+                color: COLORS.white,
+                border: "1px solid rgba(255,255,255,0.15)",
+              }}
+            >
+              {isAr ? "السحبة" : "Boneyard"} · {displayBoneyardCount}
+            </span>
+          </div>
+
           {dominoState.board.length === 0 ? (
             <div style={{ textAlign: "center", maxWidth: 300 }}>
               <div style={{ fontSize: 48, marginBottom: 12 }}>🎴</div>
@@ -618,8 +1346,21 @@ export default function DominoGame() {
             >
               {dominoState.board.map((tile, idx) => {
                 const isDouble = tile.left === tile.right;
+                const key = tileKey(tile);
+                const isHidden = !!hiddenBoardTiles[key];
                 return (
-                  <div key={idx} style={{ display: "flex", alignItems: "center" }}>
+                  <div
+                    key={key}
+                    ref={(el) => {
+                      boardTileEls.current[key] = el;
+                    }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      opacity: isHidden ? 0 : 1,
+                      transition: "opacity .25s ease",
+                    }}
+                  >
                     <DominoTile
                       left={tile.left}
                       right={tile.right}
@@ -640,25 +1381,57 @@ export default function DominoGame() {
           {myPlayer && dominoState.phase === "playing" && (
             <div style={{ width: "100%", display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 8 }}>
               {dominoState.hand?.map((tile, idx) => {
+                const key = tileKey(tile);
                 const playableDirection = getPlayableEnd(tile);
                 const isPlayable = playableDirection !== null;
                 const isSelected = selectedTile?.left === tile.left && selectedTile?.right === tile.right;
+                const isDragging = drag?.tile.left === tile.left && drag?.tile.right === tile.right;
+                const isHidden = !!hiddenTiles[key];
 
                 return (
-                  <div key={idx} style={{ position: "relative" }}>
+                  <div
+                    key={key}
+                    ref={(el) => {
+                      handTileEls.current[key] = el;
+                    }}
+                    onPointerDown={(e) => handlePointerDown(e, tile)}
+                    onPointerMove={handlePointerMove}
+                    onPointerUp={handlePointerUp}
+                    onPointerCancel={handlePointerCancel}
+                    onClick={() => {
+                      if (didDragRef.current) {
+                        didDragRef.current = false;
+                        return;
+                      }
+                      handleTileClick(tile);
+                    }}
+                    style={{
+                      position: "relative",
+                      opacity: isHidden || isDragging ? 0 : 1,
+                      transition: "opacity .25s ease, transform 320ms cubic-bezier(0.22, 1, 0.36, 1)",
+                      pointerEvents: isHidden ? "none" : "auto",
+                      userSelect: "none",
+                      WebkitUserSelect: "none",
+                      touchAction: "none",
+                    }}
+                  >
                     <DominoTile
                       left={tile.left}
                       right={tile.right}
                       tileTheme={dominoState.tileTheme}
                       isPlayable={isPlayable}
                       isSelected={isSelected}
-                      onClick={() => handleTileClick(tile)}
+                      onClick={undefined}
                       scale={1.05}
                     />
 
                     {/* Double option play popup choices */}
                     {isSelected && (
-                      <div style={{ position: "absolute", bottom: "115%", left: "50%", transform: "translateX(-50%)", display: "flex", gap: 6, background: "rgba(0,0,0,0.85)", padding: 6, borderRadius: 8, boxShadow: "0 4px 10px rgba(0,0,0,0.4)", border: "1px solid rgba(255,255,255,0.2)", zIndex: 60 }}>
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        style={{ position: "absolute", bottom: "115%", left: "50%", transform: "translateX(-50%)", display: "flex", gap: 6, background: "rgba(0,0,0,0.85)", padding: 6, borderRadius: 8, boxShadow: "0 4px 10px rgba(0,0,0,0.4)", border: "1px solid rgba(255,255,255,0.2)", zIndex: 60 }}
+                      >
                         <button
                           onClick={() => handlePlayTile(tile, "left")}
                           style={{
@@ -702,7 +1475,7 @@ export default function DominoGame() {
           )}
 
           {/* Action trigger deck/buttons (Draw / Pass / Turn hints) */}
-          {isMyTurn && dominoState.phase === "playing" && (
+          {isMyTurn && dominoState.phase === "playing" && !dealing && (
             <div style={{ display: "flex", gap: 12, marginTop: 4 }}>
               {!hasPlayableTiles && dominoState.boneyardCount > 0 && (
                 <button
@@ -991,6 +1764,88 @@ export default function DominoGame() {
           </Panel>
         </div>
       )}
+
+      {/* Drag & Drop Overlay */}
+      {drag && !drag.returning && (
+        <>
+          {dropZones.map((z) => (
+            <div
+              key={z.end}
+              style={{
+                position: "fixed",
+                left: z.rect.x,
+                top: z.rect.y,
+                width: z.rect.w,
+                height: z.rect.h,
+                zIndex: 55,
+                borderRadius: 10,
+                border: `2px dashed ${hoverEnd === z.end ? "#4ade80" : "rgba(255,255,255,0.4)"}`,
+                background: hoverEnd === z.end ? "rgba(74,222,128,0.18)" : "rgba(255,255,255,0.06)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                pointerEvents: "none",
+                transition: "all .15s ease",
+                boxSizing: "border-box",
+              }}
+            >
+              <span style={{ fontSize: 10, fontWeight: 800, color: hoverEnd === z.end ? "#4ade80" : "rgba(255,255,255,0.55)" }}>
+                {isAr ? (z.end === "left" ? "يسار" : "يمين") : z.end === "left" ? "LEFT" : "RIGHT"}
+              </span>
+            </div>
+          ))}
+
+          {previewZone && (
+            <div
+              style={{
+                position: "fixed",
+                left: previewZone.rect.x + previewZone.rect.w / 2,
+                top: previewZone.rect.y + previewZone.rect.h / 2,
+                zIndex: 56,
+                pointerEvents: "none",
+                transform: "translate(-50%, -50%)",
+                opacity: 0.92,
+              }}
+            >
+              <div style={{ filter: "drop-shadow(0 0 10px rgba(74,222,128,0.8))", borderRadius: 8 }}>
+                <DominoTile
+                  left={drag.tile.left}
+                  right={drag.tile.right}
+                  tileTheme={dominoState.tileTheme}
+                  isVertical={drag.tile.left === drag.tile.right}
+                  scale={0.9}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Dragged ghost tile following the pointer */}
+          <div
+            style={{
+              position: "fixed",
+              left: drag.pos.x,
+              top: drag.pos.y,
+              zIndex: 70,
+              pointerEvents: "none",
+              transform: "translate(-50%, -50%) scale(1.06)",
+              filter: "drop-shadow(0 10px 14px rgba(0,0,0,0.45))",
+              opacity: 0.95,
+            }}
+          >
+            <DominoTile
+              left={drag.tile.left}
+              right={drag.tile.right}
+              tileTheme={dominoState.tileTheme}
+              isVertical={drag.tile.left === drag.tile.right}
+            />
+          </div>
+        </>
+      )}
+
+      {/* Flying tiles overlay */}
+      {flying.map((f) => (
+        <FlyingTile key={f.id} flight={f} />
+      ))}
     </div>
   );
 }
