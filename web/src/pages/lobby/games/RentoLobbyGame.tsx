@@ -840,6 +840,57 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
                 </div>
               )}
             </div>
+
+            {/* Turn actions — sit right where the dice render, in the middle of the board */}
+            {isMyTurn && state?.phase === "playing" && (state?.canRoll || !!state?.hasRolled) && (
+              <div
+                className="absolute flex flex-wrap items-center justify-center"
+                style={{ top: "50%", left: "50%", transform: "translate(-50%, -50%)", gap: 12, maxWidth: "90%" }}
+              >
+                {state?.canRoll && (
+                  <button
+                    onClick={rollDice}
+                    className="rounded-full font-bold text-sm text-[#0e0b16] transition-transform duration-150 hover:scale-105 active:scale-95 animate-pulse-glow"
+                    style={{
+                      padding: "clamp(10px, 1.8vw, 14px) clamp(18px, 3vw, 28px)",
+                      fontSize: "clamp(13px, 1.8vw, 16px)",
+                      background: "linear-gradient(135deg, #5eead4, #2dd4bf)",
+                      boxShadow: "0 8px 24px -4px rgba(45,212,191,0.65)",
+                    }}
+                  >
+                    🎲 {i18n.roll}
+                  </button>
+                )}
+                {!!state?.hasRolled && currentCell && (currentCell.type === "property" || currentCell.type === "utility") && !state.players.some((p: any) => p.properties?.includes(currentCell.id)) && me && me.money >= currentCell.price && (
+                  <button
+                    onClick={buyProperty}
+                    className="rounded-full font-bold text-sm text-[#0e0b16] transition-transform duration-150 hover:scale-105 active:scale-95 animate-pop-in"
+                    style={{
+                      padding: "clamp(10px, 1.8vw, 14px) clamp(18px, 3vw, 28px)",
+                      fontSize: "clamp(13px, 1.8vw, 16px)",
+                      background: "linear-gradient(135deg, #fcd34d, #f5a524)",
+                      boxShadow: "0 8px 24px -4px rgba(245,165,36,0.55)",
+                    }}
+                  >
+                    🏠 {i18n.buy} (${currentCell.price})
+                  </button>
+                )}
+                {!!state?.hasRolled && (
+                  <button
+                    onClick={endTurn}
+                    className="rounded-full font-bold text-sm text-white transition-transform duration-150 hover:scale-105 active:scale-95 animate-pop-in"
+                    style={{
+                      padding: "clamp(10px, 1.8vw, 14px) clamp(18px, 3vw, 28px)",
+                      fontSize: "clamp(13px, 1.8vw, 16px)",
+                      background: "linear-gradient(135deg, #a78bfa, #8b5cf6)",
+                      boxShadow: "0 8px 24px -4px rgba(139,92,246,0.55)",
+                    }}
+                  >
+                    ⏭ {i18n.endTurn}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Branding wordmark */}
@@ -857,45 +908,12 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
             </span>
           </div>
 
-          {/* Action buttons */}
-          <div className="flex gap-3 flex-wrap justify-center">
-            {isMyTurn && state?.phase === "playing" && (
-              <>
-                {state?.canRoll && (
-                  <button
-                    onClick={rollDice}
-                    className="px-7 py-2.5 rounded-full font-bold text-sm text-[#0e0b16] transition-transform duration-150 hover:scale-105 active:scale-95 animate-pulse-glow"
-                    style={{ background: "linear-gradient(135deg, #5eead4, #2dd4bf)", boxShadow: "0 6px 18px -4px rgba(45,212,191,0.55)" }}
-                  >
-                    🎲 {i18n.roll}
-                  </button>
-                )}
-                {!!state?.hasRolled && currentCell && (currentCell.type === "property" || currentCell.type === "utility") && !state.players.some((p: any) => p.properties?.includes(currentCell.id)) && me && me.money >= currentCell.price && (
-                  <button
-                    onClick={buyProperty}
-                    className="px-7 py-2.5 rounded-full font-bold text-sm text-[#0e0b16] transition-transform duration-150 hover:scale-105 active:scale-95 animate-pop-in"
-                    style={{ background: "linear-gradient(135deg, #fcd34d, #f5a524)", boxShadow: "0 6px 18px -4px rgba(245,165,36,0.55)" }}
-                  >
-                    🏠 {i18n.buy} (${currentCell.price})
-                  </button>
-                )}
-                {!!state?.hasRolled && (
-                  <button
-                    onClick={endTurn}
-                    className="px-7 py-2.5 rounded-full font-bold text-sm text-white transition-transform duration-150 hover:scale-105 active:scale-95 animate-pop-in"
-                    style={{ background: "linear-gradient(135deg, #a78bfa, #8b5cf6)", boxShadow: "0 6px 18px -4px rgba(139,92,246,0.55)" }}
-                  >
-                    ⏭ {i18n.endTurn}
-                  </button>
-                )}
-              </>
-            )}
-            {state?.phase === "finished" && (
-              <div className="text-fuchsia-300 font-bold text-lg animate-pop-in">
-                🎉 {state.players?.find((p: any) => p.id === state.winnerId)?.name} wins!
-              </div>
-            )}
-          </div>
+          {/* Finished-game banner (turn actions now live centered on the board above) */}
+          {state?.phase === "finished" && (
+            <div className="text-fuchsia-300 font-bold text-lg animate-pop-in">
+              🎉 {state.players?.find((p: any) => p.id === state.winnerId)?.name} wins!
+            </div>
+          )}
 
           <p className="text-white/40 text-xs text-center max-w-lg">
             {isAr
@@ -912,12 +930,13 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
               const isMe = p.id === myPlayerId;
               const isCurrent = p.id === state?.currentPlayerId;
               const votes: string[] = state?.kickVotes?.[p.id] ?? [];
-              // 60% of ALL human players (including the target) — matches server logic,
-              // so a 1v1 can't let one player unilaterally kick the other (e.g. 2/3, 3/4).
-              const totalHumans = state?.players?.filter((pp: any) => !pp.isBot).length ?? 0;
+              // 60% of the WHOLE room (bots included) — matches server logic. A 2-player
+              // room (human or bot) can never vote-kick at all, so one player can't win
+              // by unilaterally kicking their only opponent.
+              const totalPlayers = state?.players?.length ?? 0;
               const eligibleVoters = state?.players?.filter((pp: any) => !pp.isBot && pp.id !== p.id).length ?? 0;
-              const threshold = Math.ceil(totalHumans * 0.6);
-              const kickPossible = eligibleVoters >= threshold;
+              const threshold = Math.ceil(totalPlayers * 0.6);
+              const kickPossible = totalPlayers > 2 && eligibleVoters >= threshold;
               const myVote = votes.includes(myPlayerId ?? "");
               const delta = deltas[p.id];
               const color = playerColors[p.id] ?? "#666";

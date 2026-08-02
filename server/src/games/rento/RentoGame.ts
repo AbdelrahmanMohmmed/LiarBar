@@ -52,10 +52,10 @@ const MIDDLE_EAST_BOARD: Property[] = [
   { id: 16, name: "Ankara",        nameAr: "أنقرة",           color: "#ea580c", price: 180, rent: [14, 70, 200, 550, 750, 950],  type: "property", flag: "TR" },
   { id: 17, name: "Antalya",       nameAr: "أنطاليا",         color: "#ea580c", price: 200, rent: [16, 80, 220, 600, 800, 1000], type: "property", flag: "TR" },
   { id: 18, name: "Chest",         nameAr: "صندوق",          color: "#3b82f6", price: 0,   rent: [],                            type: "chest" },
-  { id: 19, name: "Free Parking",  nameAr: "وقوف مجاني",     color: "#8b5cf6", price: 0,   rent: [],                            type: "parking" },
+  { id: 19, name: "Baghdad",       nameAr: "بغداد",           color: "#dc2626", price: 220, rent: [18, 90, 250, 700, 875, 1050], type: "property", flag: "IQ" },
 
   // Top row (right → left): positions 20-30
-  { id: 20, name: "Baghdad",       nameAr: "بغداد",           color: "#dc2626", price: 220, rent: [18, 90, 250, 700, 875, 1050], type: "property", flag: "IQ" },
+  { id: 20, name: "Free Parking",  nameAr: "وقوف مجاني",     color: "#8b5cf6", price: 0,   rent: [],                            type: "parking" },
   { id: 21, name: "Basra",         nameAr: "البصرة",          color: "#dc2626", price: 220, rent: [18, 90, 250, 700, 875, 1050], type: "property", flag: "IQ" },
   { id: 22, name: "Chest",         nameAr: "صندوق",          color: "#3b82f6", price: 0,   rent: [],                             type: "chest" },
   { id: 23, name: "Istanbul Airport", nameAr: "مطار إسطنبول", color: "#6b7280", price: 200, rent: [25, 50, 100, 200],             type: "property" },
@@ -101,9 +101,9 @@ const EUROPE_BOARD: Property[] = [
   { id: 16, name: "Munich",        nameAr: "ميونخ",           color: "#ea580c", price: 180, rent: [14, 70, 200, 550, 750, 950],  type: "property", flag: "DE" },
   { id: 17, name: "Hamburg",       nameAr: "هامبورغ",         color: "#ea580c", price: 200, rent: [16, 80, 220, 600, 800, 1000], type: "property", flag: "DE" },
   { id: 18, name: "Chest",         nameAr: "صندوق",          color: "#3b82f6", price: 0,   rent: [],                            type: "chest" },
-  { id: 19, name: "Free Parking",  nameAr: "وقوف مجاني",     color: "#8b5cf6", price: 0,   rent: [],                            type: "parking" },
+  { id: 19, name: "Rome",          nameAr: "روما",            color: "#dc2626", price: 220, rent: [18, 90, 250, 700, 875, 1050], type: "property", flag: "IT" },
 
-  { id: 20, name: "Rome",          nameAr: "روما",            color: "#dc2626", price: 220, rent: [18, 90, 250, 700, 875, 1050], type: "property", flag: "IT" },
+  { id: 20, name: "Free Parking",  nameAr: "وقوف مجاني",     color: "#8b5cf6", price: 0,   rent: [],                            type: "parking" },
   { id: 21, name: "Milan",         nameAr: "ميلانو",          color: "#dc2626", price: 220, rent: [18, 90, 250, 700, 875, 1050], type: "property", flag: "IT" },
   { id: 22, name: "Chest",         nameAr: "صندوق",          color: "#3b82f6", price: 0,   rent: [],                             type: "chest" },
   { id: 23, name: "Heathrow",      nameAr: "مطار هيثرو",      color: "#6b7280", price: 200, rent: [25, 50, 100, 200],             type: "property" },
@@ -148,9 +148,9 @@ const AMERICAS_BOARD: Property[] = [
   { id: 16, name: "São Paulo",     nameAr: "ساو باولو",        color: "#ea580c", price: 180, rent: [14, 70, 200, 550, 750, 950],  type: "property", flag: "BR" },
   { id: 17, name: "Brasília",      nameAr: "برازيليا",         color: "#ea580c", price: 200, rent: [16, 80, 220, 600, 800, 1000], type: "property", flag: "BR" },
   { id: 18, name: "Chest",         nameAr: "صندوق",          color: "#3b82f6", price: 0,   rent: [],                            type: "chest" },
-  { id: 19, name: "Free Parking",  nameAr: "وقوف مجاني",     color: "#8b5cf6", price: 0,   rent: [],                            type: "parking" },
+  { id: 19, name: "Buenos Aires",  nameAr: "بوينس آيرس",       color: "#dc2626", price: 220, rent: [18, 90, 250, 700, 875, 1050], type: "property", flag: "AR" },
 
-  { id: 20, name: "Buenos Aires",  nameAr: "بوينس آيرس",       color: "#dc2626", price: 220, rent: [18, 90, 250, 700, 875, 1050], type: "property", flag: "AR" },
+  { id: 20, name: "Free Parking",  nameAr: "وقوف مجاني",     color: "#8b5cf6", price: 0,   rent: [],                            type: "parking" },
   { id: 21, name: "Córdoba",       nameAr: "قرطبة",            color: "#dc2626", price: 220, rent: [18, 90, 250, 700, 875, 1050], type: "property", flag: "AR" },
   { id: 22, name: "Chest",         nameAr: "صندوق",          color: "#3b82f6", price: 0,   rent: [],                             type: "chest" },
   { id: 23, name: "JFK Airport",   nameAr: "مطار جيه إف كيه",  color: "#6b7280", price: 200, rent: [25, 50, 100, 200],             type: "property" },
@@ -681,6 +681,9 @@ export class RentoGame implements GameRoom {
   voteKick(voterId: string, targetPlayerId: string): { success: boolean; error?: string } {
     if (this.phase !== "playing") return { success: false, error: "Game not active" };
     if (voterId === targetPlayerId) return { success: false, error: "Cannot vote for yourself" };
+    // Vote-kick needs a real group decision — in a 2-player room (human or bot) there's
+    // no one left to out-vote the accuser, so a single vote could otherwise "win" the game.
+    if (this.players.length <= 2) return { success: false, error: "Need more than 2 players to vote-kick" };
 
     const voter = this.getPlayer(voterId);
     const target = this.getPlayer(targetPlayerId);
@@ -697,12 +700,12 @@ export class RentoGame implements GameRoom {
     if (votes.has(voterId)) votes.delete(voterId);
     else votes.add(voterId);
 
-    // Threshold is 60% of ALL human players (including the target), not just of the
-    // remaining accusers — otherwise a 1v1 lets one player unilaterally kick the other.
-    // e.g. 2/3, 3/4, 3/5.
-    const totalHumans = this.players.filter((p) => !p.isBot).length;
+    // Threshold is 60% of the WHOLE room (bots included), not just of the human
+    // accusers — e.g. 2/3, 3/4. Only non-bot players (excluding the target) can
+    // actually cast a vote, which is what keeps a lone human from clearing out bots.
+    const totalPlayers = this.players.length;
     const eligible = this.players.filter((p) => !p.isBot && p.id !== targetPlayerId);
-    const threshold = Math.ceil(totalHumans * 0.6);
+    const threshold = Math.ceil(totalPlayers * 0.6);
 
     if (eligible.length > 0 && votes.size >= threshold) {
       this.eliminatePlayer(targetPlayerId, `${this.getPlayerName(targetPlayerId)} was voted out!`);
