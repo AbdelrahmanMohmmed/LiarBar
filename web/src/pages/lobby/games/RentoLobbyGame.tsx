@@ -374,10 +374,14 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
         const isRolling = rollElapsed < DICE_ROLL_MS;
         const justLanded = rollElapsed >= DICE_ROLL_MS && rollElapsed < DICE_ROLL_MS + 200;
 
-        // Dice, centered in the board interior
+        // Dice, centered in the board interior — bigger, with room below for the action buttons
+        const DICE_SIZE = 70;
+        const DICE_GAP = 16;
+        const DICE_HALF = DICE_SIZE / 2;
+        const dTotalW = DICE_SIZE * 2 + DICE_GAP;
         for (let d = 0; d < 2; d++) {
-          const dx = centerX - 52 + d * 64;
-          const dy = centerY - 32;
+          const dx = centerX - dTotalW / 2 + d * (DICE_SIZE + DICE_GAP);
+          const dy = centerY - DICE_HALF;
 
           let faceValue = st.dice[d];
           let rotate = 0;
@@ -393,31 +397,31 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
           }
 
           ctx.save();
-          ctx.translate(dx + 24, dy + 24);
+          ctx.translate(dx + DICE_HALF, dy + DICE_HALF);
           ctx.rotate(rotate);
           ctx.scale(scale, scale);
-          ctx.translate(-24, -24);
+          ctx.translate(-DICE_HALF, -DICE_HALF);
 
-          const diceGrad = ctx.createLinearGradient(0, 0, 0, 48);
+          const diceGrad = ctx.createLinearGradient(0, 0, 0, DICE_SIZE);
           diceGrad.addColorStop(0, "#ffffff");
           diceGrad.addColorStop(1, "#e7e1f5");
           ctx.save();
           ctx.shadowColor = "rgba(0,0,0,0.45)";
-          ctx.shadowBlur = 12;
-          ctx.shadowOffsetY = 4;
-          roundRect(ctx, 0, 0, 48, 48, 13);
+          ctx.shadowBlur = 14;
+          ctx.shadowOffsetY = 5;
+          roundRect(ctx, 0, 0, DICE_SIZE, DICE_SIZE, 19);
           ctx.fillStyle = diceGrad;
           ctx.fill();
           ctx.restore();
           ctx.strokeStyle = "rgba(0,0,0,0.08)";
           ctx.lineWidth = 1;
-          roundRect(ctx, 0, 0, 48, 48, 13);
+          roundRect(ctx, 0, 0, DICE_SIZE, DICE_SIZE, 19);
           ctx.stroke();
 
           ctx.fillStyle = "#241640";
-          ctx.font = "bold 28px 'Baloo 2', sans-serif";
+          ctx.font = "bold 40px 'Baloo 2', sans-serif";
           ctx.textAlign = "center";
-          ctx.fillText(String(faceValue), 24, 33);
+          ctx.fillText(String(faceValue), DICE_HALF, DICE_HALF + 14);
           ctx.restore();
         }
       } else {
@@ -841,19 +845,19 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
               )}
             </div>
 
-            {/* Turn actions — sit right where the dice render, in the middle of the board */}
+            {/* Turn actions — sit just below the dice, in the middle of the board */}
             {isMyTurn && state?.phase === "playing" && (state?.canRoll || !!state?.hasRolled) && (
               <div
                 className="absolute flex flex-wrap items-center justify-center"
-                style={{ top: "50%", left: "50%", transform: "translate(-50%, -50%)", gap: 12, maxWidth: "90%" }}
+                style={{ top: "58%", left: "50%", transform: "translate(-50%, 0)", gap: "clamp(6px, 1.5vw, 12px)", maxWidth: "92%" }}
               >
                 {state?.canRoll && (
                   <button
                     onClick={rollDice}
-                    className="rounded-full font-bold text-sm text-[#0e0b16] transition-transform duration-150 hover:scale-105 active:scale-95 animate-pulse-glow"
+                    className="rounded-full font-bold text-[#0e0b16] transition-transform duration-150 hover:scale-105 active:scale-95 animate-pulse-glow"
                     style={{
-                      padding: "clamp(10px, 1.8vw, 14px) clamp(18px, 3vw, 28px)",
-                      fontSize: "clamp(13px, 1.8vw, 16px)",
+                      padding: "clamp(6px, 1.4vw, 14px) clamp(12px, 2.6vw, 28px)",
+                      fontSize: "clamp(10px, 1.5vw, 16px)",
                       background: "linear-gradient(135deg, #5eead4, #2dd4bf)",
                       boxShadow: "0 8px 24px -4px rgba(45,212,191,0.65)",
                     }}
@@ -864,10 +868,10 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
                 {!!state?.hasRolled && currentCell && (currentCell.type === "property" || currentCell.type === "utility") && !state.players.some((p: any) => p.properties?.includes(currentCell.id)) && me && me.money >= currentCell.price && (
                   <button
                     onClick={buyProperty}
-                    className="rounded-full font-bold text-sm text-[#0e0b16] transition-transform duration-150 hover:scale-105 active:scale-95 animate-pop-in"
+                    className="rounded-full font-bold text-[#0e0b16] transition-transform duration-150 hover:scale-105 active:scale-95 animate-pop-in"
                     style={{
-                      padding: "clamp(10px, 1.8vw, 14px) clamp(18px, 3vw, 28px)",
-                      fontSize: "clamp(13px, 1.8vw, 16px)",
+                      padding: "clamp(6px, 1.4vw, 14px) clamp(12px, 2.6vw, 28px)",
+                      fontSize: "clamp(10px, 1.5vw, 16px)",
                       background: "linear-gradient(135deg, #fcd34d, #f5a524)",
                       boxShadow: "0 8px 24px -4px rgba(245,165,36,0.55)",
                     }}
@@ -878,10 +882,10 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
                 {!!state?.hasRolled && (
                   <button
                     onClick={endTurn}
-                    className="rounded-full font-bold text-sm text-white transition-transform duration-150 hover:scale-105 active:scale-95 animate-pop-in"
+                    className="rounded-full font-bold text-white transition-transform duration-150 hover:scale-105 active:scale-95 animate-pop-in"
                     style={{
-                      padding: "clamp(10px, 1.8vw, 14px) clamp(18px, 3vw, 28px)",
-                      fontSize: "clamp(13px, 1.8vw, 16px)",
+                      padding: "clamp(6px, 1.4vw, 14px) clamp(12px, 2.6vw, 28px)",
+                      fontSize: "clamp(10px, 1.5vw, 16px)",
                       background: "linear-gradient(135deg, #a78bfa, #8b5cf6)",
                       boxShadow: "0 8px 24px -4px rgba(139,92,246,0.55)",
                     }}
