@@ -10,6 +10,7 @@ interface Property {
   price: number;
   rent: number[];
   type: "property" | "tax" | "chest" | "chance" | "start" | "jail" | "go" | "parking" | "utility";
+  flag?: string;
 }
 
 interface TradeProposal {
@@ -23,56 +24,160 @@ interface TradeProposal {
   status: "pending" | "accepted" | "rejected";
 }
 
+export type MapId = "middle_east" | "europe" | "americas";
+
+export const BACKGROUND_IDS = ["nebula", "ocean", "sunset", "emerald"] as const;
+
 // 40-tile rectangular perimeter board with Middle Eastern cities
-const BOARD: Property[] = [
+const MIDDLE_EAST_BOARD: Property[] = [
   // Bottom row (left → right): positions 0-10
   { id: 0,  name: "GO",            nameAr: "ابدأ",           color: "#22c55e", price: 0,   rent: [],                          type: "start" },
-  { id: 1,  name: "Riyadh",        nameAr: "الرياض",         color: "#92400e", price: 60,  rent: [2, 10, 30, 90, 160, 250],   type: "property" },
+  { id: 1,  name: "Riyadh",        nameAr: "الرياض",         color: "#92400e", price: 60,  rent: [2, 10, 30, 90, 160, 250],   type: "property", flag: "SA" },
   { id: 2,  name: "Chest",         nameAr: "صندوق",          color: "#3b82f6", price: 0,   rent: [],                          type: "chest" },
-  { id: 3,  name: "Jeddah",        nameAr: "جدة",            color: "#92400e", price: 60,  rent: [4, 20, 60, 180, 320, 450],  type: "property" },
+  { id: 3,  name: "Jeddah",        nameAr: "جدة",            color: "#92400e", price: 60,  rent: [4, 20, 60, 180, 320, 450],  type: "property", flag: "SA" },
   { id: 4,  name: "Income Tax",    nameAr: "ضريبة الدخل",    color: "#ef4444", price: 0,   rent: [],                          type: "tax" },
   { id: 5,  name: "Riyadh Station",nameAr: "محطة الرياض",    color: "#6b7280", price: 200, rent: [25, 50, 100, 200],          type: "property" },
-  { id: 6,  name: "Cairo",         nameAr: "القاهرة",         color: "#2563eb", price: 100, rent: [6, 30, 90, 270, 400, 550],  type: "property" },
+  { id: 6,  name: "Cairo",         nameAr: "القاهرة",         color: "#2563eb", price: 100, rent: [6, 30, 90, 270, 400, 550],  type: "property", flag: "EG" },
   { id: 7,  name: "Chance",        nameAr: "فرصة",            color: "#f59e0b", price: 0,   rent: [],                          type: "chance" },
-  { id: 8,  name: "Alexandria",    nameAr: "الإسكندرية",      color: "#2563eb", price: 100, rent: [6, 30, 90, 270, 400, 550],  type: "property" },
-  { id: 9,  name: "Luxor",         nameAr: "الأقصر",          color: "#2563eb", price: 120, rent: [8, 40, 100, 300, 450, 600], type: "property" },
+  { id: 8,  name: "Alexandria",    nameAr: "الإسكندرية",      color: "#2563eb", price: 100, rent: [6, 30, 90, 270, 400, 550],  type: "property", flag: "EG" },
+  { id: 9,  name: "Luxor",         nameAr: "الأقصر",          color: "#2563eb", price: 120, rent: [8, 40, 100, 300, 450, 600], type: "property", flag: "EG" },
   { id: 10, name: "Jail",          nameAr: "سجن",            color: "#6b7280", price: 0,   rent: [],                          type: "jail" },
 
   // Right column (bottom → top): positions 11-19
-  { id: 11, name: "Dubai",         nameAr: "دبي",            color: "#ec4899", price: 140, rent: [10, 50, 150, 450, 625, 750],  type: "property" },
-  { id: 12, name: "Abu Dhabi",     nameAr: "أبو ظبي",        color: "#ec4899", price: 140, rent: [10, 50, 150, 450, 625, 750],  type: "property" },
+  { id: 11, name: "Dubai",         nameAr: "دبي",            color: "#ec4899", price: 140, rent: [10, 50, 150, 450, 625, 750],  type: "property", flag: "AE" },
+  { id: 12, name: "Abu Dhabi",     nameAr: "أبو ظبي",        color: "#ec4899", price: 140, rent: [10, 50, 150, 450, 625, 750],  type: "property", flag: "AE" },
   { id: 13, name: "Water Works",   nameAr: "المياه",          color: "#06b6d4", price: 150, rent: [4, 10],                       type: "utility" },
-  { id: 14, name: "Istanbul",      nameAr: "إسطنبول",         color: "#ea580c", price: 180, rent: [14, 70, 200, 550, 750, 950],  type: "property" },
+  { id: 14, name: "Istanbul",      nameAr: "إسطنبول",         color: "#ea580c", price: 180, rent: [14, 70, 200, 550, 750, 950],  type: "property", flag: "TR" },
   { id: 15, name: "Chance",        nameAr: "فرصة",            color: "#f59e0b", price: 0,   rent: [],                            type: "chance" },
-  { id: 16, name: "Ankara",        nameAr: "أنقرة",           color: "#ea580c", price: 180, rent: [14, 70, 200, 550, 750, 950],  type: "property" },
-  { id: 17, name: "Antalya",       nameAr: "أنطاليا",         color: "#ea580c", price: 200, rent: [16, 80, 220, 600, 800, 1000], type: "property" },
+  { id: 16, name: "Ankara",        nameAr: "أنقرة",           color: "#ea580c", price: 180, rent: [14, 70, 200, 550, 750, 950],  type: "property", flag: "TR" },
+  { id: 17, name: "Antalya",       nameAr: "أنطاليا",         color: "#ea580c", price: 200, rent: [16, 80, 220, 600, 800, 1000], type: "property", flag: "TR" },
   { id: 18, name: "Chest",         nameAr: "صندوق",          color: "#3b82f6", price: 0,   rent: [],                            type: "chest" },
   { id: 19, name: "Free Parking",  nameAr: "وقوف مجاني",     color: "#8b5cf6", price: 0,   rent: [],                            type: "parking" },
 
   // Top row (right → left): positions 20-30
-  { id: 20, name: "Baghdad",       nameAr: "بغداد",           color: "#dc2626", price: 220, rent: [18, 90, 250, 700, 875, 1050], type: "property" },
-  { id: 21, name: "Basra",         nameAr: "البصرة",          color: "#dc2626", price: 220, rent: [18, 90, 250, 700, 875, 1050], type: "property" },
+  { id: 20, name: "Baghdad",       nameAr: "بغداد",           color: "#dc2626", price: 220, rent: [18, 90, 250, 700, 875, 1050], type: "property", flag: "IQ" },
+  { id: 21, name: "Basra",         nameAr: "البصرة",          color: "#dc2626", price: 220, rent: [18, 90, 250, 700, 875, 1050], type: "property", flag: "IQ" },
   { id: 22, name: "Chest",         nameAr: "صندوق",          color: "#3b82f6", price: 0,   rent: [],                             type: "chest" },
   { id: 23, name: "Istanbul Airport", nameAr: "مطار إسطنبول", color: "#6b7280", price: 200, rent: [25, 50, 100, 200],             type: "property" },
-  { id: 24, name: "Casablanca",    nameAr: "الدار البيضاء",   color: "#eab308", price: 260, rent: [22, 110, 330, 800, 975, 1150], type: "property" },
-  { id: 25, name: "Marrakech",     nameAr: "مراكش",           color: "#eab308", price: 260, rent: [22, 110, 330, 800, 975, 1150], type: "property" },
+  { id: 24, name: "Casablanca",    nameAr: "الدار البيضاء",   color: "#eab308", price: 260, rent: [22, 110, 330, 800, 975, 1150], type: "property", flag: "MA" },
+  { id: 25, name: "Marrakech",     nameAr: "مراكش",           color: "#eab308", price: 260, rent: [22, 110, 330, 800, 975, 1150], type: "property", flag: "MA" },
   { id: 26, name: "Chance",        nameAr: "فرصة",            color: "#f59e0b", price: 0,   rent: [],                             type: "chance" },
-  { id: 27, name: "Fez",           nameAr: "فاس",             color: "#eab308", price: 280, rent: [24, 120, 360, 850, 1025, 1200],type: "property" },
-  { id: 28, name: "Doha",          nameAr: "الدوحة",          color: "#16a34a", price: 300, rent: [26, 130, 390, 900, 1100, 1275],type: "property" },
-  { id: 29, name: "Kuwait City",   nameAr: "الكويت",          color: "#16a34a", price: 300, rent: [26, 130, 390, 900, 1100, 1275],type: "property" },
+  { id: 27, name: "Fez",           nameAr: "فاس",             color: "#eab308", price: 280, rent: [24, 120, 360, 850, 1025, 1200],type: "property", flag: "MA" },
+  { id: 28, name: "Doha",          nameAr: "الدوحة",          color: "#16a34a", price: 300, rent: [26, 130, 390, 900, 1100, 1275],type: "property", flag: "QA" },
+  { id: 29, name: "Kuwait City",   nameAr: "الكويت",          color: "#16a34a", price: 300, rent: [26, 130, 390, 900, 1100, 1275],type: "property", flag: "KW" },
   { id: 30, name: "Go To Jail",    nameAr: "اذهب للسجن",      color: "#6b7280", price: 0,   rent: [],                             type: "jail" },
 
   // Left column (top → bottom): positions 31-39
-  { id: 31, name: "Muscat",        nameAr: "مسقط",            color: "#7c3aed", price: 350, rent: [28, 150, 420, 950, 1150, 1350], type: "property" },
-  { id: 32, name: "Amman",         nameAr: "عمّان",            color: "#7c3aed", price: 350, rent: [28, 150, 420, 950, 1150, 1350], type: "property" },
+  { id: 31, name: "Muscat",        nameAr: "مسقط",            color: "#7c3aed", price: 350, rent: [28, 150, 420, 950, 1150, 1350], type: "property", flag: "OM" },
+  { id: 32, name: "Amman",         nameAr: "عمّان",            color: "#7c3aed", price: 350, rent: [28, 150, 420, 950, 1150, 1350], type: "property", flag: "JO" },
   { id: 33, name: "Electric Company", nameAr: "الكهرباء",     color: "#06b6d4", price: 150, rent: [4, 10],                          type: "utility" },
-  { id: 34, name: "Beirut",        nameAr: "بيروت",           color: "#a855f7", price: 400, rent: [30, 160, 450, 1000, 1200, 1400], type: "property" },
-  { id: 35, name: "Tripoli",       nameAr: "طرابلس",          color: "#a855f7", price: 400, rent: [30, 160, 450, 1000, 1200, 1400], type: "property" },
+  { id: 34, name: "Beirut",        nameAr: "بيروت",           color: "#a855f7", price: 400, rent: [30, 160, 450, 1000, 1200, 1400], type: "property", flag: "LB" },
+  { id: 35, name: "Tripoli",       nameAr: "طرابلس",          color: "#a855f7", price: 400, rent: [30, 160, 450, 1000, 1200, 1400], type: "property", flag: "LY" },
   { id: 36, name: "Chance",        nameAr: "فرصة",             color: "#f59e0b", price: 0,   rent: [],                                type: "chance" },
-  { id: 37, name: "Tunis",         nameAr: "تونس",             color: "#a855f7", price: 420, rent: [32, 170, 480, 1050, 1250, 1500], type: "property" },
+  { id: 37, name: "Tunis",         nameAr: "تونس",             color: "#a855f7", price: 420, rent: [32, 170, 480, 1050, 1250, 1500], type: "property", flag: "TN" },
   { id: 38, name: "Chest",         nameAr: "صندوق",           color: "#3b82f6", price: 0,   rent: [],                                type: "chest" },
-  { id: 39, name: "Algiers",       nameAr: "الجزائر",          color: "#a855f7", price: 450, rent: [35, 180, 500, 1100, 1300, 1550], type: "property" },
+  { id: 39, name: "Algiers",       nameAr: "الجزائر",          color: "#a855f7", price: 450, rent: [35, 180, 500, 1100, 1300, 1550], type: "property", flag: "DZ" },
 ];
+
+// 40-tile rectangular perimeter board with European cities
+const EUROPE_BOARD: Property[] = [
+  { id: 0,  name: "GO",            nameAr: "ابدأ",           color: "#22c55e", price: 0,   rent: [],                          type: "start" },
+  { id: 1,  name: "Moscow",        nameAr: "موسكو",          color: "#92400e", price: 60,  rent: [2, 10, 30, 90, 160, 250],   type: "property", flag: "RU" },
+  { id: 2,  name: "Chest",         nameAr: "صندوق",          color: "#3b82f6", price: 0,   rent: [],                          type: "chest" },
+  { id: 3,  name: "St. Petersburg",nameAr: "سانت بطرسبرغ",    color: "#92400e", price: 60,  rent: [4, 20, 60, 180, 320, 450],  type: "property", flag: "RU" },
+  { id: 4,  name: "Income Tax",    nameAr: "ضريبة الدخل",    color: "#ef4444", price: 0,   rent: [],                          type: "tax" },
+  { id: 5,  name: "Gare du Nord",  nameAr: "محطة الشمال",    color: "#6b7280", price: 200, rent: [25, 50, 100, 200],          type: "property" },
+  { id: 6,  name: "Madrid",        nameAr: "مدريد",          color: "#2563eb", price: 100, rent: [6, 30, 90, 270, 400, 550],  type: "property", flag: "ES" },
+  { id: 7,  name: "Chance",        nameAr: "فرصة",            color: "#f59e0b", price: 0,   rent: [],                          type: "chance" },
+  { id: 8,  name: "Barcelona",     nameAr: "برشلونة",         color: "#2563eb", price: 100, rent: [6, 30, 90, 270, 400, 550],  type: "property", flag: "ES" },
+  { id: 9,  name: "Seville",       nameAr: "إشبيلية",         color: "#2563eb", price: 120, rent: [8, 40, 100, 300, 450, 600], type: "property", flag: "ES" },
+  { id: 10, name: "Jail",          nameAr: "سجن",            color: "#6b7280", price: 0,   rent: [],                          type: "jail" },
+
+  { id: 11, name: "Amsterdam",     nameAr: "أمستردام",        color: "#ec4899", price: 140, rent: [10, 50, 150, 450, 625, 750],  type: "property", flag: "NL" },
+  { id: 12, name: "Rotterdam",     nameAr: "روتردام",         color: "#ec4899", price: 140, rent: [10, 50, 150, 450, 625, 750],  type: "property", flag: "NL" },
+  { id: 13, name: "Rhine Water Co.", nameAr: "مياه الراين",   color: "#06b6d4", price: 150, rent: [4, 10],                       type: "utility" },
+  { id: 14, name: "Berlin",        nameAr: "برلين",           color: "#ea580c", price: 180, rent: [14, 70, 200, 550, 750, 950],  type: "property", flag: "DE" },
+  { id: 15, name: "Chance",        nameAr: "فرصة",            color: "#f59e0b", price: 0,   rent: [],                            type: "chance" },
+  { id: 16, name: "Munich",        nameAr: "ميونخ",           color: "#ea580c", price: 180, rent: [14, 70, 200, 550, 750, 950],  type: "property", flag: "DE" },
+  { id: 17, name: "Hamburg",       nameAr: "هامبورغ",         color: "#ea580c", price: 200, rent: [16, 80, 220, 600, 800, 1000], type: "property", flag: "DE" },
+  { id: 18, name: "Chest",         nameAr: "صندوق",          color: "#3b82f6", price: 0,   rent: [],                            type: "chest" },
+  { id: 19, name: "Free Parking",  nameAr: "وقوف مجاني",     color: "#8b5cf6", price: 0,   rent: [],                            type: "parking" },
+
+  { id: 20, name: "Rome",          nameAr: "روما",            color: "#dc2626", price: 220, rent: [18, 90, 250, 700, 875, 1050], type: "property", flag: "IT" },
+  { id: 21, name: "Milan",         nameAr: "ميلانو",          color: "#dc2626", price: 220, rent: [18, 90, 250, 700, 875, 1050], type: "property", flag: "IT" },
+  { id: 22, name: "Chest",         nameAr: "صندوق",          color: "#3b82f6", price: 0,   rent: [],                             type: "chest" },
+  { id: 23, name: "Heathrow",      nameAr: "مطار هيثرو",      color: "#6b7280", price: 200, rent: [25, 50, 100, 200],             type: "property" },
+  { id: 24, name: "Paris",         nameAr: "باريس",           color: "#eab308", price: 260, rent: [22, 110, 330, 800, 975, 1150], type: "property", flag: "FR" },
+  { id: 25, name: "Lyon",          nameAr: "ليون",            color: "#eab308", price: 260, rent: [22, 110, 330, 800, 975, 1150], type: "property", flag: "FR" },
+  { id: 26, name: "Chance",        nameAr: "فرصة",            color: "#f59e0b", price: 0,   rent: [],                             type: "chance" },
+  { id: 27, name: "Marseille",     nameAr: "مرسيليا",         color: "#eab308", price: 280, rent: [24, 120, 360, 850, 1025, 1200],type: "property", flag: "FR" },
+  { id: 28, name: "London",        nameAr: "لندن",            color: "#16a34a", price: 300, rent: [26, 130, 390, 900, 1100, 1275],type: "property", flag: "GB" },
+  { id: 29, name: "Manchester",    nameAr: "مانشستر",         color: "#16a34a", price: 300, rent: [26, 130, 390, 900, 1100, 1275],type: "property", flag: "GB" },
+  { id: 30, name: "Go To Jail",    nameAr: "اذهب للسجن",      color: "#6b7280", price: 0,   rent: [],                             type: "jail" },
+
+  { id: 31, name: "Athens",        nameAr: "أثينا",           color: "#7c3aed", price: 350, rent: [28, 150, 420, 950, 1150, 1350], type: "property", flag: "GR" },
+  { id: 32, name: "Thessaloniki",  nameAr: "سالونيك",         color: "#7c3aed", price: 350, rent: [28, 150, 420, 950, 1150, 1350], type: "property", flag: "GR" },
+  { id: 33, name: "EuroGrid Electric", nameAr: "كهرباء أوروبا", color: "#06b6d4", price: 150, rent: [4, 10],                        type: "utility" },
+  { id: 34, name: "Dublin",        nameAr: "دبلن",            color: "#a855f7", price: 400, rent: [30, 160, 450, 1000, 1200, 1400], type: "property", flag: "IE" },
+  { id: 35, name: "Frankfurt",     nameAr: "فرانكفورت",       color: "#a855f7", price: 400, rent: [30, 160, 450, 1000, 1200, 1400], type: "property", flag: "DE" },
+  { id: 36, name: "Chance",        nameAr: "فرصة",             color: "#f59e0b", price: 0,   rent: [],                                type: "chance" },
+  { id: 37, name: "Valencia",      nameAr: "فالنسيا",         color: "#a855f7", price: 420, rent: [32, 170, 480, 1050, 1250, 1500], type: "property", flag: "ES" },
+  { id: 38, name: "Chest",         nameAr: "صندوق",           color: "#3b82f6", price: 0,   rent: [],                                type: "chest" },
+  { id: 39, name: "Naples",        nameAr: "نابولي",          color: "#a855f7", price: 450, rent: [35, 180, 500, 1100, 1300, 1550], type: "property", flag: "IT" },
+];
+
+// 40-tile rectangular perimeter board with cities of the Americas
+const AMERICAS_BOARD: Property[] = [
+  { id: 0,  name: "GO",            nameAr: "ابدأ",           color: "#22c55e", price: 0,   rent: [],                          type: "start" },
+  { id: 1,  name: "Bogotá",        nameAr: "بوغوتا",          color: "#92400e", price: 60,  rent: [2, 10, 30, 90, 160, 250],   type: "property", flag: "CO" },
+  { id: 2,  name: "Chest",         nameAr: "صندوق",          color: "#3b82f6", price: 0,   rent: [],                          type: "chest" },
+  { id: 3,  name: "Lima",          nameAr: "ليما",            color: "#92400e", price: 60,  rent: [4, 20, 60, 180, 320, 450],  type: "property", flag: "PE" },
+  { id: 4,  name: "Income Tax",    nameAr: "ضريبة الدخل",    color: "#ef4444", price: 0,   rent: [],                          type: "tax" },
+  { id: 5,  name: "Union Station", nameAr: "محطة الاتحاد",    color: "#6b7280", price: 200, rent: [25, 50, 100, 200],          type: "property" },
+  { id: 6,  name: "Mexico City",   nameAr: "مكسيكو سيتي",     color: "#2563eb", price: 100, rent: [6, 30, 90, 270, 400, 550],  type: "property", flag: "MX" },
+  { id: 7,  name: "Chance",        nameAr: "فرصة",            color: "#f59e0b", price: 0,   rent: [],                          type: "chance" },
+  { id: 8,  name: "Guadalajara",   nameAr: "غوادالاخارا",      color: "#2563eb", price: 100, rent: [6, 30, 90, 270, 400, 550],  type: "property", flag: "MX" },
+  { id: 9,  name: "Monterrey",     nameAr: "مونتيري",         color: "#2563eb", price: 120, rent: [8, 40, 100, 300, 450, 600], type: "property", flag: "MX" },
+  { id: 10, name: "Jail",          nameAr: "سجن",            color: "#6b7280", price: 0,   rent: [],                          type: "jail" },
+
+  { id: 11, name: "Toronto",       nameAr: "تورنتو",           color: "#ec4899", price: 140, rent: [10, 50, 150, 450, 625, 750],  type: "property", flag: "CA" },
+  { id: 12, name: "Vancouver",     nameAr: "فانكوفر",          color: "#ec4899", price: 140, rent: [10, 50, 150, 450, 625, 750],  type: "property", flag: "CA" },
+  { id: 13, name: "Amazon Water Co.", nameAr: "مياه الأمازون", color: "#06b6d4", price: 150, rent: [4, 10],                       type: "utility" },
+  { id: 14, name: "Rio de Janeiro",nameAr: "ريو دي جانيرو",    color: "#ea580c", price: 180, rent: [14, 70, 200, 550, 750, 950],  type: "property", flag: "BR" },
+  { id: 15, name: "Chance",        nameAr: "فرصة",            color: "#f59e0b", price: 0,   rent: [],                            type: "chance" },
+  { id: 16, name: "São Paulo",     nameAr: "ساو باولو",        color: "#ea580c", price: 180, rent: [14, 70, 200, 550, 750, 950],  type: "property", flag: "BR" },
+  { id: 17, name: "Brasília",      nameAr: "برازيليا",         color: "#ea580c", price: 200, rent: [16, 80, 220, 600, 800, 1000], type: "property", flag: "BR" },
+  { id: 18, name: "Chest",         nameAr: "صندوق",          color: "#3b82f6", price: 0,   rent: [],                            type: "chest" },
+  { id: 19, name: "Free Parking",  nameAr: "وقوف مجاني",     color: "#8b5cf6", price: 0,   rent: [],                            type: "parking" },
+
+  { id: 20, name: "Buenos Aires",  nameAr: "بوينس آيرس",       color: "#dc2626", price: 220, rent: [18, 90, 250, 700, 875, 1050], type: "property", flag: "AR" },
+  { id: 21, name: "Córdoba",       nameAr: "قرطبة",            color: "#dc2626", price: 220, rent: [18, 90, 250, 700, 875, 1050], type: "property", flag: "AR" },
+  { id: 22, name: "Chest",         nameAr: "صندوق",          color: "#3b82f6", price: 0,   rent: [],                             type: "chest" },
+  { id: 23, name: "JFK Airport",   nameAr: "مطار جيه إف كيه",  color: "#6b7280", price: 200, rent: [25, 50, 100, 200],             type: "property" },
+  { id: 24, name: "Santiago",      nameAr: "سانتياغو",         color: "#eab308", price: 260, rent: [22, 110, 330, 800, 975, 1150], type: "property", flag: "CL" },
+  { id: 25, name: "Montevideo",    nameAr: "مونتيفيديو",       color: "#eab308", price: 260, rent: [22, 110, 330, 800, 975, 1150], type: "property", flag: "UY" },
+  { id: 26, name: "Chance",        nameAr: "فرصة",            color: "#f59e0b", price: 0,   rent: [],                             type: "chance" },
+  { id: 27, name: "Quito",         nameAr: "كيتو",             color: "#eab308", price: 280, rent: [24, 120, 360, 850, 1025, 1200],type: "property", flag: "EC" },
+  { id: 28, name: "San Francisco", nameAr: "سان فرانسيسكو",    color: "#16a34a", price: 300, rent: [26, 130, 390, 900, 1100, 1275],type: "property", flag: "US" },
+  { id: 29, name: "Los Angeles",   nameAr: "لوس أنجلوس",       color: "#16a34a", price: 300, rent: [26, 130, 390, 900, 1100, 1275],type: "property", flag: "US" },
+  { id: 30, name: "Go To Jail",    nameAr: "اذهب للسجن",      color: "#6b7280", price: 0,   rent: [],                             type: "jail" },
+
+  { id: 31, name: "Ottawa",        nameAr: "أوتاوا",           color: "#7c3aed", price: 350, rent: [28, 150, 420, 950, 1150, 1350], type: "property", flag: "CA" },
+  { id: 32, name: "Montreal",      nameAr: "مونتريال",         color: "#7c3aed", price: 350, rent: [28, 150, 420, 950, 1150, 1350], type: "property", flag: "CA" },
+  { id: 33, name: "Continental Power", nameAr: "كهرباء القارة", color: "#06b6d4", price: 150, rent: [4, 10],                        type: "utility" },
+  { id: 34, name: "New York",      nameAr: "نيويورك",          color: "#a855f7", price: 400, rent: [30, 160, 450, 1000, 1200, 1400], type: "property", flag: "US" },
+  { id: 35, name: "Toronto Bay",   nameAr: "تورنتو باي",       color: "#a855f7", price: 400, rent: [30, 160, 450, 1000, 1200, 1400], type: "property", flag: "CA" },
+  { id: 36, name: "Chance",        nameAr: "فرصة",             color: "#f59e0b", price: 0,   rent: [],                                type: "chance" },
+  { id: 37, name: "São Paulo Ave", nameAr: "شارع ساو باولو",   color: "#a855f7", price: 420, rent: [32, 170, 480, 1050, 1250, 1500], type: "property", flag: "BR" },
+  { id: 38, name: "Chest",         nameAr: "صندوق",           color: "#3b82f6", price: 0,   rent: [],                                type: "chest" },
+  { id: 39, name: "Buenos Aires Sur", nameAr: "بوينس آيرس الجنوبية", color: "#a855f7", price: 450, rent: [35, 180, 500, 1100, 1300, 1550], type: "property", flag: "AR" },
+];
+
+const MAPS: Record<MapId, Property[]> = {
+  middle_east: MIDDLE_EAST_BOARD,
+  europe: EUROPE_BOARD,
+  americas: AMERICAS_BOARD,
+};
 
 type Phase = "lobby" | "playing" | "finished";
 
@@ -117,6 +222,9 @@ export class RentoGame implements GameRoom {
   freeParkingBonus: number;
   turnTimerMs: number;
   aiDifficulty: "easy" | "medium" | "hard";
+  readonly mapId: MapId;
+  readonly board: Property[];
+  readonly backgroundId: string;
 
   private callbacks: GameRoomCallbacks;
   private turnTimer: NodeJS.Timeout | null = null;
@@ -125,7 +233,7 @@ export class RentoGame implements GameRoom {
 
   constructor(
     roomId: string,
-    options: { maxPlayers?: number; startingBalance?: number; jailEnabled?: boolean; freeParkingBonus?: number; turnTimer?: number; aiDifficulty?: "easy" | "medium" | "hard" },
+    options: { maxPlayers?: number; startingBalance?: number; jailEnabled?: boolean; freeParkingBonus?: number; turnTimer?: number; aiDifficulty?: "easy" | "medium" | "hard"; mapId?: string; backgroundId?: string },
     callbacks: GameRoomCallbacks,
   ) {
     this.roomId = roomId;
@@ -133,8 +241,11 @@ export class RentoGame implements GameRoom {
     this.startingBalance = Math.max(200, Math.min(10000, options?.startingBalance || 1500));
     this.jailEnabled = options?.jailEnabled !== false;
     this.freeParkingBonus = Math.max(0, options?.freeParkingBonus || 0);
-    this.turnTimerMs = Math.max(5000, Math.min(60000, options?.turnTimer || 15000));
+    this.turnTimerMs = Math.max(30000, Math.min(120000, options?.turnTimer || 45000));
     this.aiDifficulty = options?.aiDifficulty || "medium";
+    this.mapId = options?.mapId && options.mapId in MAPS ? (options.mapId as MapId) : "middle_east";
+    this.board = MAPS[this.mapId];
+    this.backgroundId = (BACKGROUND_IDS as readonly string[]).includes(options?.backgroundId ?? "") ? options!.backgroundId! : "nebula";
     this.callbacks = callbacks;
   }
 
@@ -234,7 +345,7 @@ export class RentoGame implements GameRoom {
         this.doublesCount = 0;
         this.nextTurn();
       }
-    }, 15000);
+    }, this.turnTimerMs);
     this.turnTimer.unref?.();
   }
 
@@ -360,7 +471,7 @@ export class RentoGame implements GameRoom {
 
   private advance(ps: PlayerState, total: number): boolean {
     const oldPos = ps.position;
-    ps.position = (ps.position + total) % BOARD.length;
+    ps.position = (ps.position + total) % this.board.length;
     return ps.position < oldPos;
   }
 
@@ -368,7 +479,7 @@ export class RentoGame implements GameRoom {
     const ps = this.playerStates.get(playerId);
     if (!ps) return;
 
-    const cell = BOARD[ps.position];
+    const cell = this.board[ps.position];
     const name = this.getPlayerName(playerId);
 
     switch (cell.type) {
@@ -430,8 +541,8 @@ export class RentoGame implements GameRoom {
       } else if (owner !== playerId) {
         const ownerState = this.playerStates.get(owner);
         if (ownerState) {
-          const colorCount = BOARD.filter(c => c.color === cell.color && (c.type === "property" || c.type === "utility")).length;
-          const ownedCount = ownerState.properties.filter(pid => BOARD[pid]?.color === cell.color).length;
+          const colorCount = this.board.filter(c => c.color === cell.color && (c.type === "property" || c.type === "utility")).length;
+          const ownedCount = ownerState.properties.filter(pid => this.board[pid]?.color === cell.color).length;
           const houses = Math.floor(ownedCount / Math.max(1, colorCount));
           const rentIdx = Math.min(houses, cell.rent.length - 1);
           let rent = cell.rent[rentIdx];
@@ -471,7 +582,7 @@ export class RentoGame implements GameRoom {
     const ps = this.playerStates.get(playerId);
     if (!ps) return { success: false, error: "No player state" };
 
-    const cell = BOARD[ps.position];
+    const cell = this.board[ps.position];
     if (cell.type !== "property" && cell.type !== "utility") return { success: false, error: "Not a property" };
     if (this.getPropertyOwner(cell.id)) return { success: false, error: "Already owned" };
     if (ps.money < cell.price) return { success: false, error: "Not enough money" };
@@ -479,12 +590,15 @@ export class RentoGame implements GameRoom {
     ps.money -= cell.price;
     ps.properties.push(cell.id);
 
+    const name = this.getPlayerName(playerId);
+    this.lastAction = `${name} bought ${cell.name} for $${cell.price}!`;
+
     const color = cell.color;
-    const allColorProps = BOARD.filter(c => c.color === color && (c.type === "property" || c.type === "utility")).map(c => c.id);
+    const allColorProps = this.board.filter(c => c.color === color && (c.type === "property" || c.type === "utility")).map(c => c.id);
     const ownedColorProps = ps.properties.filter(pid => allColorProps.includes(pid));
     if (ownedColorProps.length === allColorProps.length && !ps.upgradedColors.has(color)) {
       ps.upgradedColors.add(color);
-      this.lastAction = `${this.getPlayerName(playerId)} completed ${color} set — rent doubled!`;
+      this.lastAction = `${name} bought ${cell.name} and completed the set — rent doubled!`;
     }
 
     this.lastActivityAt = Date.now();
@@ -583,8 +697,12 @@ export class RentoGame implements GameRoom {
     if (votes.has(voterId)) votes.delete(voterId);
     else votes.add(voterId);
 
+    // Threshold is 60% of ALL human players (including the target), not just of the
+    // remaining accusers — otherwise a 1v1 lets one player unilaterally kick the other.
+    // e.g. 2/3, 3/4, 3/5.
+    const totalHumans = this.players.filter((p) => !p.isBot).length;
     const eligible = this.players.filter((p) => !p.isBot && p.id !== targetPlayerId);
-    const threshold = Math.floor(eligible.length / 2) + 1;
+    const threshold = Math.ceil(totalHumans * 0.6);
 
     if (eligible.length > 0 && votes.size >= threshold) {
       this.eliminatePlayer(targetPlayerId, `${this.getPlayerName(targetPlayerId)} was voted out!`);
@@ -713,7 +831,7 @@ export class RentoGame implements GameRoom {
   private updateColorUpgrades(ps: PlayerState) {
     ps.upgradedColors.clear();
     const colorGroups = new Map<string, number[]>();
-    for (const cell of BOARD) {
+    for (const cell of this.board) {
       if (cell.type === "property" || cell.type === "utility") {
         if (!colorGroups.has(cell.color)) colorGroups.set(cell.color, []);
         colorGroups.get(cell.color)!.push(cell.id);
@@ -769,7 +887,7 @@ export class RentoGame implements GameRoom {
     // Step 2: After landing (800ms delay built into rollDice), decide to buy
     setTimeout(() => {
       if (this.phase !== "playing") return;
-      const cell = BOARD[ps.position];
+      const cell = this.board[ps.position];
       const isProperty = cell.type === "property" || cell.type === "utility";
       const isOwned = this.getPropertyOwner(cell.id) !== null;
       const canAfford = ps.money >= cell.price;
@@ -815,7 +933,9 @@ export class RentoGame implements GameRoom {
       gameId: this.gameId,
       phase: this.phase,
       maxPlayers: this.maxPlayers,
-      board: BOARD,
+      mapId: this.mapId,
+      backgroundId: this.backgroundId,
+      board: this.board,
       players: this.players.map((p) => {
         const ps = this.playerStates.get(p.id);
         return {
