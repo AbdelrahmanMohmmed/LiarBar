@@ -5,7 +5,7 @@ import { useLanguage } from "@/lib/languageContext";
 import { localeToFlag } from "@/lib/utils";
 import { Seo } from "@/lib/seo";
 import { COLORS, uiFont } from "@/pages/domino/theme";
-import { Panel, Field, TabButton, PrimaryButton, inputStyle } from "@/pages/domino/ui";
+import { Panel, Field, TabButton, PrimaryButton, PillToggle, inputStyle } from "@/pages/domino/ui";
 
 const COPY = {
   ar: {
@@ -37,6 +37,15 @@ const COPY = {
     codeRequired: "اكتب رمز الغرفة",
     off: "معطل",
     seconds: "ثانية",
+    map: "الخريطة",
+    mapMiddleEast: "الشرق الأوسط",
+    mapEurope: "أوروبا",
+    mapAmericas: "الأمريكتين",
+    background: "الخلفية",
+    bgNebula: "سديم",
+    bgOcean: "محيط",
+    bgSunset: "غروب",
+    bgEmerald: "زمردي",
   },
   en: {
     back: "Home",
@@ -67,8 +76,30 @@ const COPY = {
     codeRequired: "Enter a room code",
     off: "Off",
     seconds: "seconds",
+    map: "Map",
+    mapMiddleEast: "Middle East",
+    mapEurope: "Europe",
+    mapAmericas: "Americas",
+    background: "Background",
+    bgNebula: "Nebula",
+    bgOcean: "Ocean",
+    bgSunset: "Sunset",
+    bgEmerald: "Emerald",
   },
 } as const;
+
+const MAP_OPTIONS = [
+  { id: "middle_east" as const, color: "#3AA6A6" },
+  { id: "europe" as const, color: "#FED23F" },
+  { id: "americas" as const, color: "#E8574A" },
+];
+
+const BACKGROUND_OPTIONS = [
+  { id: "nebula" as const, gradient: "linear-gradient(135deg, #2dd4bf, #c084fc, #f5a524)" },
+  { id: "ocean" as const, gradient: "linear-gradient(135deg, #2dd4bf, #38bdf8, #818cf8)" },
+  { id: "sunset" as const, gradient: "linear-gradient(135deg, #f5a524, #fb7185, #e879f9)" },
+  { id: "emerald" as const, gradient: "linear-gradient(135deg, #2dd4bf, #22c55e, #a3e635)" },
+];
 
 export default function RentoHome() {
   const navigate = useNavigate();
@@ -86,8 +117,10 @@ export default function RentoHome() {
   const [startingBalance, setStartingBalance] = useState("1500");
   const [jailEnabled, setJailEnabled] = useState(true);
   const [freeParking, setFreeParking] = useState("0");
-  const [turnTimer, setTurnTimer] = useState("0");
+  const [turnTimer, setTurnTimer] = useState(45); // seconds
   const [aiDifficulty, setAiDifficulty] = useState<"easy" | "medium" | "hard">("medium");
+  const [mapId, setMapId] = useState<"middle_east" | "europe" | "americas">("middle_east");
+  const [backgroundId, setBackgroundId] = useState<"nebula" | "ocean" | "sunset" | "emerald">("nebula");
   const [joinRoomId, setJoinRoomId] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -118,9 +151,11 @@ export default function RentoHome() {
         parseInt(startingBalance, 10),
         jailEnabled,
         parseInt(freeParking, 10),
-        parseInt(turnTimer, 10),
+        turnTimer * 1000,
         aiDifficulty,
         localeToFlag(),
+        mapId,
+        backgroundId,
       );
       navigate(`/rento/room/${roomId}`);
     } catch (err) {
@@ -128,7 +163,7 @@ export default function RentoHome() {
     } finally {
       setIsLoading(false);
     }
-  }, [playerName, maxPlayers, startingBalance, jailEnabled, freeParking, turnTimer, aiDifficulty, createRoom, navigate, addToast, c]);
+  }, [playerName, maxPlayers, startingBalance, jailEnabled, freeParking, turnTimer, aiDifficulty, mapId, backgroundId, createRoom, navigate, addToast, c]);
 
   const handleJoin = useCallback(async () => {
     if (!playerName.trim()) {
@@ -223,6 +258,56 @@ export default function RentoHome() {
 
           {tab === "create" ? (
             <div>
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: "block", fontSize: 13, color: COLORS.textSecondary, marginBottom: 6, textAlign }}>
+                  {c.map}
+                </label>
+                <div style={{ display: "flex", gap: 8 }}>
+                  {MAP_OPTIONS.map((m) => (
+                    <PillToggle
+                      key={m.id}
+                      active={mapId === m.id}
+                      onClick={() => setMapId(m.id)}
+                      color={m.color}
+                      label={m.id === "middle_east" ? c.mapMiddleEast : m.id === "europe" ? c.mapEurope : c.mapAmericas}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ display: "block", fontSize: 13, color: COLORS.textSecondary, marginBottom: 6, textAlign }}>
+                  {c.background}
+                </label>
+                <div style={{ display: "flex", gap: 10 }}>
+                  {BACKGROUND_OPTIONS.map((b) => {
+                    const active = backgroundId === b.id;
+                    const label = b.id === "nebula" ? c.bgNebula : b.id === "ocean" ? c.bgOcean : b.id === "sunset" ? c.bgSunset : c.bgEmerald;
+                    return (
+                      <button
+                        key={b.id}
+                        type="button"
+                        onClick={() => setBackgroundId(b.id)}
+                        disabled={isLoading}
+                        title={label}
+                        style={{
+                          width: 52,
+                          height: 52,
+                          borderRadius: 14,
+                          border: active ? `3px solid ${COLORS.ink}` : "2px solid rgba(43,36,32,0.25)",
+                          background: b.gradient,
+                          cursor: isLoading ? "not-allowed" : "pointer",
+                          boxShadow: active ? "0 0 0 2px " + COLORS.gold : "none",
+                          transform: active ? "scale(1.05)" : "scale(1)",
+                          transition: "all 0.15s",
+                          padding: 0,
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
                 <div>
                   <label style={{ display: "block", fontSize: 13, color: COLORS.textSecondary, marginBottom: 6, textAlign }}>
@@ -291,39 +376,51 @@ export default function RentoHome() {
                 </div>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
-                <div>
-                  <label style={{ display: "block", fontSize: 13, color: COLORS.textSecondary, marginBottom: 6, textAlign }}>
-                    {c.turnTimer}
-                  </label>
-                  <select
-                    style={selectStyle}
-                    value={turnTimer}
-                    onChange={(e) => setTurnTimer(e.target.value)}
-                    disabled={isLoading}
-                  >
-                    <option value="0">{c.off}</option>
-                    <option value="30000">30 {c.seconds}</option>
-                    <option value="45000">45 {c.seconds}</option>
-                    <option value="60000">60 {c.seconds}</option>
-                  </select>
-                </div>
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13, color: COLORS.textSecondary, marginBottom: 6, textAlign }}>
+                  <span>{c.turnTimer}</span>
+                  <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <input
+                      type="number"
+                      min={30}
+                      max={120}
+                      value={turnTimer}
+                      onChange={(e) => {
+                        const n = parseInt(e.target.value, 10);
+                        if (!Number.isNaN(n)) setTurnTimer(Math.max(30, Math.min(120, n)));
+                      }}
+                      disabled={isLoading}
+                      style={{ width: 52, padding: "2px 6px", borderRadius: 8, border: `1.5px solid ${COLORS.ink}`, fontSize: 13, textAlign: "center", fontWeight: 700, color: COLORS.ink }}
+                    />
+                    <span style={{ fontWeight: 700, color: COLORS.ink }}>{c.seconds}</span>
+                  </span>
+                </label>
+                <input
+                  type="range"
+                  min={30}
+                  max={120}
+                  step={1}
+                  value={turnTimer}
+                  onChange={(e) => setTurnTimer(parseInt(e.target.value, 10))}
+                  disabled={isLoading}
+                  style={{ width: "100%", accentColor: COLORS.teal, cursor: isLoading ? "not-allowed" : "pointer" }}
+                />
+              </div>
 
-                <div>
-                  <label style={{ display: "block", fontSize: 13, color: COLORS.textSecondary, marginBottom: 6, textAlign }}>
-                    {c.aiDifficulty}
-                  </label>
-                  <select
-                    style={selectStyle}
-                    value={aiDifficulty}
-                    onChange={(e) => setAiDifficulty(e.target.value as "easy" | "medium" | "hard")}
-                    disabled={isLoading}
-                  >
-                    <option value="easy">{c.easy}</option>
-                    <option value="medium">{c.medium}</option>
-                    <option value="hard">{c.hard}</option>
-                  </select>
-                </div>
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ display: "block", fontSize: 13, color: COLORS.textSecondary, marginBottom: 6, textAlign }}>
+                  {c.aiDifficulty}
+                </label>
+                <select
+                  style={selectStyle}
+                  value={aiDifficulty}
+                  onChange={(e) => setAiDifficulty(e.target.value as "easy" | "medium" | "hard")}
+                  disabled={isLoading}
+                >
+                  <option value="easy">{c.easy}</option>
+                  <option value="medium">{c.medium}</option>
+                  <option value="hard">{c.hard}</option>
+                </select>
               </div>
 
               <PrimaryButton onClick={handleCreate} disabled={isLoading}>

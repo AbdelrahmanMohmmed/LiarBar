@@ -47,6 +47,9 @@ interface GameActions {
     freeParkingBonus?: number,
     turnTimer?: number,
     aiDifficulty?: "easy" | "medium" | "hard",
+    flag?: string,
+    mapId?: string,
+    backgroundId?: string,
   ) => Promise<{ roomId: string; playerId: string }>;
   joinRoom: (
     roomId: string,
@@ -146,6 +149,10 @@ export const [GameProvider, useGame] = createContextHook(() => {
   const clearToasts = useCallback(() => setToasts([]), []);
 
   const resetGame = useCallback(() => {
+    // Force a real disconnect so the server immediately unbinds this socket's
+    // room session — otherwise the same connection is still "in a room" server-side
+    // and the next create_room/join_room fails with "Already in a room".
+    disconnectSocket();
     setLobbyState(null);
     setGameState(null);
     setCodenamesState(null);
@@ -156,6 +163,8 @@ export const [GameProvider, useGame] = createContextHook(() => {
     setChatMessages([]);
     setToasts([]);
     setError(null);
+    setMyRoomId(null);
+    setMyPlayerId(null);
   }, []);
 
   // Socket setup
@@ -385,6 +394,8 @@ export const [GameProvider, useGame] = createContextHook(() => {
       turnTimer?: number,
       aiDifficulty?: "easy" | "medium" | "hard",
       flag?: string,
+      mapId?: string,
+      backgroundId?: string,
     ): Promise<{ roomId: string; playerId: string }> => {
       connectSocket();
       const res = await emitWithAck<{
@@ -415,6 +426,8 @@ export const [GameProvider, useGame] = createContextHook(() => {
         turnTimer,
         aiDifficulty,
         flag,
+        mapId,
+        backgroundId,
       });
 
       setMyRoomId(res.roomId);

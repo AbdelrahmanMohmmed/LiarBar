@@ -377,8 +377,8 @@ export function registerSocketHandlers(
             }
             if (data.turnTimer !== undefined) {
               const t = Number(data.turnTimer);
-              if (!Number.isFinite(t) || t < 5000 || t > 60000) {
-                fail(callback, "Turn timer must be between 5000 and 60000 ms");
+              if (!Number.isFinite(t) || t < 30000 || t > 120000) {
+                fail(callback, "Turn timer must be between 30 and 120 seconds");
                 return;
               }
             }
@@ -391,6 +391,14 @@ export function registerSocketHandlers(
             }
             if (data.aiDifficulty !== undefined && !["easy", "medium", "hard"].includes(data.aiDifficulty)) {
               fail(callback, "Invalid AI difficulty");
+              return;
+            }
+            if (data.mapId !== undefined && !["middle_east", "europe", "americas"].includes(data.mapId)) {
+              fail(callback, "Invalid map");
+              return;
+            }
+            if (data.backgroundId !== undefined && !["nebula", "ocean", "sunset", "emerald"].includes(data.backgroundId)) {
+              fail(callback, "Invalid background");
               return;
             }
           } else {

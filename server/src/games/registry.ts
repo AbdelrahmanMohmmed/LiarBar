@@ -45,6 +45,8 @@ export interface CreateRoomOptions {
   freeParkingBonus?: number;
   turnTimer?: number;
   aiDifficulty?: "easy" | "medium" | "hard";
+  mapId?: string;
+  backgroundId?: string;
 }
 
 export type GameFactory = (
@@ -180,6 +182,8 @@ registerGame("rento", (roomId, options, callbacks) => {
       freeParkingBonus: Number(options.freeParkingBonus) || 0,
       turnTimer: Number(options.turnTimer) || 15000,
       aiDifficulty: options.aiDifficulty === "easy" || options.aiDifficulty === "hard" ? options.aiDifficulty : "medium",
+      mapId: options.mapId,
+      backgroundId: options.backgroundId,
     },
     callbacks,
   );
