@@ -32,6 +32,7 @@ export default function Game() {
     sendChat,
     addToast,
     reconnectRoom,
+    leaveRoom,
   } = useGame();
 
   const { lang, toggleLang, t } = useLanguage();
@@ -596,7 +597,7 @@ export default function Game() {
           gameState={gameState}
           myPlayerId={myPlayerId!}
           onBackToLobby={() => navigate(`/room/${paramRoomId}`)}
-          onHome={() => { localStorage.removeItem("liarsbar_roomId"); localStorage.removeItem("liarsbar_playerId"); navigate("/"); }}
+          onHome={() => { leaveRoom(); navigate("/"); }}
         />
       )}
     </div>

@@ -59,6 +59,7 @@ export class SnakeLadderGame implements GameRoom {
   private callbacks: GameRoomCallbacks;
   private countdownTimer: NodeJS.Timeout | null = null;
   private turnTimer: NodeJS.Timeout | null = null;
+  private botTimers: NodeJS.Timeout[] = [];
 
   constructor(roomId: string, maxPlayers: number, callbacks: GameRoomCallbacks) {
     this.roomId = roomId;
@@ -168,6 +169,21 @@ export class SnakeLadderGame implements GameRoom {
     }, 20000);
     this.turnTimer.unref?.();
     this.broadcast();
+    this.scheduleBotTurn();
+  }
+
+  private scheduleBotTurn() {
+    const currentId = this.getCurrentPlayerId();
+    const bot = this.players.find((p) => p.id === currentId);
+    if (!bot || !bot.isBot || this.phase !== "playing") return;
+
+    const t = setTimeout(() => {
+      if (this.phase !== "playing" || this.moveLock) return;
+      if (this.getCurrentPlayerId() !== bot.id) return;
+      this.rollDice(bot.id);
+    }, 900 + Math.random() * 800);
+    t.unref?.();
+    this.botTimers.push(t);
   }
 
   private getCurrentPlayerId(): string | null {
@@ -291,5 +307,7 @@ export class SnakeLadderGame implements GameRoom {
   destroy(): void {
     if (this.countdownTimer) { clearInterval(this.countdownTimer); this.countdownTimer = null; }
     if (this.turnTimer) { clearTimeout(this.turnTimer); this.turnTimer = null; }
+    for (const t of this.botTimers) clearTimeout(t);
+    this.botTimers = [];
   }
 }

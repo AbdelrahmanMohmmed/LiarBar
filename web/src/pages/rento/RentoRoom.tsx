@@ -69,7 +69,7 @@ export default function RentoRoom() {
   const navigate = useNavigate();
   const {
     rentoState, myPlayerId, joinRoom, reconnectRoom,
-    startGame, addBot, removeBot, addToast, resetGame,
+    startGame, addBot, removeBot, addToast, leaveRoom,
   } = useGame();
   const { lang } = useLanguage();
   const isAr = lang === "ar";
@@ -151,11 +151,9 @@ export default function RentoRoom() {
   }, [startGame, addToast]);
 
   const handleLeave = useCallback(() => {
-    resetGame();
-    localStorage.removeItem("liarsbar_roomId");
-    localStorage.removeItem("liarsbar_playerId");
+    leaveRoom();
     navigate("/rento");
-  }, [resetGame, navigate]);
+  }, [leaveRoom, navigate]);
 
   if (!reconnected) {
     return (

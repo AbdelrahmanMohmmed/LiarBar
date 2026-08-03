@@ -77,6 +77,7 @@ interface GameActions {
   ) => void;
   clearToasts: () => void;
   resetGame: () => void;
+  leaveRoom: () => void;
   codenamesJoinTeam: (team: CodenamesTeam, role: CodenamesRole) => Promise<void>;
   codenamesGiveClue: (word: string, count: number) => Promise<void>;
   codenamesGuess: (cardIndex: number) => Promise<void>;
@@ -166,6 +167,18 @@ export const [GameProvider, useGame] = createContextHook(() => {
     setMyRoomId(null);
     setMyPlayerId(null);
   }, []);
+
+  // Single entry point for "leave the room and go home" — every leave button
+  // across the app should call this instead of duplicating the reset + cleanup.
+  const leaveRoom = useCallback(() => {
+    resetGame();
+    try {
+      localStorage.removeItem(LS_ROOM_ID);
+      localStorage.removeItem(LS_PLAYER_ID);
+    } catch {
+      /* ignore */
+    }
+  }, [resetGame]);
 
   // Socket setup
   useEffect(() => {
@@ -698,6 +711,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
     addToast,
     clearToasts,
     resetGame,
+    leaveRoom,
     codenamesJoinTeam,
     codenamesGiveClue,
     codenamesGuess,

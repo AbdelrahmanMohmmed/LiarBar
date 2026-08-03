@@ -66,7 +66,7 @@ export default function HigherLowerRoom() {
   const navigate = useNavigate();
   const {
     higherLowerState, myPlayerId, myRoomId, joinRoom, reconnectRoom,
-    startGame, addBot, removeBot, addToast, resetGame,
+    startGame, addBot, removeBot, addToast, leaveRoom,
   } = useGame();
   const { lang } = useLanguage();
   const isAr = lang === "ar";
@@ -168,11 +168,9 @@ export default function HigherLowerRoom() {
   }, [startGame, addToast]);
 
   const handleLeave = useCallback(() => {
-    resetGame();
-    localStorage.removeItem("liarsbar_roomId");
-    localStorage.removeItem("liarsbar_playerId");
+    leaveRoom();
     navigate("/higher-lower");
-  }, [resetGame, navigate]);
+  }, [leaveRoom, navigate]);
 
   if (!reconnected) {
     return (

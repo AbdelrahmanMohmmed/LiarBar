@@ -13,7 +13,7 @@ import MemoryPuzzleLobbyGame from "./games/MemoryPuzzleLobbyGame";
 import TetrisLobbyGame from "./games/TetrisLobbyGame";
 import RentoLobbyGame from "./games/RentoLobbyGame";
 import SnakeLadderLobbyGame from "./games/SnakeLadderLobbyGame";
-import FighterGame from "../arcade/FighterGame";
+import FighterLobbyGame from "./games/FighterLobbyGame";
 import {
   ArrowLeft,
   Crown,
@@ -43,6 +43,7 @@ export default function LobbyRoom() {
     lobbyReturnToLobby,
     addToast,
     addBot,
+    leaveRoom,
   } = useGame();
   const { t, lang } = useLanguage();
 
@@ -82,6 +83,16 @@ export default function LobbyRoom() {
 
   // Rento options
   const [rentoMaxPlayers, setRentoMaxPlayers] = useState("4");
+  const [rentoMapId, setRentoMapId] = useState<"middle_east" | "europe" | "americas">("middle_east");
+  const [rentoBackgroundId, setRentoBackgroundId] = useState<"nebula" | "ocean" | "sunset" | "emerald">("nebula");
+  const [rentoStartingBalance, setRentoStartingBalance] = useState("1500");
+  const [rentoJailEnabled, setRentoJailEnabled] = useState(true);
+  const [rentoFreeParking, setRentoFreeParking] = useState("0");
+  const [rentoTurnTimer, setRentoTurnTimer] = useState("45");
+  const [rentoAiDifficulty, setRentoAiDifficulty] = useState<"easy" | "medium" | "hard">("medium");
+
+  // Memory Puzzle options
+  const [mpDifficulty, setMpDifficulty] = useState<"easy" | "medium" | "hard">("medium");
 
   const isInRoom = myPlayerId && lobbyState?.players.some((p) => p.id === myPlayerId);
   const me = lobbyState?.players.find((p) => p.id === myPlayerId);
@@ -163,10 +174,25 @@ export default function LobbyRoom() {
         if (selectedGame === "tictactoe") {
           options = { winTarget: parseInt(tttWinTarget) };
         }
+        if (selectedGame === "memory-puzzle") {
+          options = { difficulty: mpDifficulty };
+        }
       } else if (selectedGame === "rento") {
-        options = { maxPlayers: parseInt(rentoMaxPlayers) };
+        options = {
+          maxPlayers: parseInt(rentoMaxPlayers),
+          mapId: rentoMapId,
+          backgroundId: rentoBackgroundId,
+          startingBalance: parseInt(rentoStartingBalance),
+          jailEnabled: rentoJailEnabled,
+          freeParkingBonus: parseInt(rentoFreeParking),
+          turnTimer: parseInt(rentoTurnTimer) * 1000,
+          aiDifficulty: rentoAiDifficulty,
+        };
       } else if (selectedGame === "fighter") {
-        options = {};
+        options = {
+          winTarget: parseInt(fighterWins),
+          theme: fighterTheme,
+        };
       }
 
       await lobbyStartGame(selectedGame, options);
@@ -189,6 +215,15 @@ export default function LobbyRoom() {
     fighterWins,
     fighterTheme,
     rentoMaxPlayers,
+    rentoMapId,
+    rentoBackgroundId,
+    rentoStartingBalance,
+    rentoJailEnabled,
+    rentoFreeParking,
+    rentoTurnTimer,
+    rentoAiDifficulty,
+    mpDifficulty,
+    tttWinTarget,
     lobbyStartGame,
     addToast,
   ]);
@@ -277,7 +312,7 @@ export default function LobbyRoom() {
         {lobbyState.activeGameId === "snake" && <SnakeLobbyGame />}
         {lobbyState.activeGameId === "tictactoe" && <TicTacToeLobbyGame />}
         {lobbyState.activeGameId === "space-invaders" && <SpaceInvadersLobbyGame />}
-        {lobbyState.activeGameId === "fighter" && <FighterGame />}
+        {lobbyState.activeGameId === "fighter" && <FighterLobbyGame />}
         {lobbyState.activeGameId === "memory-puzzle" && <MemoryPuzzleLobbyGame />}
         {lobbyState.activeGameId === "tetris" && <TetrisLobbyGame />}
         {lobbyState.activeGameId === "rento" && <RentoLobbyGame />}
@@ -294,8 +329,7 @@ export default function LobbyRoom() {
         <div className="flex items-center justify-between border-b border-purple-950/30 pb-4">
           <button
             onClick={() => {
-              localStorage.removeItem("liarsbar_roomId");
-              localStorage.removeItem("liarsbar_playerId");
+              leaveRoom();
               navigate("/");
             }}
             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-purple-300/60 hover:text-white hover:bg-purple-950/40 transition-all text-xs"
@@ -610,9 +644,37 @@ export default function LobbyRoom() {
                   {selectedGame === "fighter" && (
                     <div className="space-y-3">
                       <h3 className="font-black text-purple-400 border-b border-purple-950/20 pb-1.5">Fighter Settings</h3>
+                      <div className="grid grid-cols-2 gap-3">
+                        <label className="space-y-1 block">
+                          <span className="text-purple-300/70 block">Rounds to Win</span>
+                          <select
+                            value={fighterWins}
+                            onChange={(e) => setFighterWins(e.target.value)}
+                            className="w-full bg-[#271533] border border-purple-900/40 rounded px-2 py-1.5 text-white focus:outline-none"
+                          >
+                            <option value="1">1</option>
+                            <option value="3">3</option>
+                            <option value="5">5</option>
+                          </select>
+                        </label>
+                        <label className="space-y-1 block">
+                          <span className="text-purple-300/70 block">Theme</span>
+                          <select
+                            value={fighterTheme}
+                            onChange={(e) => setFighterTheme(e.target.value as typeof fighterTheme)}
+                            className="w-full bg-[#271533] border border-purple-900/40 rounded px-2 py-1.5 text-white focus:outline-none"
+                          >
+                            <option value="default">Default</option>
+                            <option value="night">Night</option>
+                            <option value="sunset">Sunset</option>
+                            <option value="cyber">Cyber</option>
+                          </select>
+                        </label>
+                      </div>
                       <p className="text-purple-300/50 text-[10px] leading-snug">
-                        Local 2-player brawl on the same screen. P1: A/D move, W jump, J hand, K kick, L block, I special.
-                        P2: Arrow keys, N jump, H hand, M kick, U block, O special.
+                        Real-time online brawl — each player controls their own fighter from their
+                        own device. Move, jump, punch, kick, block, and unleash your special when
+                        your meter is full. First to the target round wins takes the match!
                       </p>
                     </div>
                   )}
@@ -620,6 +682,18 @@ export default function LobbyRoom() {
                   {selectedGame === "memory-puzzle" && (
                     <div className="space-y-3">
                       <h3 className="font-black text-purple-400 border-b border-purple-950/20 pb-1.5">Memory Puzzle Settings</h3>
+                      <label className="space-y-1 block">
+                        <span className="text-purple-300/70 block">Bot Difficulty</span>
+                        <select
+                          value={mpDifficulty}
+                          onChange={(e) => setMpDifficulty(e.target.value as typeof mpDifficulty)}
+                          className="w-full bg-[#271533] border border-purple-900/40 rounded px-2 py-1.5 text-white focus:outline-none"
+                        >
+                          <option value="easy">Easy</option>
+                          <option value="medium">Medium</option>
+                          <option value="hard">Hard</option>
+                        </select>
+                      </label>
                       <p className="text-purple-300/50 text-[10px] leading-snug">
                         Players take turns flipping cards to find matching pairs. The player
                         with the most matches when all pairs are found wins!
@@ -655,9 +729,94 @@ export default function LobbyRoom() {
                             <option value="6">6</option>
                           </select>
                         </label>
+                        <label className="space-y-1 block">
+                          <span className="text-purple-300/70 block">Map</span>
+                          <select
+                            value={rentoMapId}
+                            onChange={(e) => setRentoMapId(e.target.value as typeof rentoMapId)}
+                            className="w-full bg-[#271533] border border-purple-900/40 rounded px-2 py-1.5 text-white focus:outline-none"
+                          >
+                            <option value="middle_east">Middle East</option>
+                            <option value="europe">Europe</option>
+                            <option value="americas">Americas</option>
+                          </select>
+                        </label>
+                        <label className="space-y-1 block">
+                          <span className="text-purple-300/70 block">Background</span>
+                          <select
+                            value={rentoBackgroundId}
+                            onChange={(e) => setRentoBackgroundId(e.target.value as typeof rentoBackgroundId)}
+                            className="w-full bg-[#271533] border border-purple-900/40 rounded px-2 py-1.5 text-white focus:outline-none"
+                          >
+                            <option value="nebula">Nebula</option>
+                            <option value="ocean">Ocean</option>
+                            <option value="sunset">Sunset</option>
+                            <option value="emerald">Emerald</option>
+                          </select>
+                        </label>
+                        <label className="space-y-1 block">
+                          <span className="text-purple-300/70 block">Starting Balance</span>
+                          <select
+                            value={rentoStartingBalance}
+                            onChange={(e) => setRentoStartingBalance(e.target.value)}
+                            className="w-full bg-[#271533] border border-purple-900/40 rounded px-2 py-1.5 text-white focus:outline-none"
+                          >
+                            <option value="1500">$1500</option>
+                            <option value="3000">$3000</option>
+                            <option value="6000">$6000</option>
+                          </select>
+                        </label>
+                        <label className="space-y-1 block">
+                          <span className="text-purple-300/70 block">Jail</span>
+                          <select
+                            value={rentoJailEnabled ? "on" : "off"}
+                            onChange={(e) => setRentoJailEnabled(e.target.value === "on")}
+                            className="w-full bg-[#271533] border border-purple-900/40 rounded px-2 py-1.5 text-white focus:outline-none"
+                          >
+                            <option value="on">Enabled</option>
+                            <option value="off">Disabled</option>
+                          </select>
+                        </label>
+                        <label className="space-y-1 block">
+                          <span className="text-purple-300/70 block">Free Parking Bonus</span>
+                          <select
+                            value={rentoFreeParking}
+                            onChange={(e) => setRentoFreeParking(e.target.value)}
+                            className="w-full bg-[#271533] border border-purple-900/40 rounded px-2 py-1.5 text-white focus:outline-none"
+                          >
+                            <option value="0">None</option>
+                            <option value="200">$200</option>
+                            <option value="500">$500</option>
+                          </select>
+                        </label>
+                        <label className="space-y-1 block">
+                          <span className="text-purple-300/70 block">Turn Timer</span>
+                          <select
+                            value={rentoTurnTimer}
+                            onChange={(e) => setRentoTurnTimer(e.target.value)}
+                            className="w-full bg-[#271533] border border-purple-900/40 rounded px-2 py-1.5 text-white focus:outline-none"
+                          >
+                            <option value="30">30s</option>
+                            <option value="45">45s</option>
+                            <option value="60">60s</option>
+                            <option value="120">120s</option>
+                          </select>
+                        </label>
+                        <label className="space-y-1 block">
+                          <span className="text-purple-300/70 block">Bot Difficulty</span>
+                          <select
+                            value={rentoAiDifficulty}
+                            onChange={(e) => setRentoAiDifficulty(e.target.value as typeof rentoAiDifficulty)}
+                            className="w-full bg-[#271533] border border-purple-900/40 rounded px-2 py-1.5 text-white focus:outline-none"
+                          >
+                            <option value="easy">Easy</option>
+                            <option value="medium">Medium</option>
+                            <option value="hard">Hard</option>
+                          </select>
+                        </label>
                       </div>
                       <p className="text-purple-300/50 text-[10px] leading-snug">
-                        Monopoly-style property trading with Middle Eastern cities. Roll dice, buy
+                        Monopoly-style property trading. Roll dice, buy
                         properties, collect rent. Bots play automatically! Last player with money wins.
                       </p>
                     </div>

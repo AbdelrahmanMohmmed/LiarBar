@@ -78,224 +78,48 @@ export function registerSocketHandlers(
       return m;
     }
 
-    /** Narrow a generic room to the Liar's Bar engine for game actions. */
-    function liarsBarMembership(callback: Ack) {
-      const m = membership();
-      if (!m) {
-        fail(callback, "Not in a room");
-        return null;
-      }
-      let targetRoom = m.room;
-      if (targetRoom instanceof LobbyRoom && targetRoom.activeSubRoom) {
-        targetRoom = targetRoom.activeSubRoom;
-      }
-      if (!(targetRoom instanceof GameManager)) {
-        fail(callback, "Action not supported by this game");
-        return null;
-      }
-      const player = targetRoom.getPlayer(m.player.id) || m.player;
-      return { room: targetRoom, player };
+    /**
+     * Build a membership-narrowing function for a specific game engine: resolves the
+     * caller's room + player, unwraps a LobbyRoom's active sub-room, and confirms the
+     * sub-room is an instance of `GameClass`. Some engines (Liar's Bar, Codenames,
+     * Higher/Lower) keep their own copy of the Player with extra game state, so their
+     * membership must re-resolve the player via `targetRoom.getPlayer()`.
+     */
+    function makeMembership<T extends GameRoom>(
+      GameClass: new (...args: any[]) => T,
+      opts: { resolvePlayer?: boolean } = {},
+    ) {
+      return (callback: Ack): { room: T; player: Player } | null => {
+        const m = membership();
+        if (!m) {
+          fail(callback, "Not in a room");
+          return null;
+        }
+        let targetRoom = m.room;
+        if (targetRoom instanceof LobbyRoom && targetRoom.activeSubRoom) {
+          targetRoom = targetRoom.activeSubRoom;
+        }
+        if (!(targetRoom instanceof GameClass)) {
+          fail(callback, "Action not supported by this game");
+          return null;
+        }
+        const player = opts.resolvePlayer ? targetRoom.getPlayer(m.player.id) || m.player : m.player;
+        return { room: targetRoom, player };
+      };
     }
 
-    /** Narrow a generic room to the Codenames engine for game actions. */
-    function codenamesMembership(callback: Ack) {
-      const m = membership();
-      if (!m) {
-        fail(callback, "Not in a room");
-        return null;
-      }
-      let targetRoom = m.room;
-      if (targetRoom instanceof LobbyRoom && targetRoom.activeSubRoom) {
-        targetRoom = targetRoom.activeSubRoom;
-      }
-      if (!(targetRoom instanceof CodenamesGame)) {
-        fail(callback, "Action not supported by this game");
-        return null;
-      }
-      const player = targetRoom.getPlayer(m.player.id) || m.player;
-      return { room: targetRoom, player };
-    }
-
-    /** Narrow a generic room to the Higher or Lower engine for game actions. */
-    function higherLowerMembership(callback: Ack) {
-      const m = membership();
-      if (!m) {
-        fail(callback, "Not in a room");
-        return null;
-      }
-      let targetRoom = m.room;
-      if (targetRoom instanceof LobbyRoom && targetRoom.activeSubRoom) {
-        targetRoom = targetRoom.activeSubRoom;
-      }
-      if (!(targetRoom instanceof HigherLowerGame)) {
-        fail(callback, "Action not supported by this game");
-        return null;
-      }
-      const player = targetRoom.getPlayer(m.player.id) || m.player;
-      return { room: targetRoom, player };
-    }
-
-    /** Narrow to the Tic-Tac-Toe engine. */
-    function tttMembership(callback: Ack) {
-      const m = membership();
-      if (!m) {
-        fail(callback, "Not in a room");
-        return null;
-      }
-      let targetRoom = m.room;
-      if (targetRoom instanceof LobbyRoom && targetRoom.activeSubRoom) {
-        targetRoom = targetRoom.activeSubRoom;
-      }
-      if (!(targetRoom instanceof TicTacToeGame)) {
-        fail(callback, "Action not supported by this game");
-        return null;
-      }
-      return { room: targetRoom, player: m.player };
-    }
-
-    /** Narrow to the Snake engine. */
-    function snakeMembership(callback: Ack) {
-      const m = membership();
-      if (!m) {
-        fail(callback, "Not in a room");
-        return null;
-      }
-      let targetRoom = m.room;
-      if (targetRoom instanceof LobbyRoom && targetRoom.activeSubRoom) {
-        targetRoom = targetRoom.activeSubRoom;
-      }
-      if (!(targetRoom instanceof SnakeGame)) {
-        fail(callback, "Action not supported by this game");
-        return null;
-      }
-      return { room: targetRoom, player: m.player };
-    }
-
-    /** Narrow to the Space Invaders engine. */
-    function siMembership(callback: Ack) {
-      const m = membership();
-      if (!m) {
-        fail(callback, "Not in a room");
-        return null;
-      }
-      let targetRoom = m.room;
-      if (targetRoom instanceof LobbyRoom && targetRoom.activeSubRoom) {
-        targetRoom = targetRoom.activeSubRoom;
-      }
-      if (!(targetRoom instanceof SpaceInvadersGame)) {
-        fail(callback, "Action not supported by this game");
-        return null;
-      }
-      return { room: targetRoom, player: m.player };
-    }
-
-    /** Narrow to the Fighter engine. */
-    function fighterMembership(callback: Ack) {
-      const m = membership();
-      if (!m) {
-        fail(callback, "Not in a room");
-        return null;
-      }
-      let targetRoom = m.room;
-      if (targetRoom instanceof LobbyRoom && targetRoom.activeSubRoom) {
-        targetRoom = targetRoom.activeSubRoom;
-      }
-      if (!(targetRoom instanceof FighterGame)) {
-        fail(callback, "Action not supported by this game");
-        return null;
-      }
-      return { room: targetRoom, player: m.player };
-    }
-
-    /** Narrow to the Domino engine. */
-    function dominoMembership(callback: Ack) {
-      const m = membership();
-      if (!m) {
-        fail(callback, "Not in a room");
-        return null;
-      }
-      let targetRoom = m.room;
-      if (targetRoom instanceof LobbyRoom && targetRoom.activeSubRoom) {
-        targetRoom = targetRoom.activeSubRoom;
-      }
-      if (!(targetRoom instanceof DominoGame)) {
-        fail(callback, "Action not supported by this game");
-        return null;
-      }
-      return { room: targetRoom, player: m.player };
-    }
-
-    /** Narrow to the Memory Puzzle engine. */
-    function memoryPuzzleMembership(callback: Ack) {
-      const m = membership();
-      if (!m) {
-        fail(callback, "Not in a room");
-        return null;
-      }
-      let targetRoom = m.room;
-      if (targetRoom instanceof LobbyRoom && targetRoom.activeSubRoom) {
-        targetRoom = targetRoom.activeSubRoom;
-      }
-      if (!(targetRoom instanceof MemoryPuzzleGame)) {
-        fail(callback, "Action not supported by this game");
-        return null;
-      }
-      return { room: targetRoom, player: m.player };
-    }
-
-    /** Narrow to the Tetris engine. */
-    function tetrisMembership(callback: Ack) {
-      const m = membership();
-      if (!m) {
-        fail(callback, "Not in a room");
-        return null;
-      }
-      let targetRoom = m.room;
-      if (targetRoom instanceof LobbyRoom && targetRoom.activeSubRoom) {
-        targetRoom = targetRoom.activeSubRoom;
-      }
-      if (!(targetRoom instanceof TetrisGame)) {
-        fail(callback, "Action not supported by this game");
-        return null;
-      }
-      return { room: targetRoom, player: m.player };
-    }
-
-    /** Narrow to the Rento engine. */
-    function rentoMembership(callback: Ack) {
-      const m = membership();
-      if (!m) {
-        fail(callback, "Not in a room");
-        return null;
-      }
-      let targetRoom = m.room;
-      if (targetRoom instanceof LobbyRoom && targetRoom.activeSubRoom) {
-        targetRoom = targetRoom.activeSubRoom;
-      }
-      if (!(targetRoom instanceof RentoGame)) {
-        fail(callback, "Action not supported by this game");
-        return null;
-      }
-      return { room: targetRoom, player: m.player };
-    }
-
-    /** Narrow to the Snake & Ladder engine. */
-    function snakeLadderMembership(callback: Ack) {
-      const m = membership();
-      if (!m) {
-        fail(callback, "Not in a room");
-        return null;
-      }
-      let targetRoom = m.room;
-      if (targetRoom instanceof LobbyRoom && targetRoom.activeSubRoom) {
-        targetRoom = targetRoom.activeSubRoom;
-      }
-      if (!(targetRoom instanceof SnakeLadderGame)) {
-        fail(callback, "Action not supported by this game");
-        return null;
-      }
-      return { room: targetRoom, player: m.player };
-    }
+    const liarsBarMembership = makeMembership(GameManager, { resolvePlayer: true });
+    const codenamesMembership = makeMembership(CodenamesGame, { resolvePlayer: true });
+    const higherLowerMembership = makeMembership(HigherLowerGame, { resolvePlayer: true });
+    const tttMembership = makeMembership(TicTacToeGame);
+    const snakeMembership = makeMembership(SnakeGame);
+    const siMembership = makeMembership(SpaceInvadersGame);
+    const fighterMembership = makeMembership(FighterGame);
+    const dominoMembership = makeMembership(DominoGame);
+    const memoryPuzzleMembership = makeMembership(MemoryPuzzleGame);
+    const tetrisMembership = makeMembership(TetrisGame);
+    const rentoMembership = makeMembership(RentoGame);
+    const snakeLadderMembership = makeMembership(SnakeLadderGame);
 
     // ===== ROOM LIFECYCLE =====
 
@@ -888,7 +712,7 @@ export function registerSocketHandlers(
 
     socket.on(
       "fighter_input",
-      (data: { left?: boolean; right?: boolean; jump?: boolean; attack1?: boolean; attack2?: boolean }, callback: Ack) => {
+      (data: { left?: boolean; right?: boolean; jump?: boolean; attack1?: boolean; attack2?: boolean; special?: boolean; parry?: boolean }, callback: Ack) => {
         const m = fighterMembership(callback);
         if (!m) return;
         const result = m.room.setInput(m.player.id, {
@@ -897,6 +721,8 @@ export function registerSocketHandlers(
           jump: data?.jump,
           attack1: data?.attack1,
           attack2: data?.attack2,
+          special: data?.special,
+          parry: data?.parry,
         });
         if (!result.success) {
           fail(callback, result.error ?? "Invalid input");
@@ -1000,6 +826,51 @@ export function registerSocketHandlers(
         return;
       }
       reply(callback, { success: true, tradeId: result.tradeId });
+    });
+
+    socket.on("rento_edit_trade", (data: unknown, callback: Ack) => {
+      const m = rentoMembership(callback);
+      if (!m) return;
+      const d = data as {
+        tradeId?: string;
+        offerProperties?: number[];
+        offerMoney?: number;
+        requestProperties?: number[];
+        requestMoney?: number;
+      };
+      if (!d.tradeId) {
+        fail(callback, "Missing tradeId");
+        return;
+      }
+      const result = m.room.editTrade(
+        m.player.id,
+        d.tradeId,
+        d.offerProperties ?? [],
+        d.offerMoney ?? 0,
+        d.requestProperties ?? [],
+        d.requestMoney ?? 0
+      );
+      if (!result.success) {
+        fail(callback, result.error ?? "Cannot edit trade");
+        return;
+      }
+      reply(callback, { success: true });
+    });
+
+    socket.on("rento_build_house", (data: unknown, callback: Ack) => {
+      const m = rentoMembership(callback);
+      if (!m) return;
+      const d = data as { propertyId?: number };
+      if (d.propertyId === undefined) {
+        fail(callback, "Missing propertyId");
+        return;
+      }
+      const result = m.room.buildHouse(m.player.id, Number(d.propertyId));
+      if (!result.success) {
+        fail(callback, result.error ?? "Cannot build house");
+        return;
+      }
+      reply(callback, { success: true });
     });
 
     socket.on("rento_accept_trade", (data: unknown, callback: Ack) => {

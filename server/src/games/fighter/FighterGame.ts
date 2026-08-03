@@ -50,6 +50,7 @@ class Fighter {
   stun = 0;
   action: Action = "idle";
   input: InputState = { left: false, right: false, jump: false, attack1: false, attack2: false, parry: false, special: false };
+  difficulty: "easy" | "medium" | "hard" = "medium";
 
   constructor(playerId: string, name: string, color: string, isBot: boolean, x: number, facing: 1 | -1) {
     this.playerId = playerId;
@@ -230,6 +231,7 @@ export class FighterGame implements GameRoom {
   private winTarget = 3;
   private theme = "default";
   private roundTimer: any = null;
+  private botDifficulty: Map<string, "easy" | "medium" | "hard"> = new Map();
 
   constructor(roomId: string, options: any, callbacks: GameRoomCallbacks) {
     this.roomId = roomId;
@@ -255,6 +257,7 @@ export class FighterGame implements GameRoom {
   addBot(name: string, difficulty: "easy" | "medium" | "hard" = "medium"): Player {
     const bot = new Player(randomUUID(), name, true, false);
     this.players.push(bot);
+    this.botDifficulty.set(bot.id, difficulty);
     this.lastActivityAt = Date.now();
     return bot;
   }
@@ -329,9 +332,11 @@ export class FighterGame implements GameRoom {
   }
 
   private assignFighters() {
-    this.fighters = this.players.slice(0, 2).map((p, i) =>
-      new Fighter(p.id, p.name, FIGHTER_COLORS[i % FIGHTER_COLORS.length], p.isBot, i === 0 ? 200 : 824, i === 0 ? 1 : -1),
-    );
+    this.fighters = this.players.slice(0, 2).map((p, i) => {
+      const f = new Fighter(p.id, p.name, FIGHTER_COLORS[i % FIGHTER_COLORS.length], p.isBot, i === 0 ? 200 : 824, i === 0 ? 1 : -1);
+      if (p.isBot) f.difficulty = this.botDifficulty.get(p.id) ?? "medium";
+      return f;
+    });
     this.scores = {};
     for (const p of this.players) this.scores[p.id] = 0;
   }
@@ -403,13 +408,30 @@ export class FighterGame implements GameRoom {
   private botSteer(bot: Fighter, opp: Fighter) {
     const dx = opp.x - bot.x;
     const dir = dx > 0 ? 1 : -1;
+    const dist = Math.abs(dx);
     bot.input = { left: false, right: false, jump: false, attack1: false, attack2: false, parry: false, special: false };
-    if (Math.abs(dx) > 70) {
+
+    const diff = bot.difficulty;
+    const attackRange = diff === "easy" ? 60 : diff === "hard" ? 85 : 70;
+    const attackChance = diff === "easy" ? 0.35 : diff === "hard" ? 0.95 : 0.7;
+    const retreatChance = diff === "hard" ? 0.15 : diff === "easy" ? 0.02 : 0.06;
+    const jumpChance = diff === "easy" ? 0.01 : diff === "hard" ? 0.035 : 0.02;
+
+    if (dist > attackRange) {
       if (dir > 0) bot.input.right = true; else bot.input.left = true;
-    } else {
-      bot.input.attack1 = true;
+    } else if (Math.random() < retreatChance && bot.parryStamina > 20) {
+      // Step back into the auto-block stance instead of trading hits
+      if (dir > 0) bot.input.left = true; else bot.input.right = true;
+    } else if (Math.random() < attackChance) {
+      if (diff === "hard" && bot.specialMeter >= 100 && Math.random() < 0.5) {
+        bot.input.special = true;
+      } else if (diff !== "easy" && Math.random() < 0.3) {
+        bot.input.attack2 = true;
+      } else {
+        bot.input.attack1 = true;
+      }
     }
-    if (bot.y >= GROUND && Math.random() < 0.02) bot.input.jump = true;
+    if (bot.y >= GROUND && Math.random() < jumpChance) bot.input.jump = true;
     // face opponent
     bot.facing = dir > 0 ? 1 : -1;
   }

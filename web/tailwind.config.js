@@ -65,6 +65,10 @@ export default {
           "33%": { transform: "translate(4%, -6%) scale(1.1)" },
           "66%": { transform: "translate(-3%, 5%) scale(0.94)" },
         },
+        "confetti-fall": {
+          "0%": { transform: "translateY(-10px) rotate(0deg)", opacity: "1" },
+          "100%": { transform: "translateY(320px) rotate(360deg)", opacity: "0" },
+        },
       },
       animation: {
         "bubble-in": "bubble-in 0.35s cubic-bezier(0.34,1.56,0.64,1)",
@@ -72,6 +76,7 @@ export default {
         "pulse-glow": "pulse-glow 1.8s ease-out infinite",
         "pop-in": "pop-in 0.25s ease-out",
         "blob-float": "blob-float 20s ease-in-out infinite",
+        "confetti-fall": "confetti-fall 1.8s ease-in forwards",
       },
     },
   },

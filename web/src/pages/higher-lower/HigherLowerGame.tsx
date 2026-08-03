@@ -90,7 +90,7 @@ export default function HigherLowerGame() {
   const {
     lobbyState,
     higherLowerState, myPlayerId, myRoomId, reconnectRoom,
-    higherLowerGuess, higherLowerRematch, sendChat, chatMessages, addToast, resetGame
+    higherLowerGuess, higherLowerRematch, sendChat, chatMessages, addToast, leaveRoom
   } = useGame();
 
   const { lang } = useLanguage();
@@ -234,9 +234,7 @@ export default function HigherLowerGame() {
   };
 
   const handleLeave = () => {
-    resetGame();
-    localStorage.removeItem("liarsbar_roomId");
-    localStorage.removeItem("liarsbar_playerId");
+    leaveRoom();
     navigate("/higher-lower");
   };
 
