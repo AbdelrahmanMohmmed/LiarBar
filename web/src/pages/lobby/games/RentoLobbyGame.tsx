@@ -4,9 +4,9 @@ import { getSocket } from "@/lib/socket";
 import { useLanguage } from "@/lib/languageContext";
 import { VoiceControls } from "@/components/VoiceControls";
 import { MessageCircle, Send, Crown, UserX } from "lucide-react";
-import { codeToEmoji } from "@/lib/utils";
+import { flagImageUrl } from "@/lib/utils";
 
-const CELL_SIZE = 100;      // each tile is 100×100
+const CELL_SIZE = 78;       // each tile is 78×78 — compact board, less vertical scroll
 const CORNER = CELL_SIZE;   // corners are square
 const INNER_TILES = 9;      // tiles between corners on each side
 const BOARD_W = CORNER + INNER_TILES * CELL_SIZE + CORNER; // 1100
@@ -159,6 +159,26 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
   stateRef.current = state;
   const myPlayerId = props?.myPlayerId ?? ctxMyId;
 
+  // Flag display preference (CSS-drawn vs real flag photo), persisted per-browser.
+  // Any previously-stored "emoji" value is treated as "image" (the old emoji mode
+  // was replaced by real flagsapi.com photos).
+  const [flagMode, setFlagMode] = useState<"css" | "image">(() => {
+    try {
+      return localStorage.getItem("rento_flag_mode") === "css" ? "css" : "image";
+    } catch {
+      return "css";
+    }
+  });
+  const flagModeRef = useRef(flagMode);
+  flagModeRef.current = flagMode;
+  const toggleFlagMode = () => {
+    setFlagMode((prev) => {
+      const next = prev === "css" ? "image" : "css";
+      try { localStorage.setItem("rento_flag_mode", next); } catch { /* ignore */ }
+      return next;
+    });
+  };
+
   const [chatOpen, setChatOpen] = useState(false);
   const [chatInput, setChatInput] = useState("");
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -178,6 +198,8 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
 
   // Trade state
   const [showTradeModal, setShowTradeModal] = useState(false);
+  const [editingTradeId, setEditingTradeId] = useState<string | null>(null);
+  const [viewingTradeId, setViewingTradeId] = useState<string | null>(null);
   const [tradeTarget, setTradeTarget] = useState<string>("");
   const [offerProperties, setOfferProperties] = useState<number[]>([]);
   const [offerMoney, setOfferMoney] = useState(0);
@@ -242,13 +264,15 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
   }, [state?.players]);
 
   // Rolling log of recent lastAction messages
-  const [actionLog, setActionLog] = useState<string[]>([]);
+  const [actionLog, setActionLog] = useState<{ id: number; text: string }[]>([]);
   const lastLoggedRef = useRef<string>("");
+  const actionLogSeq = useRef(0);
   useEffect(() => {
     const la = state?.lastAction;
     if (la && la !== lastLoggedRef.current) {
       lastLoggedRef.current = la;
-      setActionLog((prev) => [...prev.slice(-4), la]);
+      actionLogSeq.current += 1;
+      setActionLog((prev) => [...prev.slice(-4), { id: actionLogSeq.current, text: la }]);
     }
   }, [state?.lastAction]);
 
@@ -282,21 +306,47 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
   const declareBankrupt = () => { getSocket().emit("rento_bankrupt"); setShowBankruptConfirm(false); };
   const voteKick = (targetPlayerId: string) => { getSocket().emit("rento_votekick", { targetPlayerId }); };
 
-  const proposeTrade = () => {
-    if (!tradeTarget) return;
-    getSocket().emit("rento_trade", {
-      toPlayerId: tradeTarget,
-      offerProperties,
-      offerMoney,
-      requestProperties,
-      requestMoney,
-    });
+  const resetTradeForm = () => {
     setShowTradeModal(false);
+    setEditingTradeId(null);
     setTradeTarget("");
     setOfferProperties([]);
     setOfferMoney(0);
     setRequestProperties([]);
     setRequestMoney(0);
+  };
+
+  const submitTrade = () => {
+    if (!tradeTarget) return;
+    if (editingTradeId) {
+      getSocket().emit("rento_edit_trade", {
+        tradeId: editingTradeId,
+        offerProperties,
+        offerMoney,
+        requestProperties,
+        requestMoney,
+      });
+    } else {
+      getSocket().emit("rento_trade", {
+        toPlayerId: tradeTarget,
+        offerProperties,
+        offerMoney,
+        requestProperties,
+        requestMoney,
+      });
+    }
+    resetTradeForm();
+  };
+
+  const openEditTrade = (trade: any) => {
+    setEditingTradeId(trade.id);
+    setTradeTarget(trade.toPlayerId);
+    setOfferProperties([...trade.offerProperties]);
+    setOfferMoney(trade.offerMoney);
+    setRequestProperties([...trade.requestProperties]);
+    setRequestMoney(trade.requestMoney);
+    setViewingTradeId(null);
+    setShowTradeModal(true);
   };
 
   const acceptTrade = (tradeId: string) => {
@@ -309,7 +359,10 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
 
   const cancelTrade = (tradeId: string) => {
     getSocket().emit("rento_cancel_trade", { tradeId });
+    setViewingTradeId(null);
   };
+
+  const buildHouse = (propertyId: number) => { getSocket().emit("rento_build_house", { propertyId }); };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -327,6 +380,18 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
     let lastDice: [number, number] = [0, 0];
     let diceRollStart = 0;
     const DICE_ROLL_MS = 550;
+
+    // Real flag images (flagsapi.com), lazily loaded and cached per country code.
+    const flagImgCache: Record<string, HTMLImageElement> = {};
+    const getFlagImg = (code: string): HTMLImageElement => {
+      let img = flagImgCache[code];
+      if (!img) {
+        img = new Image();
+        img.src = flagImageUrl(code, 64) || "";
+        flagImgCache[code] = img;
+      }
+      return img;
+    };
     const pseudoRand = (seed: number) => {
       const x = Math.sin(seed) * 10000;
       return x - Math.floor(x);
@@ -452,9 +517,11 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
         // Ownership lookup — used both to boost the flag's vividness and to draw
         // the border below, so the player's own color is consistent everywhere.
         let ownerColor: string | null = null;
+        let ownerHouses = 0;
         for (let pi = 0; pi < (st.players?.length ?? 0); pi++) {
           if (st.players[pi].properties?.includes(cell.id)) {
             ownerColor = PLAYER_COLORS[pi % PLAYER_COLORS.length];
+            ownerHouses = st.players[pi].houses?.[cell.id] ?? 0;
             break;
           }
         }
@@ -465,12 +532,25 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
         ctx.clip();
 
         if (cc) {
-          // Draw the flag full-bleed and vivid — once it's owned, boost its
-          // saturation so it visibly "pops" — only scrim small strips behind
-          // the text (top name, bottom price) so the flag colors stay clear.
-          if (ownerColor) ctx.filter = "saturate(180%) brightness(1.12) contrast(1.06)";
-          drawFlag(ctx, cc, px, py, pos.w, pos.h);
-          ctx.filter = "none";
+          if (flagModeRef.current === "image") {
+            const img = getFlagImg(cc);
+            if (img.complete && img.naturalWidth) {
+              if (ownerColor) ctx.filter = "saturate(180%) brightness(1.12) contrast(1.06)";
+              ctx.drawImage(img, px, py, pos.w, pos.h);
+              ctx.filter = "none";
+            } else {
+              // Still loading — subtle placeholder so the tile isn't blank for a frame.
+              ctx.fillStyle = "rgba(255,255,255,0.06)";
+              ctx.fillRect(px, py, pos.w, pos.h);
+            }
+          } else {
+            // Draw the flag full-bleed and vivid — once it's owned, boost its
+            // saturation so it visibly "pops".
+            if (ownerColor) ctx.filter = "saturate(180%) brightness(1.12) contrast(1.06)";
+            drawFlag(ctx, cc, px, py, pos.w, pos.h);
+            ctx.filter = "none";
+          }
+          // Scrim small strips behind the text (top name, bottom price) either way.
           const topScrim = ctx.createLinearGradient(px, py, px, py + pos.h * 0.3);
           topScrim.addColorStop(0, "rgba(0,0,0,0.6)");
           topScrim.addColorStop(1, "rgba(0,0,0,0)");
@@ -496,6 +576,17 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
         }
         ctx.restore();
 
+        // Unowned properties/utilities get a dim overlay so it's obvious at a
+        // glance which tiles are still up for grabs — cleared once bought.
+        if (!ownerColor && (cell.type === "property" || cell.type === "utility")) {
+          ctx.save();
+          roundRect(ctx, px + 1, py + 1, pos.w - 2, pos.h - 2, TR);
+          ctx.clip();
+          ctx.fillStyle = "rgba(10,8,16,0.4)";
+          ctx.fillRect(px, py, pos.w, pos.h);
+          ctx.restore();
+        }
+
         // No default border — only owned tiles get a border, in the buying
         // player's own color, so ownership reads identically everywhere.
 
@@ -504,38 +595,38 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
         ctx.textAlign = "center";
 
         if (isCorner) {
-          ctx.font = "bold 16px 'Baloo 2', sans-serif";
+          ctx.font = "bold 13px 'Baloo 2', sans-serif";
           ctx.fillStyle = "#fbbf24";
-          ctx.fillText(name, px + pos.w / 2, py + pos.h / 2 - 4);
+          ctx.fillText(name, px + pos.w / 2, py + pos.h / 2 - 3);
           if (cell.type === "start") {
-            ctx.font = "18px sans-serif";
-            ctx.fillText("▶", px + pos.w / 2, py + pos.h / 2 + 18);
+            ctx.font = "15px sans-serif";
+            ctx.fillText("▶", px + pos.w / 2, py + pos.h / 2 + 14);
           } else if (cell.type === "jail") {
-            ctx.font = "16px sans-serif";
-            ctx.fillText(i === 10 ? "🔒" : "🚔", px + pos.w / 2, py + pos.h / 2 + 18);
+            ctx.font = "13px sans-serif";
+            ctx.fillText(i === 10 ? "🔒" : "🚔", px + pos.w / 2, py + pos.h / 2 + 14);
           } else if (cell.type === "go") {
-            ctx.font = "16px sans-serif";
-            ctx.fillText("🅿", px + pos.w / 2, py + pos.h / 2 + 18);
+            ctx.font = "13px sans-serif";
+            ctx.fillText("🅿", px + pos.w / 2, py + pos.h / 2 + 14);
           }
         } else if (cc) {
           // Full-flag tile: name at top, price at bottom — bigger, with a drop
           // shadow (not a solid scrim) so the flag's real colors stay vivid.
           ctx.save();
           ctx.shadowColor = "rgba(0,0,0,0.85)";
-          ctx.shadowBlur = 4;
-          ctx.font = "bold 15px 'Baloo 2', sans-serif";
+          ctx.shadowBlur = 3;
+          ctx.font = "bold 11.5px 'Baloo 2', sans-serif";
           ctx.fillStyle = "#fff";
           // Wrap name at top
           const maxW = pos.w - 4;
           const words = name.split(" ");
           let line = "";
-          let ly = py + 17;
+          let ly = py + 13;
           for (const word of words) {
             const test = line ? line + " " + word : word;
             if (ctx.measureText(test).width > maxW && line) {
               ctx.fillText(line, px + pos.w / 2, ly);
               line = word;
-              ly += 15.5;
+              ly += 12;
             } else {
               line = test;
             }
@@ -544,27 +635,27 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
           // Price at bottom
           if (cell.price > 0) {
             ctx.fillStyle = "#fde047";
-            ctx.font = "bold 14.5px 'Baloo 2', sans-serif";
-            ctx.fillText(`$${cell.price}`, px + pos.w / 2, py + pos.h - 6);
+            ctx.font = "bold 11px 'Baloo 2', sans-serif";
+            ctx.fillText(`$${cell.price}`, px + pos.w / 2, py + pos.h - 5);
           }
           ctx.restore();
         } else {
           // Non-flag special tiles (chance, chest, tax, etc.)
-          ctx.font = "bold 15px 'Baloo 2', sans-serif";
+          ctx.font = "bold 11.5px 'Baloo 2', sans-serif";
           ctx.fillStyle = "#e5e7eb";
-          ctx.fillText(name, px + pos.w / 2, py + pos.h / 2 + 4);
+          ctx.fillText(name, px + pos.w / 2, py + pos.h / 2 + 3);
           if (cell.type === "utility") {
-            ctx.font = "14px sans-serif";
-            ctx.fillText(cell.id === 13 ? "💧" : "⚡", px + pos.w / 2, py + pos.h / 2 + 20);
+            ctx.font = "12px sans-serif";
+            ctx.fillText(cell.id === 13 ? "💧" : "⚡", px + pos.w / 2, py + pos.h / 2 + 16);
           } else if (cell.type === "chance") {
-            ctx.font = "14px sans-serif";
-            ctx.fillText("❓", px + pos.w / 2, py + pos.h / 2 + 20);
+            ctx.font = "12px sans-serif";
+            ctx.fillText("❓", px + pos.w / 2, py + pos.h / 2 + 16);
           } else if (cell.type === "chest") {
-            ctx.font = "14px sans-serif";
-            ctx.fillText("📦", px + pos.w / 2, py + pos.h / 2 + 20);
+            ctx.font = "12px sans-serif";
+            ctx.fillText("📦", px + pos.w / 2, py + pos.h / 2 + 16);
           } else if (cell.type === "tax") {
-            ctx.font = "14px sans-serif";
-            ctx.fillText("💰", px + pos.w / 2, py + pos.h / 2 + 20);
+            ctx.font = "12px sans-serif";
+            ctx.fillText("💰", px + pos.w / 2, py + pos.h / 2 + 16);
           }
         }
 
@@ -582,6 +673,19 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
           roundRect(ctx, px + pos.w * 0.14, py + pos.h - 8, pos.w * 0.72, 5, 2.5);
           ctx.fill();
           ctx.restore();
+
+          // House/hotel badge, top-left corner of the tile
+          if (ownerHouses > 0) {
+            ctx.save();
+            ctx.font = `bold ${Math.max(9, Math.round(pos.w * 0.15))}px sans-serif`;
+            ctx.textAlign = "left";
+            ctx.textBaseline = "top";
+            ctx.shadowColor = "rgba(0,0,0,0.85)";
+            ctx.shadowBlur = 3;
+            ctx.fillStyle = "#fff";
+            ctx.fillText(ownerHouses >= 5 ? "🏨" : `🏠${ownerHouses}`, px + 3, py + 2);
+            ctx.restore();
+          }
         }
       }
 
@@ -595,8 +699,8 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
 
         const offset = occupiedCells[p.position] ?? 0;
         occupiedCells[p.position] = offset + 1;
-        const fanX = (offset % 3 - 1) * 18;
-        const fanY = Math.floor(offset / 3) * 18;
+        const fanX = (offset % 3 - 1) * 14;
+        const fanY = Math.floor(offset / 3) * 14;
 
         const finalTile = getTilePos(p.position);
         let cx = ox + finalTile.x + finalTile.w / 2;
@@ -649,7 +753,7 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
         const shadowScale = 1 - Math.min(0.55, Math.abs(jumpY) / 55);
         ctx.fillStyle = "rgba(0,0,0,0.45)";
         ctx.beginPath();
-        ctx.ellipse(groundX, groundY + 17, 13 * shadowScale, 5 * shadowScale, 0, 0, Math.PI * 2);
+        ctx.ellipse(groundX, groundY + 13, 10 * shadowScale, 4 * shadowScale, 0, 0, Math.PI * 2);
         ctx.fill();
 
         // Active-player glow ring
@@ -658,7 +762,7 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
           ctx.strokeStyle = `rgba(45,212,191,${pulse})`;
           ctx.lineWidth = 2.5;
           ctx.beginPath();
-          ctx.arc(tx, ty, 22, 0, Math.PI * 2);
+          ctx.arc(tx, ty, 17, 0, Math.PI * 2);
           ctx.stroke();
         }
 
@@ -671,17 +775,17 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
         ctx.shadowBlur = 6;
         ctx.fillStyle = color;
         ctx.beginPath();
-        ctx.arc(0, 0, 19, 0, Math.PI * 2);
+        ctx.arc(0, 0, 15, 0, Math.PI * 2);
         ctx.fill();
         ctx.shadowBlur = 0;
         ctx.strokeStyle = "rgba(255,255,255,0.9)";
-        ctx.lineWidth = 2.5;
+        ctx.lineWidth = 2;
         ctx.stroke();
 
-        ctx.font = "21px sans-serif";
+        ctx.font = "17px sans-serif";
         ctx.textAlign = "center";
         ctx.fillStyle = "#000";
-        ctx.fillText(p.token, 0, 7);
+        ctx.fillText(p.token, 0, 6);
 
         ctx.restore();
       }
@@ -716,6 +820,10 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
       votekick: "طرد بالتصويت", bankrupt: "إفلاس", bankruptConfirmTitle: "إعلان الإفلاس؟",
       bankruptConfirmBody: "ستفقد جميع ممتلكاتك وتخرج من اللعبة نهائياً. هل أنت متأكد؟",
       isPlaying: "يلعب الآن...", waitingTurn: "بانتظار دوره...",
+      flagImage: "صورة حقيقية", flagCss: "رسم", tradeDetails: "تفاصيل التبادل", offering: "يعرض", requesting: "يطلب",
+      total: "الإجمالي", edit: "تعديل", save: "حفظ", close: "إغلاق", completeSet: "مجموعة كاملة",
+      build: "بناء", houseCount: "منزل", hotel: "فندق", notEnoughForHouse: "لا يوجد مال كافٍ",
+      editTradeTitle: "تعديل التبادل", viewDetails: "عرض التفاصيل", with: "مع",
     },
     en: {
       title: "Rento", roll: "Roll Dice", buy: "Buy Property", endTurn: "End Turn", turn: "Your turn", notTurn: "Waiting...",
@@ -727,6 +835,10 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
       votekick: "Votekick", bankrupt: "Bankrupt", bankruptConfirmTitle: "Declare bankruptcy?",
       bankruptConfirmBody: "You'll lose all your properties and be eliminated from the game. Are you sure?",
       isPlaying: "is playing...", waitingTurn: "is waiting...",
+      flagImage: "Real", flagCss: "Drawn", tradeDetails: "Trade Details", offering: "Offering", requesting: "Requesting",
+      total: "Total", edit: "Edit", save: "Save", close: "Close", completeSet: "Complete set",
+      build: "Build", houseCount: "house", hotel: "hotel", notEnoughForHouse: "Not enough money",
+      editTradeTitle: "Edit Trade", viewDetails: "View details", with: "with",
     },
   }[isAr ? "ar" : "en"];
 
@@ -779,6 +891,13 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
           {i18n.title}
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={toggleFlagMode}
+            className="flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-bold text-white/80 transition-colors hover:bg-white/10"
+            title={isAr ? "تبديل نمط الأعلام" : "Toggle flag style"}
+          >
+            {flagMode === "image" ? "🏳️" : "🎨"} {flagMode === "image" ? i18n.flagImage : i18n.flagCss}
+          </button>
           {state?.roomId && <VoiceControls roomId={state.roomId} />}
         </div>
       </div>
@@ -836,9 +955,9 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
 
               {actionLog.length > 1 && (
                 <div className="mt-2 flex flex-col gap-0.5">
-                  {actionLog.slice(0, -1).slice(-4).map((line) => (
-                    <div key={line} className="text-white/40 animate-pop-in" style={{ fontSize: "clamp(9px, 1.1vw, 11px)" }}>
-                      {line}
+                  {actionLog.slice(0, -1).slice(-4).map((entry) => (
+                    <div key={entry.id} className="text-white/40 animate-pop-in" style={{ fontSize: "clamp(9px, 1.1vw, 11px)" }}>
+                      {entry.text}
                     </div>
                   ))}
                 </div>
@@ -1018,7 +1137,7 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
             <div className="flex items-center justify-between mb-2">
               <span className="text-white font-bold text-sm">{i18n.trades}</span>
               <button
-                onClick={() => setShowTradeModal(true)}
+                onClick={() => { resetTradeForm(); setShowTradeModal(true); }}
                 disabled={state?.phase !== "playing" || otherAlivePlayers.length === 0}
                 className="px-3.5 py-1.5 rounded-full bg-gradient-to-br from-purple-500 to-purple-700 hover:from-purple-400 hover:to-purple-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold transition-all duration-150 hover:scale-105 active:scale-95"
               >
@@ -1044,7 +1163,11 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
                 {myPendingTrades.map((trade: any) => {
                   const fromPlayer = state.players?.find((p: any) => p.id === trade.fromPlayerId);
                   return (
-                    <div key={trade.id} className="bg-white/5 border border-white/10 rounded-xl p-2 flex items-center justify-between gap-2 animate-pop-in">
+                    <div
+                      key={trade.id}
+                      onClick={() => setViewingTradeId(trade.id)}
+                      className="bg-white/5 border border-white/10 rounded-xl p-2 flex items-center justify-between gap-2 animate-pop-in cursor-pointer transition-colors hover:bg-white/10"
+                    >
                       <div className="text-white text-[11px]">
                         <span className="font-bold">{fromPlayer?.name}</span>
                         {trade.offerMoney > 0 && <span className="text-amber-400"> ${trade.offerMoney}</span>}
@@ -1058,8 +1181,8 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
                         )}
                       </div>
                       <div className="flex gap-1 flex-shrink-0">
-                        <button onClick={() => acceptTrade(trade.id)} className="px-2 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold transition-colors">{i18n.accept}</button>
-                        <button onClick={() => rejectTrade(trade.id)} className="px-2 py-1 rounded-lg bg-red-600 hover:bg-red-500 text-white text-[10px] font-bold transition-colors">{i18n.reject}</button>
+                        <button onClick={(e) => { e.stopPropagation(); acceptTrade(trade.id); }} className="px-2 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold transition-colors">{i18n.accept}</button>
+                        <button onClick={(e) => { e.stopPropagation(); rejectTrade(trade.id); }} className="px-2 py-1 rounded-lg bg-red-600 hover:bg-red-500 text-white text-[10px] font-bold transition-colors">{i18n.reject}</button>
                       </div>
                     </div>
                   );
@@ -1074,12 +1197,19 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
                 {sentTrades.map((trade: any) => {
                   const toPlayer = state.players?.find((p: any) => p.id === trade.toPlayerId);
                   return (
-                    <div key={trade.id} className="bg-white/5 border border-white/10 rounded-xl p-2 flex items-center justify-between gap-2 animate-pop-in">
+                    <div
+                      key={trade.id}
+                      onClick={() => setViewingTradeId(trade.id)}
+                      className="bg-white/5 border border-white/10 rounded-xl p-2 flex items-center justify-between gap-2 animate-pop-in cursor-pointer transition-colors hover:bg-white/10"
+                    >
                       <div className="text-white text-[11px]">
                         <span className="font-bold">{toPlayer?.name}</span>
                         <span className="text-gray-400"> {isAr ? "ينتظر..." : "pending..."}</span>
                       </div>
-                      <button onClick={() => cancelTrade(trade.id)} className="px-2 py-1 rounded-lg bg-gray-600 hover:bg-gray-500 text-white text-[10px] font-bold transition-colors">{i18n.cancel}</button>
+                      <div className="flex gap-1 flex-shrink-0">
+                        <button onClick={(e) => { e.stopPropagation(); openEditTrade(trade); }} className="px-2 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold transition-colors">{i18n.edit}</button>
+                        <button onClick={(e) => { e.stopPropagation(); cancelTrade(trade.id); }} className="px-2 py-1 rounded-lg bg-gray-600 hover:bg-gray-500 text-white text-[10px] font-bold transition-colors">{i18n.cancel}</button>
+                      </div>
                     </div>
                   );
                 })}
@@ -1095,17 +1225,55 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
           <div className="rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-sm p-4 shadow-lg shadow-black/30">
             <div className="text-white font-bold text-sm mb-2">{i18n.myProperties} ({me?.properties?.length ?? 0})</div>
             {me?.properties?.length > 0 ? (
-              <div className="flex flex-col gap-1.5">
-                {me.properties.map((pid: number) => {
-                  const cell = state.board?.[pid];
-                  if (!cell) return null;
-                  return (
-                    <div key={pid} className="flex items-center gap-2 animate-pop-in">
-                      <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: cell.color, boxShadow: `0 0 6px ${withAlpha(cell.color, 0.7)}` }} />
-                      <span className="text-white/70 text-xs truncate">{isAr ? cell.nameAr : cell.name}</span>
-                    </div>
-                  );
-                })}
+              <div className="flex flex-col gap-3">
+                {(() => {
+                  const groups: Record<string, any[]> = {};
+                  for (const pid of me.properties) {
+                    const cell = state.board?.[pid];
+                    if (!cell) continue;
+                    (groups[cell.color] ??= []).push(cell);
+                  }
+                  return Object.entries(groups).map(([color, cells]) => {
+                    const allOfColor = (state.board ?? []).filter((c: any) => c.color === color && (c.type === "property" || c.type === "utility"));
+                    const isComplete = allOfColor.length > 0 && allOfColor.every((c: any) => me.properties.includes(c.id));
+                    return (
+                      <div key={color}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: color, boxShadow: `0 0 6px ${withAlpha(color, 0.7)}` }} />
+                          {isComplete && (
+                            <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/15 px-1.5 py-0.5 rounded-full">{i18n.completeSet}</span>
+                          )}
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          {cells.map((cell: any) => {
+                            const houses = me.houses?.[cell.id] ?? 0;
+                            const canBuild = isComplete && cell.type === "property" && houses < 5;
+                            const cost = Math.round(cell.price / 2);
+                            const canAfford = me.money >= cost;
+                            return (
+                              <div key={cell.id} className="flex items-center justify-between gap-2 animate-pop-in">
+                                <span className="text-white/70 text-xs truncate flex-1">
+                                  {isAr ? cell.nameAr : cell.name}
+                                  {houses > 0 && <span className="ms-1">{houses >= 5 ? "🏨" : "🏠".repeat(houses)}</span>}
+                                </span>
+                                {canBuild && (
+                                  <button
+                                    onClick={() => buildHouse(cell.id)}
+                                    disabled={!canAfford}
+                                    title={!canAfford ? i18n.notEnoughForHouse : undefined}
+                                    className="flex-shrink-0 px-2 py-0.5 rounded-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-[10px] font-bold transition-all hover:scale-105 active:scale-95"
+                                  >
+                                    {houses === 4 ? `🏨 $${cost}` : `🏠 $${cost}`}
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
               </div>
             ) : (
               <p className="text-white/30 text-xs">{i18n.noProperties}</p>
@@ -1132,7 +1300,7 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
       {showTradeModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-[#1d0d29] border border-purple-500/30 rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl shadow-purple-900/30 animate-bubble-in max-h-[90vh] overflow-y-auto">
-            <div className="text-white font-bold text-lg">{i18n.tradeTitle}</div>
+            <div className="text-white font-bold text-lg">{editingTradeId ? i18n.editTradeTitle : i18n.tradeTitle}</div>
 
             {/* Select player */}
             <div>
@@ -1140,7 +1308,8 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
               <select
                 value={tradeTarget}
                 onChange={(e) => setTradeTarget(e.target.value)}
-                className="w-full mt-1 p-2 rounded-lg bg-white/10 border border-white/20 text-white transition-colors focus:border-purple-400 focus:outline-none"
+                disabled={!!editingTradeId}
+                className="w-full mt-1 p-2 rounded-lg bg-white/10 border border-white/20 text-white transition-colors focus:border-purple-400 focus:outline-none disabled:opacity-60"
               >
                 <option value="">{isAr ? "اختر لاعب..." : "Select player..."}</option>
                 {otherAlivePlayers.map((p: any) => (
@@ -1245,29 +1414,91 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
             {/* Action buttons */}
             <div className="flex gap-3 justify-end">
               <button
-                onClick={() => {
-                  setShowTradeModal(false);
-                  setTradeTarget("");
-                  setOfferProperties([]);
-                  setOfferMoney(0);
-                  setRequestProperties([]);
-                  setRequestMoney(0);
-                }}
+                onClick={resetTradeForm}
                 className="px-4 py-2 rounded-full bg-gray-600 hover:bg-gray-500 font-bold text-sm transition-all hover:scale-105 active:scale-95"
               >
                 {i18n.cancel}
               </button>
               <button
-                onClick={proposeTrade}
+                onClick={submitTrade}
                 disabled={!tradeTarget || (offerProperties.length === 0 && offerMoney === 0 && requestProperties.length === 0 && requestMoney === 0)}
                 className="px-4 py-2 rounded-full bg-blue-600 hover:bg-blue-500 font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:scale-105 active:scale-95 disabled:hover:scale-100"
               >
-                {i18n.propose}
+                {editingTradeId ? i18n.save : i18n.propose}
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Trade Detail Modal */}
+      {viewingTradeId && (() => {
+        const trade = state?.tradeProposals?.find((t: any) => t.id === viewingTradeId);
+        if (!trade) return null;
+        const fromPlayer = state.players?.find((p: any) => p.id === trade.fromPlayerId);
+        const toPlayer = state.players?.find((p: any) => p.id === trade.toPlayerId);
+        const offerProps = trade.offerProperties.map((pid: number) => state.board?.[pid]).filter(Boolean);
+        const requestProps = trade.requestProperties.map((pid: number) => state.board?.[pid]).filter(Boolean);
+        const offerTotal = trade.offerMoney + offerProps.reduce((s: number, c: any) => s + (c.price || 0), 0);
+        const requestTotal = trade.requestMoney + requestProps.reduce((s: number, c: any) => s + (c.price || 0), 0);
+        const isSender = trade.fromPlayerId === myPlayerId;
+        const isReceiver = trade.toPlayerId === myPlayerId;
+
+        const renderSide = (title: string, player: any, money: number, props: any[], total: number, accent: string) => (
+          <div className="flex-1 rounded-xl border border-white/10 bg-white/5 p-3 min-w-0">
+            <div className="text-xs font-bold mb-2 truncate" style={{ color: accent }}>{title}: {player?.token} {player?.name}</div>
+            {money > 0 && <div className="text-amber-300 text-sm font-bold mb-1">${money}</div>}
+            <div className="flex flex-col gap-1.5">
+              {props.map((cell: any) => (
+                <div key={cell.id} className="flex items-center justify-between gap-2 text-white/80 text-xs">
+                  <span className="flex items-center gap-1.5 truncate">
+                    {flagImageUrl(cell.flag) ? (
+                      <img src={flagImageUrl(cell.flag)!} alt="" className="w-4 h-3 rounded-sm object-cover flex-shrink-0" />
+                    ) : (
+                      <span>🌐</span>
+                    )}
+                    <span className="truncate">{isAr ? cell.nameAr : cell.name}</span>
+                  </span>
+                  <span className="text-amber-300 font-semibold flex-shrink-0">${cell.price}</span>
+                </div>
+              ))}
+              {props.length === 0 && money === 0 && <div className="text-white/30 text-xs">—</div>}
+            </div>
+            <div className="mt-2 pt-2 border-t border-white/10 flex justify-between text-xs font-bold">
+              <span className="text-white/50">{i18n.total}</span>
+              <span style={{ color: accent }}>${total}</span>
+            </div>
+          </div>
+        );
+
+        return (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setViewingTradeId(null)}>
+            <div className="bg-[#1d0d29] border border-purple-500/30 rounded-2xl p-6 w-full max-w-lg space-y-4 shadow-2xl shadow-purple-900/30 animate-bubble-in max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+              <div className="text-white font-bold text-lg">{i18n.tradeDetails}</div>
+              <div className="text-white/50 text-xs -mt-2">{fromPlayer?.name} {i18n.with} {toPlayer?.name}</div>
+              <div className="flex gap-3">
+                {renderSide(i18n.offering, fromPlayer, trade.offerMoney, offerProps, offerTotal, "#34d399")}
+                {renderSide(i18n.requesting, toPlayer, trade.requestMoney, requestProps, requestTotal, "#fb7185")}
+              </div>
+              <div className="flex gap-3 justify-end flex-wrap">
+                {isSender && (
+                  <>
+                    <button onClick={() => cancelTrade(trade.id)} className="px-4 py-2 rounded-full bg-gray-600 hover:bg-gray-500 font-bold text-sm text-white transition-all hover:scale-105 active:scale-95">{i18n.cancel}</button>
+                    <button onClick={() => openEditTrade(trade)} className="px-4 py-2 rounded-full bg-indigo-600 hover:bg-indigo-500 font-bold text-sm text-white transition-all hover:scale-105 active:scale-95">{i18n.edit}</button>
+                  </>
+                )}
+                {isReceiver && (
+                  <>
+                    <button onClick={() => { rejectTrade(trade.id); setViewingTradeId(null); }} className="px-4 py-2 rounded-full bg-red-600 hover:bg-red-500 font-bold text-sm text-white transition-all hover:scale-105 active:scale-95">{i18n.reject}</button>
+                    <button onClick={() => { acceptTrade(trade.id); setViewingTradeId(null); }} className="px-4 py-2 rounded-full bg-emerald-600 hover:bg-emerald-500 font-bold text-sm text-white transition-all hover:scale-105 active:scale-95">{i18n.accept}</button>
+                  </>
+                )}
+                <button onClick={() => setViewingTradeId(null)} className="px-4 py-2 rounded-full bg-white/10 hover:bg-white/20 font-bold text-sm text-white transition-all hover:scale-105 active:scale-95">{i18n.close}</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Floating chat bubble */}
       <button
@@ -1331,8 +1562,11 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
           <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8, padding: 16 }}>
             {chatMessages.map((msg, i) => (
               <div key={i} style={{ fontSize: 12, wordBreak: "break-word" }}>
-                <strong style={{ color: "#FED23F" }}>
-                  {msg.flag ? codeToEmoji(msg.flag) + " " : ""}{msg.playerName}:
+                <strong style={{ color: "#FED23F", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                  {flagImageUrl(msg.flag) && (
+                    <img src={flagImageUrl(msg.flag)!} alt="" style={{ width: 14, height: 11, borderRadius: 2, objectFit: "cover" }} />
+                  )}
+                  {msg.playerName}:
                 </strong>{" "}
                 <span style={{ color: "rgba(255,255,255,0.9)" }}>{msg.message}</span>
               </div>

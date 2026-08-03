@@ -92,7 +92,7 @@ export default function DominoRoom() {
   const navigate = useNavigate();
   const {
     dominoState, myPlayerId, joinRoom, reconnectRoom,
-    startGame, addBot, removeBot, addToast, resetGame,
+    startGame, addBot, removeBot, addToast, leaveRoom,
   } = useGame();
   const { lang } = useLanguage();
   const isAr = lang === "ar";
@@ -177,11 +177,9 @@ export default function DominoRoom() {
   }, [startGame, addToast]);
 
   const handleLeave = useCallback(() => {
-    resetGame();
-    localStorage.removeItem("liarsbar_roomId");
-    localStorage.removeItem("liarsbar_playerId");
+    leaveRoom();
     navigate("/domino");
-  }, [resetGame, navigate]);
+  }, [leaveRoom, navigate]);
 
   if (!reconnected) {
     return (

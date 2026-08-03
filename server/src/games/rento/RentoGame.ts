@@ -1,6 +1,7 @@
 import { nanoid } from "nanoid";
 import { Player } from "../liars-bar/Player.js";
 import type { GameRoom, GameRoomCallbacks } from "../types.js";
+import { PIECE_ICONS } from "../shared/pieceIcons.js";
 
 interface Property {
   id: number;
@@ -187,13 +188,14 @@ interface PlayerState {
   money: number;
   properties: number[];
   upgradedColors: Set<string>;
+  houses: Map<number, number>; // propertyId -> house count (0-5, 5 = hotel)
   jailTurns: number;
   bankrupt: boolean;
   token: string;
   inJail: boolean;
 }
 
-const TOKENS = ["🚗", "🎩", "👟", "🔑", "💎", "🎯"];
+const TOKENS = PIECE_ICONS;
 
 export class RentoGame implements GameRoom {
   readonly gameId = "rento";
@@ -249,12 +251,13 @@ export class RentoGame implements GameRoom {
     this.callbacks = callbacks;
   }
 
-  addPlayer(name: string, socketId: string, isHost = false, playerId?: string, flag?: string): Player {
+  addPlayer(name: string, socketId: string, isHost = false, playerId?: string, flag?: string, icon?: string): Player {
     const id = playerId || nanoid(8);
     const player = new Player(id, name, false, isHost);
     player.socketId = socketId;
     player.isConnected = true;
     if (flag) player.flag = flag;
+    if (icon && PIECE_ICONS.includes(icon)) player.icon = icon;
     this.players.push(player);
     this.lastActivityAt = Date.now();
     return player;
@@ -321,9 +324,10 @@ export class RentoGame implements GameRoom {
         money: this.startingBalance,
         properties: [],
         upgradedColors: new Set<string>(),
+        houses: new Map<number, number>(),
         jailTurns: 0,
         bankrupt: false,
-        token: TOKENS[i % TOKENS.length],
+        token: p.icon && TOKENS.includes(p.icon) ? p.icon : TOKENS[i % TOKENS.length],
         inJail: false,
       });
     });
@@ -541,12 +545,27 @@ export class RentoGame implements GameRoom {
       } else if (owner !== playerId) {
         const ownerState = this.playerStates.get(owner);
         if (ownerState) {
-          const colorCount = this.board.filter(c => c.color === cell.color && (c.type === "property" || c.type === "utility")).length;
-          const ownedCount = ownerState.properties.filter(pid => this.board[pid]?.color === cell.color).length;
-          const houses = Math.floor(ownedCount / Math.max(1, colorCount));
-          const rentIdx = Math.min(houses, cell.rent.length - 1);
-          let rent = cell.rent[rentIdx];
-          if (ownerState.upgradedColors.has(cell.color)) rent *= 2;
+          let rent: number;
+          if (cell.type === "utility") {
+            // Utilities don't get houses — unchanged tiered/doubling logic.
+            const colorCount = this.board.filter(c => c.color === cell.color && (c.type === "property" || c.type === "utility")).length;
+            const ownedCount = ownerState.properties.filter(pid => this.board[pid]?.color === cell.color).length;
+            const tier = Math.floor(ownedCount / Math.max(1, colorCount));
+            rent = cell.rent[Math.min(tier, cell.rent.length - 1)];
+            if (ownerState.upgradedColors.has(cell.color)) rent *= 2;
+          } else {
+            // Properties: real house count drives the rent tier directly (the
+            // rent array already assumes a completed set from tier 1 onward),
+            // and only the un-improved (0-house) rent doubles for owning the set.
+            const houseCount = ownerState.houses.get(cell.id) ?? 0;
+            if (houseCount > 0) {
+              rent = cell.rent[Math.min(houseCount, cell.rent.length - 1)];
+            } else if (ownerState.upgradedColors.has(cell.color)) {
+              rent = cell.rent[0] * 2;
+            } else {
+              rent = cell.rent[0];
+            }
+          }
           ps.money -= rent;
           ownerState.money += rent;
           this.lastAction = `${name} paid $${rent} rent to ${this.getPlayerName(owner)}.`;
@@ -606,6 +625,36 @@ export class RentoGame implements GameRoom {
     return { success: true };
   }
 
+  buildHouse(playerId: string, propertyId: number): { success: boolean; error?: string } {
+    if (this.phase !== "playing") return { success: false, error: "Game not active" };
+    const ps = this.playerStates.get(playerId);
+    if (!ps) return { success: false, error: "No player state" };
+    if (!ps.properties.includes(propertyId)) return { success: false, error: "You don't own that property" };
+
+    const cell = this.board[propertyId];
+    if (!cell || cell.type !== "property") return { success: false, error: "Houses can only be built on properties" };
+    if (!ps.upgradedColors.has(cell.color)) return { success: false, error: "You must own the full color set first" };
+
+    const current = ps.houses.get(propertyId) ?? 0;
+    if (current >= 5) return { success: false, error: "Already at a hotel" };
+
+    const cost = Math.round(cell.price / 2);
+    if (ps.money < cost) return { success: false, error: "Not enough money" };
+
+    ps.money -= cost;
+    const newCount = current + 1;
+    ps.houses.set(propertyId, newCount);
+
+    const name = this.getPlayerName(playerId);
+    this.lastAction = newCount >= 5
+      ? `${name} built a hotel on ${cell.name}!`
+      : `${name} built a house on ${cell.name}! (${newCount}/5)`;
+
+    this.lastActivityAt = Date.now();
+    this.broadcast();
+    return { success: true };
+  }
+
   endTurn(playerId: string): { success: boolean; error?: string } {
     if (this.phase !== "playing") return { success: false, error: "Game not active" };
     const currentId = this.getCurrentPlayerId();
@@ -652,6 +701,7 @@ export class RentoGame implements GameRoom {
     if (!ps || ps.bankrupt) return;
     const wasCurrent = this.getCurrentPlayerId() === playerId;
     ps.properties = [];
+    ps.houses.clear();
     ps.bankrupt = true;
     this.lastAction = message;
     this.kickVotes.delete(playerId);
@@ -766,6 +816,44 @@ export class RentoGame implements GameRoom {
     return { success: true, tradeId };
   }
 
+  editTrade(
+    playerId: string,
+    tradeId: string,
+    offerProperties: number[],
+    offerMoney: number,
+    requestProperties: number[],
+    requestMoney: number
+  ): { success: boolean; error?: string } {
+    if (this.phase !== "playing") return { success: false, error: "Game not active" };
+
+    const proposal = this.tradeProposals.get(tradeId);
+    if (!proposal) return { success: false, error: "Trade not found" };
+    if (proposal.status !== "pending") return { success: false, error: "Trade already resolved" };
+    if (proposal.fromPlayerId !== playerId) return { success: false, error: "Only the sender can edit this trade" };
+
+    const fromPs = this.playerStates.get(proposal.fromPlayerId);
+    const toPs = this.playerStates.get(proposal.toPlayerId);
+    if (!fromPs || !toPs) return { success: false, error: "Invalid player" };
+
+    for (const pid of offerProperties) {
+      if (!fromPs.properties.includes(pid)) return { success: false, error: "You don't own that property" };
+    }
+    for (const pid of requestProperties) {
+      if (!toPs.properties.includes(pid)) return { success: false, error: "They don't own that property" };
+    }
+    if (fromPs.money < offerMoney) return { success: false, error: "Not enough money" };
+    if (toPs.money < requestMoney) return { success: false, error: "They don't have enough money" };
+
+    proposal.offerProperties = offerProperties;
+    proposal.offerMoney = offerMoney;
+    proposal.requestProperties = requestProperties;
+    proposal.requestMoney = requestMoney;
+
+    this.lastAction = `${this.getPlayerName(proposal.fromPlayerId)} updated their trade with ${this.getPlayerName(proposal.toPlayerId)}.`;
+    this.broadcast();
+    return { success: true };
+  }
+
   acceptTrade(playerId: string, tradeId: string): { success: boolean; error?: string } {
     if (this.phase !== "playing") return { success: false, error: "Game not active" };
 
@@ -789,13 +877,15 @@ export class RentoGame implements GameRoom {
     if (toPs.money < proposal.requestMoney) return { success: false, error: "You don't have enough money" };
 
     // Execute the trade
-    // Transfer properties
+    // Transfer properties — houses don't carry over to the new owner
     for (const pid of proposal.offerProperties) {
       fromPs.properties = fromPs.properties.filter(p => p !== pid);
+      fromPs.houses.delete(pid);
       toPs.properties.push(pid);
     }
     for (const pid of proposal.requestProperties) {
       toPs.properties = toPs.properties.filter(p => p !== pid);
+      toPs.houses.delete(pid);
       fromPs.properties.push(pid);
     }
 
@@ -950,10 +1040,12 @@ export class RentoGame implements GameRoom {
           position: ps?.position ?? 0,
           money: ps?.money ?? 0,
           properties: ps?.properties ?? [],
+          houses: ps ? Object.fromEntries(ps.houses) : {},
           inJail: ps?.inJail ?? false,
           bankrupt: ps?.bankrupt ?? false,
           token: ps?.token ?? "?",
           flag: p.flag ?? undefined,
+          icon: p.icon ?? undefined,
         };
       }),
       currentPlayerId: this.getCurrentPlayerId(),

@@ -46,6 +46,9 @@ const COPY = {
     bgOcean: "محيط",
     bgSunset: "غروب",
     bgEmerald: "زمردي",
+    flagStyle: "شكل الأعلام",
+    flagCss: "رسم",
+    flagImage: "صورة حقيقية",
   },
   en: {
     back: "Home",
@@ -85,6 +88,9 @@ const COPY = {
     bgOcean: "Ocean",
     bgSunset: "Sunset",
     bgEmerald: "Emerald",
+    flagStyle: "Flag Style",
+    flagCss: "Drawn",
+    flagImage: "Real",
   },
 } as const;
 
@@ -121,8 +127,17 @@ export default function RentoHome() {
   const [aiDifficulty, setAiDifficulty] = useState<"easy" | "medium" | "hard">("medium");
   const [mapId, setMapId] = useState<"middle_east" | "europe" | "americas">("middle_east");
   const [backgroundId, setBackgroundId] = useState<"nebula" | "ocean" | "sunset" | "emerald">("nebula");
+  const [flagMode, setFlagMode] = useState<"css" | "image">(() => {
+    try { return localStorage.getItem("rento_flag_mode") === "css" ? "css" : "image"; }
+    catch { return "css"; }
+  });
   const [joinRoomId, setJoinRoomId] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  const updateFlagMode = useCallback((mode: "css" | "image") => {
+    setFlagMode(mode);
+    try { localStorage.setItem("rento_flag_mode", mode); } catch { /* ignore */ }
+  }, []);
 
   const handleCreate = useCallback(async () => {
     if (!playerName.trim()) {
@@ -305,6 +320,16 @@ export default function RentoHome() {
                       />
                     );
                   })}
+                </div>
+              </div>
+
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ display: "block", fontSize: 13, color: COLORS.textSecondary, marginBottom: 6, textAlign }}>
+                  {c.flagStyle}
+                </label>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <PillToggle active={flagMode === "css"} onClick={() => updateFlagMode("css")} color={COLORS.teal} label={c.flagCss} />
+                  <PillToggle active={flagMode === "image"} onClick={() => updateFlagMode("image")} color={COLORS.teal} label={c.flagImage} />
                 </div>
               </div>
 

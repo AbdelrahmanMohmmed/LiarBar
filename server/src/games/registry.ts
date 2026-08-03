@@ -47,6 +47,8 @@ export interface CreateRoomOptions {
   aiDifficulty?: "easy" | "medium" | "hard";
   mapId?: string;
   backgroundId?: string;
+  // Memory Puzzle options
+  difficulty?: "easy" | "medium" | "hard";
 }
 
 export type GameFactory = (
@@ -165,7 +167,8 @@ registerGame("domino", (roomId, options, callbacks) => {
 });
 
 registerGame("memory-puzzle", (roomId, options, callbacks) => {
-  return new MemoryPuzzleGame(roomId, options.maxPlayers, callbacks);
+  const difficulty = options.difficulty === "easy" || options.difficulty === "hard" ? options.difficulty : "medium";
+  return new MemoryPuzzleGame(roomId, options.maxPlayers, callbacks, difficulty);
 });
 
 registerGame("tetris", (roomId, options, callbacks) => {

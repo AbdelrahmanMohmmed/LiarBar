@@ -342,7 +342,7 @@ export default function DominoGame() {
   const navigate = useNavigate();
   const {
     dominoState, myPlayerId, chatMessages, sendChat,
-    dominoPlayTile, dominoDrawTile, dominoPass, dominoRematch, resetGame, addToast
+    dominoPlayTile, dominoDrawTile, dominoPass, dominoRematch, leaveRoom, addToast
   } = useGame();
 
   const { lang } = useLanguage();
@@ -840,9 +840,7 @@ export default function DominoGame() {
   };
 
   const handleLeave = () => {
-    resetGame();
-    localStorage.removeItem("liarsbar_roomId");
-    localStorage.removeItem("liarsbar_playerId");
+    leaveRoom();
     navigate("/domino");
   };
 

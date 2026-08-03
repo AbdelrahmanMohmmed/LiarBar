@@ -30,7 +30,7 @@ export default function RentoGame() {
   const { roomId: paramRoomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
   const {
-    rentoState, myPlayerId, resetGame,
+    rentoState, myPlayerId, leaveRoom,
   } = useGame();
   const { lang } = useLanguage();
   const isAr = lang === "ar";
@@ -41,11 +41,9 @@ export default function RentoGame() {
   const [showHelp, setShowHelp] = useState(false);
 
   const handleLeave = useCallback(() => {
-    resetGame();
-    localStorage.removeItem("liarsbar_roomId");
-    localStorage.removeItem("liarsbar_playerId");
+    leaveRoom();
     navigate("/rento");
-  }, [resetGame, navigate]);
+  }, [leaveRoom, navigate]);
 
   if (!rentoState) {
     return (
