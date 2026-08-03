@@ -1,6 +1,7 @@
 import { nanoid } from "nanoid";
 import { Player } from "../liars-bar/Player.js";
 import type { GameRoom, GameRoomCallbacks } from "../types.js";
+import { PIECE_ICONS } from "../shared/pieceIcons.js";
 
 // Board: 10x10, cells numbered 1-100
 // Snakes go down, ladders go up
@@ -67,11 +68,13 @@ export class SnakeLadderGame implements GameRoom {
     this.callbacks = callbacks;
   }
 
-  addPlayer(name: string, socketId: string, isHost = false, playerId?: string): Player {
+  addPlayer(name: string, socketId: string, isHost = false, playerId?: string, flag?: string, icon?: string): Player {
     const id = playerId || nanoid(8);
     const player = new Player(id, name, false, isHost);
     player.socketId = socketId;
     player.isConnected = true;
+    if (flag) player.flag = flag;
+    if (icon && PIECE_ICONS.includes(icon)) player.icon = icon;
     this.players.push(player);
     this.lastActivityAt = Date.now();
     return player;
@@ -280,6 +283,7 @@ export class SnakeLadderGame implements GameRoom {
         isBot: p.isBot,
         position: this.positions.get(p.id) ?? 0,
         color: this.getPlayerColor(p.id),
+        icon: this.getPlayerIcon(p),
       })),
       currentPlayerId: this.getCurrentPlayerId(),
       dice: this.dice,
@@ -294,6 +298,12 @@ export class SnakeLadderGame implements GameRoom {
     const colors = ["#ef4444", "#3b82f6", "#22c55e", "#eab308", "#a855f7", "#ec4899"];
     const idx = this.players.findIndex((p) => p.id === id);
     return colors[idx % colors.length];
+  }
+
+  private getPlayerIcon(p: Player): string {
+    if (p.icon && PIECE_ICONS.includes(p.icon)) return p.icon;
+    const idx = this.players.findIndex((x) => x.id === p.id);
+    return PIECE_ICONS[idx % PIECE_ICONS.length];
   }
 
   toPlayerState(_playerId: string): unknown {

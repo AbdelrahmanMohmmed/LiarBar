@@ -4,7 +4,7 @@ import { getSocket } from "@/lib/socket";
 import { useLanguage } from "@/lib/languageContext";
 import { VoiceControls } from "@/components/VoiceControls";
 import { MessageCircle, Send, Crown, UserX } from "lucide-react";
-import { codeToEmoji } from "@/lib/utils";
+import { flagImageUrl } from "@/lib/utils";
 
 const CELL_SIZE = 78;       // each tile is 78×78 — compact board, less vertical scroll
 const CORNER = CELL_SIZE;   // corners are square
@@ -159,10 +159,12 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
   stateRef.current = state;
   const myPlayerId = props?.myPlayerId ?? ctxMyId;
 
-  // Flag display preference (CSS-drawn vs real emoji), persisted per-browser.
-  const [flagMode, setFlagMode] = useState<"css" | "emoji">(() => {
+  // Flag display preference (CSS-drawn vs real flag photo), persisted per-browser.
+  // Any previously-stored "emoji" value is treated as "image" (the old emoji mode
+  // was replaced by real flagsapi.com photos).
+  const [flagMode, setFlagMode] = useState<"css" | "image">(() => {
     try {
-      return localStorage.getItem("rento_flag_mode") === "emoji" ? "emoji" : "css";
+      return localStorage.getItem("rento_flag_mode") === "css" ? "css" : "image";
     } catch {
       return "css";
     }
@@ -171,7 +173,7 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
   flagModeRef.current = flagMode;
   const toggleFlagMode = () => {
     setFlagMode((prev) => {
-      const next = prev === "css" ? "emoji" : "css";
+      const next = prev === "css" ? "image" : "css";
       try { localStorage.setItem("rento_flag_mode", next); } catch { /* ignore */ }
       return next;
     });
@@ -378,6 +380,18 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
     let lastDice: [number, number] = [0, 0];
     let diceRollStart = 0;
     const DICE_ROLL_MS = 550;
+
+    // Real flag images (flagsapi.com), lazily loaded and cached per country code.
+    const flagImgCache: Record<string, HTMLImageElement> = {};
+    const getFlagImg = (code: string): HTMLImageElement => {
+      let img = flagImgCache[code];
+      if (!img) {
+        img = new Image();
+        img.src = flagImageUrl(code, 64) || "";
+        flagImgCache[code] = img;
+      }
+      return img;
+    };
     const pseudoRand = (seed: number) => {
       const x = Math.sin(seed) * 10000;
       return x - Math.floor(x);
@@ -518,18 +532,17 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
         ctx.clip();
 
         if (cc) {
-          if (flagModeRef.current === "emoji") {
-            // Plain gradient backdrop so the emoji reads clearly on its own
-            const flagBg = ctx.createLinearGradient(px, py, px, py + pos.h);
-            flagBg.addColorStop(0, withAlpha(ownerColor ?? cell.color ?? "#333333", ownerColor ? 0.55 : 0.35));
-            flagBg.addColorStop(1, "rgba(16,11,24,0.92)");
-            ctx.fillStyle = flagBg;
-            ctx.fillRect(px, py, pos.w, pos.h);
-            ctx.font = `${Math.round(pos.w * 0.42)}px sans-serif`;
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
-            ctx.fillText(codeToEmoji(cc), px + pos.w / 2, py + pos.h / 2 - 3);
-            ctx.textBaseline = "alphabetic";
+          if (flagModeRef.current === "image") {
+            const img = getFlagImg(cc);
+            if (img.complete && img.naturalWidth) {
+              if (ownerColor) ctx.filter = "saturate(180%) brightness(1.12) contrast(1.06)";
+              ctx.drawImage(img, px, py, pos.w, pos.h);
+              ctx.filter = "none";
+            } else {
+              // Still loading — subtle placeholder so the tile isn't blank for a frame.
+              ctx.fillStyle = "rgba(255,255,255,0.06)";
+              ctx.fillRect(px, py, pos.w, pos.h);
+            }
           } else {
             // Draw the flag full-bleed and vivid — once it's owned, boost its
             // saturation so it visibly "pops".
@@ -807,7 +820,7 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
       votekick: "طرد بالتصويت", bankrupt: "إفلاس", bankruptConfirmTitle: "إعلان الإفلاس؟",
       bankruptConfirmBody: "ستفقد جميع ممتلكاتك وتخرج من اللعبة نهائياً. هل أنت متأكد؟",
       isPlaying: "يلعب الآن...", waitingTurn: "بانتظار دوره...",
-      flagEmoji: "إيموجي", flagCss: "رسم", tradeDetails: "تفاصيل التبادل", offering: "يعرض", requesting: "يطلب",
+      flagImage: "صورة حقيقية", flagCss: "رسم", tradeDetails: "تفاصيل التبادل", offering: "يعرض", requesting: "يطلب",
       total: "الإجمالي", edit: "تعديل", save: "حفظ", close: "إغلاق", completeSet: "مجموعة كاملة",
       build: "بناء", houseCount: "منزل", hotel: "فندق", notEnoughForHouse: "لا يوجد مال كافٍ",
       editTradeTitle: "تعديل التبادل", viewDetails: "عرض التفاصيل", with: "مع",
@@ -822,7 +835,7 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
       votekick: "Votekick", bankrupt: "Bankrupt", bankruptConfirmTitle: "Declare bankruptcy?",
       bankruptConfirmBody: "You'll lose all your properties and be eliminated from the game. Are you sure?",
       isPlaying: "is playing...", waitingTurn: "is waiting...",
-      flagEmoji: "Emoji", flagCss: "Drawn", tradeDetails: "Trade Details", offering: "Offering", requesting: "Requesting",
+      flagImage: "Real", flagCss: "Drawn", tradeDetails: "Trade Details", offering: "Offering", requesting: "Requesting",
       total: "Total", edit: "Edit", save: "Save", close: "Close", completeSet: "Complete set",
       build: "Build", houseCount: "house", hotel: "hotel", notEnoughForHouse: "Not enough money",
       editTradeTitle: "Edit Trade", viewDetails: "View details", with: "with",
@@ -883,7 +896,7 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
             className="flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-bold text-white/80 transition-colors hover:bg-white/10"
             title={isAr ? "تبديل نمط الأعلام" : "Toggle flag style"}
           >
-            {flagMode === "emoji" ? "🏳️" : "🎨"} {flagMode === "emoji" ? i18n.flagEmoji : i18n.flagCss}
+            {flagMode === "image" ? "🏳️" : "🎨"} {flagMode === "image" ? i18n.flagImage : i18n.flagCss}
           </button>
           {state?.roomId && <VoiceControls roomId={state.roomId} />}
         </div>
@@ -1439,7 +1452,11 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
               {props.map((cell: any) => (
                 <div key={cell.id} className="flex items-center justify-between gap-2 text-white/80 text-xs">
                   <span className="flex items-center gap-1.5 truncate">
-                    <span>{codeToEmoji(cell.flag)}</span>
+                    {flagImageUrl(cell.flag) ? (
+                      <img src={flagImageUrl(cell.flag)!} alt="" className="w-4 h-3 rounded-sm object-cover flex-shrink-0" />
+                    ) : (
+                      <span>🌐</span>
+                    )}
                     <span className="truncate">{isAr ? cell.nameAr : cell.name}</span>
                   </span>
                   <span className="text-amber-300 font-semibold flex-shrink-0">${cell.price}</span>
@@ -1545,8 +1562,11 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
           <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8, padding: 16 }}>
             {chatMessages.map((msg, i) => (
               <div key={i} style={{ fontSize: 12, wordBreak: "break-word" }}>
-                <strong style={{ color: "#FED23F" }}>
-                  {msg.flag ? codeToEmoji(msg.flag) + " " : ""}{msg.playerName}:
+                <strong style={{ color: "#FED23F", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                  {flagImageUrl(msg.flag) && (
+                    <img src={flagImageUrl(msg.flag)!} alt="" style={{ width: 14, height: 11, borderRadius: 2, objectFit: "cover" }} />
+                  )}
+                  {msg.playerName}:
                 </strong>{" "}
                 <span style={{ color: "rgba(255,255,255,0.9)" }}>{msg.message}</span>
               </div>

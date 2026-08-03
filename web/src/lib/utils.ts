@@ -22,3 +22,9 @@ export function codeToEmoji(code?: string): string {
   return String.fromCodePoint(...cps);
 }
 
+/** Real flag image URL for a 2-letter ISO region code, via flagsapi.com. */
+export function flagImageUrl(code?: string, size: 16 | 24 | 32 | 48 | 64 = 32, style: "flat" | "shiny" = "flat"): string | null {
+  if (!code || !/^[A-Za-z]{2}$/.test(code)) return null;
+  return `https://flagsapi.com/${code.toUpperCase()}/${style}/${size}.png`;
+}
+

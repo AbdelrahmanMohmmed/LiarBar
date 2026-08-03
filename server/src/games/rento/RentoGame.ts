@@ -1,6 +1,7 @@
 import { nanoid } from "nanoid";
 import { Player } from "../liars-bar/Player.js";
 import type { GameRoom, GameRoomCallbacks } from "../types.js";
+import { PIECE_ICONS } from "../shared/pieceIcons.js";
 
 interface Property {
   id: number;
@@ -194,7 +195,7 @@ interface PlayerState {
   inJail: boolean;
 }
 
-const TOKENS = ["🚗", "🎩", "👟", "🔑", "💎", "🎯"];
+const TOKENS = PIECE_ICONS;
 
 export class RentoGame implements GameRoom {
   readonly gameId = "rento";
@@ -250,12 +251,13 @@ export class RentoGame implements GameRoom {
     this.callbacks = callbacks;
   }
 
-  addPlayer(name: string, socketId: string, isHost = false, playerId?: string, flag?: string): Player {
+  addPlayer(name: string, socketId: string, isHost = false, playerId?: string, flag?: string, icon?: string): Player {
     const id = playerId || nanoid(8);
     const player = new Player(id, name, false, isHost);
     player.socketId = socketId;
     player.isConnected = true;
     if (flag) player.flag = flag;
+    if (icon && PIECE_ICONS.includes(icon)) player.icon = icon;
     this.players.push(player);
     this.lastActivityAt = Date.now();
     return player;
@@ -325,7 +327,7 @@ export class RentoGame implements GameRoom {
         houses: new Map<number, number>(),
         jailTurns: 0,
         bankrupt: false,
-        token: TOKENS[i % TOKENS.length],
+        token: p.icon && TOKENS.includes(p.icon) ? p.icon : TOKENS[i % TOKENS.length],
         inJail: false,
       });
     });
@@ -1043,6 +1045,7 @@ export class RentoGame implements GameRoom {
           bankrupt: ps?.bankrupt ?? false,
           token: ps?.token ?? "?",
           flag: p.flag ?? undefined,
+          icon: p.icon ?? undefined,
         };
       }),
       currentPlayerId: this.getCurrentPlayerId(),

@@ -40,8 +40,8 @@ class Fighter {
   hit = false;
   hitTimer = 0;
   cooldown = 0;
-  parryTimer = 0;
-  parryActive = false;
+  /** True only for the current tick — holding away-from-opponent absorbs a hit landing right now. */
+  blocking = false;
   parryFlash = 0;
   parryStamina = 100;
   guardBreak = false;
@@ -51,6 +51,7 @@ class Fighter {
   action: Action = "idle";
   input: InputState = { left: false, right: false, jump: false, attack1: false, attack2: false, parry: false, special: false };
   difficulty: "easy" | "medium" | "hard" = "medium";
+  characterId: string = "cat";
 
   constructor(playerId: string, name: string, color: string, isBot: boolean, x: number, facing: 1 | -1) {
     this.playerId = playerId;
@@ -74,8 +75,7 @@ class Fighter {
     this.hit = false;
     this.hitTimer = 0;
     this.cooldown = 0;
-    this.parryTimer = 0;
-    this.parryActive = false;
+    this.blocking = false;
     this.parryFlash = 0;
     this.parryStamina = 100;
     this.guardBreak = false;
@@ -100,7 +100,7 @@ class Fighter {
     const dx = Math.abs(this.x - target.x);
     const dy = Math.abs(this.y - target.y);
     if (dx < 130 && dy < 120) {
-      if (target.parryActive && target.parryStamina > 0) {
+      if (target.blocking && target.parryStamina > 0) {
         // Blocked! Cost stamina
         const cost = dmg * 0.6;
         target.parryStamina = Math.max(0, target.parryStamina - cost);
@@ -111,8 +111,7 @@ class Fighter {
         if (target.parryStamina <= 0) {
           target.guardBreak = true;
           target.stun = 40;
-          target.parryActive = false;
-          target.parryTimer = 0;
+          target.blocking = false;
           target.parryFlash = 20;
         }
         return;
@@ -128,13 +127,8 @@ class Fighter {
   update(opponent: Fighter, f: number) {
     if (this.cooldown > 0) this.cooldown -= f;
     if (this.stun > 0) this.stun -= f;
-    if (this.parryTimer > 0) {
-      this.parryTimer -= f;
-      if (this.parryTimer <= 0) { this.parryActive = false; }
-      else if (this.parryTimer < 10) this.parryActive = false;
-    }
     // Stamina recharge when not blocking
-    if (!this.parryActive && this.parryStamina < 100) {
+    if (!this.blocking && this.parryStamina < 100) {
       this.parryStamina = Math.min(100, this.parryStamina + 0.8 * f);
     }
     if (this.parryFlash > 0) this.parryFlash -= f;
@@ -157,23 +151,21 @@ class Fighter {
     if (this.hit) { this.action = "hit"; return; }
 
     let move = 0;
-    const canAct = this.parryTimer <= 0 && !this.attacking && this.stun <= 0;
+    this.blocking = false;
+    const canAct = !this.attacking && this.stun <= 0;
     if (canAct) {
       if (this.input.left) move -= 10;
       if (this.input.right) move += 10;
       if (this.input.jump && !this.jumping) { this.vy = -40; this.jumping = true; }
 
-      // Auto-block when walking AWAY from enemy (block stance)
-      if (move !== 0 && this.parryStamina > 0) {
-        const awayFromEnemy = (opponent.x > this.x && move < 0) || (opponent.x < this.x && move > 0);
-        if (awayFromEnemy) {
-          this.parryTimer = 26;
-          this.parryActive = true;
-          move = 0;
-        }
-      }
+      // Holding the direction AWAY from the opponent = guarding, like a normal
+      // fighting game: you keep walking backward at full speed, but a hit that
+      // lands on you while you're doing it is blocked (costs stamina) instead of
+      // dealing damage. No freeze, no timer — just a reactive per-tick flag.
+      const awayFromEnemy = move !== 0 && ((opponent.x > this.x && move < 0) || (opponent.x < this.x && move > 0));
+      this.blocking = awayFromEnemy && this.parryStamina > 0 && !this.jumping;
 
-      if (!this.parryActive) {
+      if (!this.blocking) {
         if (this.input.special && this.specialMeter >= 100 && this.cooldown <= 0) {
           this.attacking = true;
           this.attackStyle = 3;
@@ -201,7 +193,7 @@ class Fighter {
     else if (opponent.x > this.x) this.facing = 1;
     else this.facing = -1;
 
-    if (this.parryTimer > 0) this.action = "parry";
+    if (this.blocking) this.action = "parry";
     else if (this.attacking) this.action = this.attackStyle === 2 ? "kick" : this.attackStyle === 3 ? "special" : "hand";
     else if (this.jumping) this.action = "jump";
     else if (move !== 0) this.action = "walk";
@@ -245,10 +237,13 @@ export class FighterGame implements GameRoom {
     return this.players.length;
   }
 
-  addPlayer(name: string, socketId: string, isHost = false, existingId?: string): Player {
+  addPlayer(name: string, socketId: string, isHost = false, existingId?: string, flag?: string, icon?: string, characterId?: string): Player {
     const id = existingId ?? randomUUID();
     const player = new Player(id, name, false, isHost);
     player.socketId = socketId;
+    if (flag) player.flag = flag;
+    if (icon) player.icon = icon;
+    if (characterId) player.characterId = characterId;
     this.players.push(player);
     this.lastActivityAt = Date.now();
     return player;
@@ -332,9 +327,11 @@ export class FighterGame implements GameRoom {
   }
 
   private assignFighters() {
+    const DEFAULT_CHARACTER_IDS = ["cat", "mon"];
     this.fighters = this.players.slice(0, 2).map((p, i) => {
       const f = new Fighter(p.id, p.name, FIGHTER_COLORS[i % FIGHTER_COLORS.length], p.isBot, i === 0 ? 200 : 824, i === 0 ? 1 : -1);
       if (p.isBot) f.difficulty = this.botDifficulty.get(p.id) ?? "medium";
+      f.characterId = p.characterId ?? DEFAULT_CHARACTER_IDS[i % DEFAULT_CHARACTER_IDS.length];
       return f;
     });
     this.scores = {};
@@ -445,6 +442,7 @@ export class FighterGame implements GameRoom {
         playerId: fi.playerId,
         name: fi.name,
         color: fi.color,
+        characterId: fi.characterId,
         x: Math.round(fi.x),
         y: Math.round(fi.y),
         facing: fi.facing,
@@ -453,7 +451,7 @@ export class FighterGame implements GameRoom {
         action: fi.action,
         attackStyle: fi.attackStyle,
         special: fi.specialMeter,
-        parryActive: fi.parryActive,
+        parryActive: fi.blocking,
         parryFlash: fi.parryFlash,
         parryStamina: fi.parryStamina,
         specialFlash: fi.specialFlash,

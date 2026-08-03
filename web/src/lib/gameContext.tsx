@@ -62,6 +62,8 @@ interface GameActions {
   startGame: () => Promise<void>;
   addBot: (botName?: string, difficulty?: BotDifficulty) => Promise<void>;
   removeBot: (botId: string) => Promise<void>;
+  setPlayerIcon: (icon: string) => Promise<void>;
+  setPlayerCharacter: (characterId: string) => Promise<void>;
     playCards: (
     cardIndices: number[],
     declaration: CardDeclaration,
@@ -509,6 +511,22 @@ export const [GameProvider, useGame] = createContextHook(() => {
     [myRoomId, emitWithAck],
   );
 
+  const setPlayerIcon = useCallback(
+    async (icon: string) => {
+      if (!myRoomId) throw new Error("Not in a room");
+      await emitWithAck("set_player_icon", { roomId: myRoomId, icon });
+    },
+    [myRoomId, emitWithAck],
+  );
+
+  const setPlayerCharacter = useCallback(
+    async (characterId: string) => {
+      if (!myRoomId) throw new Error("Not in a room");
+      await emitWithAck("set_player_character", { roomId: myRoomId, characterId });
+    },
+    [myRoomId, emitWithAck],
+  );
+
   const playCards = useCallback(
     async (cardIndices: number[], declaration: CardDeclaration) => {
       if (!myRoomId) throw new Error("Not in a room");
@@ -702,6 +720,8 @@ export const [GameProvider, useGame] = createContextHook(() => {
     startGame,
     addBot,
     removeBot,
+    setPlayerIcon,
+    setPlayerCharacter,
     playCards,
     callLiar,
     passTurn,

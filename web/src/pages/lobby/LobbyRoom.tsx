@@ -14,6 +14,8 @@ import TetrisLobbyGame from "./games/TetrisLobbyGame";
 import RentoLobbyGame from "./games/RentoLobbyGame";
 import SnakeLadderLobbyGame from "./games/SnakeLadderLobbyGame";
 import FighterLobbyGame from "./games/FighterLobbyGame";
+import { PIECE_ICONS } from "@/lib/pieceIcons";
+import { CHARACTERS } from "./games/fighterCharacters";
 import {
   ArrowLeft,
   Crown,
@@ -44,6 +46,8 @@ export default function LobbyRoom() {
     addToast,
     addBot,
     leaveRoom,
+    setPlayerIcon,
+    setPlayerCharacter,
   } = useGame();
   const { t, lang } = useLanguage();
 
@@ -90,6 +94,10 @@ export default function LobbyRoom() {
   const [rentoFreeParking, setRentoFreeParking] = useState("0");
   const [rentoTurnTimer, setRentoTurnTimer] = useState("45");
   const [rentoAiDifficulty, setRentoAiDifficulty] = useState<"easy" | "medium" | "hard">("medium");
+  const [rentoFlagMode, setRentoFlagMode] = useState<"css" | "image">(() => {
+    try { return localStorage.getItem("rento_flag_mode") === "css" ? "css" : "image"; }
+    catch { return "css"; }
+  });
 
   // Memory Puzzle options
   const [mpDifficulty, setMpDifficulty] = useState<"easy" | "medium" | "hard">("medium");
@@ -376,7 +384,11 @@ export default function LobbyRoom() {
                   <div className="flex items-center gap-3">
                     <div className="relative">
                       <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white text-xs font-black">
-                        {player.name.slice(0, 2).toUpperCase()}
+                        {player.icon ? (
+                          <span className="text-base leading-none">{player.icon}</span>
+                        ) : (
+                          player.name.slice(0, 2).toUpperCase()
+                        )}
                       </div>
                       {!player.isConnected && (
                         <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-red-600 rounded-full border-2 border-[#180b20]" title="Offline" />
@@ -397,6 +409,60 @@ export default function LobbyRoom() {
                 </div>
               ))}
             </div>
+
+            {!lobbyState.activeGameId && (
+              <div className="border-t border-purple-950/30 pt-3 space-y-3">
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-purple-300/60 font-bold mb-2">
+                    Choose Your Piece
+                  </p>
+                  <div className="grid grid-cols-6 gap-1.5">
+                    {PIECE_ICONS.map((icon) => {
+                      const me = lobbyState.players.find((p) => p.id === myPlayerId);
+                      const active = me?.icon === icon;
+                      return (
+                        <button
+                          key={icon}
+                          onClick={() => setPlayerIcon(icon)}
+                          className={`text-base py-1.5 rounded-lg border transition-all ${
+                            active
+                              ? "bg-purple-600 border-purple-400"
+                              : "bg-[#21112b]/50 border-purple-950/20 hover:bg-[#251330]"
+                          }`}
+                        >
+                          {icon}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-purple-300/60 font-bold mb-2">
+                    Your Fighter Character
+                  </p>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {CHARACTERS.map((ch) => {
+                      const me = lobbyState.players.find((p) => p.id === myPlayerId);
+                      const active = (me?.characterId ?? "cat") === ch.id;
+                      return (
+                        <button
+                          key={ch.id}
+                          onClick={() => setPlayerCharacter(ch.id)}
+                          className={`py-1.5 px-1 rounded-lg border text-[10px] font-bold transition-all ${
+                            active
+                              ? "bg-purple-600 text-white border-purple-400"
+                              : "bg-[#21112b]/50 border-purple-950/20 text-purple-300 hover:bg-[#251330] hover:text-white"
+                          }`}
+                        >
+                          {ch.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {isHost && (
               <button
@@ -674,7 +740,8 @@ export default function LobbyRoom() {
                       <p className="text-purple-300/50 text-[10px] leading-snug">
                         Real-time online brawl — each player controls their own fighter from their
                         own device. Move, jump, punch, kick, block, and unleash your special when
-                        your meter is full. First to the target round wins takes the match!
+                        your meter is full. First to the target round wins takes the match! Pick
+                        your character in the party member list on the left.
                       </p>
                     </div>
                   )}
@@ -752,6 +819,21 @@ export default function LobbyRoom() {
                             <option value="ocean">Ocean</option>
                             <option value="sunset">Sunset</option>
                             <option value="emerald">Emerald</option>
+                          </select>
+                        </label>
+                        <label className="space-y-1 block">
+                          <span className="text-purple-300/70 block">Flag Style</span>
+                          <select
+                            value={rentoFlagMode}
+                            onChange={(e) => {
+                              const mode = e.target.value as "css" | "image";
+                              setRentoFlagMode(mode);
+                              try { localStorage.setItem("rento_flag_mode", mode); } catch { /* ignore */ }
+                            }}
+                            className="w-full bg-[#271533] border border-purple-900/40 rounded px-2 py-1.5 text-white focus:outline-none"
+                          >
+                            <option value="css">Drawn</option>
+                            <option value="image">Real</option>
                           </select>
                         </label>
                         <label className="space-y-1 block">

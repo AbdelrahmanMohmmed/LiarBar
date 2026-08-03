@@ -2,10 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useGame } from "@/lib/gameContext";
 import { useLanguage } from "@/lib/languageContext";
-import { codeToEmoji } from "@/lib/utils";
+import { flagImageUrl } from "@/lib/utils";
 import { COLORS, uiFont } from "@/pages/domino/theme";
 import { Panel, PrimaryButton, SecondaryButton, Badge } from "@/pages/domino/ui";
 import { Users, Bot, Share2, Copy, Trash2 } from "lucide-react";
+import { PIECE_ICONS } from "@/lib/pieceIcons";
 
 const COPY = {
   ar: {
@@ -26,6 +27,7 @@ const COPY = {
     hard: "صعب",
     maxReached: "تم الوصول للحد الأقصى",
     settingsTitle: "خيارات الغرفة",
+    choosePiece: "اختر قطعتك",
     startingBalance: "رأس المال الابتدائي",
     jail: "السجن",
     freeParking: "جائزة الوقوف",
@@ -53,6 +55,7 @@ const COPY = {
     hard: "Hard",
     maxReached: "Max players reached",
     settingsTitle: "Room Options",
+    choosePiece: "Choose Your Piece",
     startingBalance: "Starting Balance",
     jail: "Jail",
     freeParking: "Free Parking",
@@ -70,6 +73,7 @@ export default function RentoRoom() {
   const {
     rentoState, myPlayerId, joinRoom, reconnectRoom,
     startGame, addBot, removeBot, addToast, leaveRoom,
+    setPlayerIcon,
   } = useGame();
   const { lang } = useLanguage();
   const isAr = lang === "ar";
@@ -284,7 +288,15 @@ export default function RentoRoom() {
                   }}
                 >
                   <span style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700 }}>
-                    {p.isBot ? <Bot className="w-4 h-4" /> : <span>{codeToEmoji(p.flag)}</span>}
+                    {p.icon ? (
+                      <span style={{ fontSize: 18 }}>{p.icon}</span>
+                    ) : p.isBot ? (
+                      <Bot className="w-4 h-4" />
+                    ) : flagImageUrl(p.flag) ? (
+                      <img src={flagImageUrl(p.flag)!} alt="" style={{ width: 20, height: 15, borderRadius: 2, objectFit: "cover" }} />
+                    ) : (
+                      <span>🌐</span>
+                    )}
                     {p.name} {p.id === myPlayerId ? `(${c.you})` : ""}
                   </span>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -316,6 +328,34 @@ export default function RentoRoom() {
                   {isAr ? "بانتظار لاعبين آخرين..." : "Waiting for player..."}
                 </div>
               ))}
+            </div>
+          </Panel>
+
+          <Panel style={{ padding: 20, marginBottom: 20 }}>
+            <h3 style={{ margin: "0 0 12px 0", fontSize: 16, fontWeight: 800, textAlign }}>
+              {c.choosePiece}
+            </h3>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(38px, 1fr))", gap: 6 }}>
+              {PIECE_ICONS.map((icon) => {
+                const myIcon = rentoState.players.find((p) => p.id === myPlayerId)?.icon;
+                const active = myIcon === icon;
+                return (
+                  <button
+                    key={icon}
+                    onClick={() => setPlayerIcon(icon)}
+                    style={{
+                      fontSize: 18,
+                      padding: "6px 0",
+                      borderRadius: 10,
+                      border: active ? `2px solid ${COLORS.ink}` : "2px solid transparent",
+                      background: active ? COLORS.peach : COLORS.white,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {icon}
+                  </button>
+                );
+              })}
             </div>
           </Panel>
 

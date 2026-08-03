@@ -392,6 +392,30 @@ export function registerSocketHandlers(
       reply(callback, { success: true });
     });
 
+    // Player-chosen piece icon (Rento/Snake & Ladder board token) and fighter
+    // character id — generic, game-agnostic mutations on the caller's own Player.
+    // Only meaningful before a sub-game has started; picking after that point
+    // won't retroactively change an already-running sub-game's own player copy.
+    socket.on("set_player_icon", (data: { icon?: string }, callback: Ack) => {
+      const m = membership();
+      if (!m) { fail(callback, "Not in a room"); return; }
+      if (typeof data?.icon === "string" && data.icon.length > 0 && data.icon.length <= 8) {
+        m.player.icon = data.icon;
+      }
+      broadcastState(io, m.room);
+      reply(callback, { success: true });
+    });
+
+    socket.on("set_player_character", (data: { characterId?: string }, callback: Ack) => {
+      const m = membership();
+      if (!m) { fail(callback, "Not in a room"); return; }
+      if (typeof data?.characterId === "string" && data.characterId.length > 0 && data.characterId.length <= 32) {
+        m.player.characterId = data.characterId;
+      }
+      broadcastState(io, m.room);
+      reply(callback, { success: true });
+    });
+
     socket.on("start_game", (_data: unknown, callback: Ack) => {
       const m = hostMembership(callback);
       if (!m) return;

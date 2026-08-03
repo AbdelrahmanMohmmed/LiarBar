@@ -395,12 +395,17 @@ export default function SnakeLadderLobbyGame() {
         ctx.lineWidth = 1.5;
         ctx.stroke();
 
-        // initial letter
-        ctx.fillStyle = "#fff";
-        ctx.font = "bold 12px sans-serif";
+        // piece icon (falls back to the player's initial letter if none assigned)
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText(p.name.charAt(0).toUpperCase(), 0, 0);
+        if (p.icon) {
+          ctx.font = "13px sans-serif";
+          ctx.fillText(p.icon, 0, 0);
+        } else {
+          ctx.fillStyle = "#fff";
+          ctx.font = "bold 12px sans-serif";
+          ctx.fillText(p.name.charAt(0).toUpperCase(), 0, 0);
+        }
         ctx.restore();
 
         // Player name label
