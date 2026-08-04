@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useGame } from "@/lib/gameContext";
 import { useLanguage } from "@/lib/languageContext";
@@ -30,7 +30,7 @@ export default function RentoGame() {
   const { roomId: paramRoomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
   const {
-    rentoState, myPlayerId, leaveRoom,
+    rentoState, myPlayerId, leaveRoom, reconnectRoom,
   } = useGame();
   const { lang } = useLanguage();
   const isAr = lang === "ar";
@@ -39,6 +39,23 @@ export default function RentoGame() {
   const textAlign = isAr ? "right" : "left";
 
   const [showHelp, setShowHelp] = useState(false);
+  const [reconnected, setReconnected] = useState(false);
+
+  // Reconnect on mount (e.g. after a page refresh or a dropped connection
+  // mid-match) — every other *Game.tsx screen already does this.
+  useEffect(() => {
+    if (reconnected) return;
+    const storedRoomId = localStorage.getItem("liarsbar_roomId");
+    const storedPlayerId = localStorage.getItem("liarsbar_playerId");
+
+    if (paramRoomId && storedRoomId === paramRoomId && storedPlayerId) {
+      reconnectRoom(paramRoomId, storedPlayerId)
+        .then(() => setReconnected(true))
+        .catch(() => setReconnected(true));
+    } else {
+      setReconnected(true);
+    }
+  }, [paramRoomId, reconnectRoom, reconnected]);
 
   const handleLeave = useCallback(() => {
     leaveRoom();

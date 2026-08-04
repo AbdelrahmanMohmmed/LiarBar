@@ -345,6 +345,15 @@ export class RentoGame implements GameRoom {
     this.turnDeadline = Date.now() + this.turnTimerMs;
     this.turnTimer = setTimeout(() => {
       if (this.phase === "playing" && !this.moveLock) {
+        const currentId = this.getCurrentPlayerId();
+        const ps = currentId ? this.playerStates.get(currentId) : null;
+        if (currentId && ps && ps.money < 0) {
+          // Ran out the clock while still in debt — that's the only way
+          // negative money actually costs you the game (besides declaring
+          // bankruptcy yourself or being voted out).
+          this.eliminatePlayer(currentId, `${this.getPlayerName(currentId)} ran out of time in debt and went bankrupt!`);
+          return;
+        }
         this.lastAction = "AFK! Turn skipped.";
         this.doublesCount = 0;
         this.nextTurn();
@@ -573,11 +582,10 @@ export class RentoGame implements GameRoom {
       }
     }
 
-    if (ps.money < 0) {
-      ps.bankrupt = true;
-      this.lastAction = `${name} is bankrupt!`;
-      this.checkWinner();
-    }
+    // Negative money doesn't eliminate you on the spot anymore — you keep your
+    // turn to sell houses/properties or arrange a trade. You only actually go
+    // bankrupt if your turn's timer runs out while still negative (see
+    // startTurnTimer), you declare bankruptcy yourself, or you're voted out.
 
     this.broadcast();
 
@@ -649,6 +657,59 @@ export class RentoGame implements GameRoom {
     this.lastAction = newCount >= 5
       ? `${name} built a hotel on ${cell.name}!`
       : `${name} built a house on ${cell.name}! (${newCount}/5)`;
+
+    this.lastActivityAt = Date.now();
+    this.broadcast();
+    return { success: true };
+  }
+
+  sellHouse(playerId: string, propertyId: number): { success: boolean; error?: string } {
+    if (this.phase !== "playing") return { success: false, error: "Game not active" };
+    const ps = this.playerStates.get(playerId);
+    if (!ps) return { success: false, error: "No player state" };
+    if (!ps.properties.includes(propertyId)) return { success: false, error: "You don't own that property" };
+
+    const cell = this.board[propertyId];
+    const current = ps.houses.get(propertyId) ?? 0;
+    if (current <= 0) return { success: false, error: "No houses to sell" };
+
+    const buildCost = Math.round(cell.price / 2);
+    const refund = Math.round(buildCost / 2);
+    ps.money += refund;
+    const newCount = current - 1;
+    if (newCount <= 0) ps.houses.delete(propertyId);
+    else ps.houses.set(propertyId, newCount);
+
+    const name = this.getPlayerName(playerId);
+    this.lastAction = current >= 5
+      ? `${name} sold the hotel on ${cell.name} for $${refund}.`
+      : `${name} sold a house on ${cell.name} for $${refund}.`;
+
+    this.lastActivityAt = Date.now();
+    this.broadcast();
+    return { success: true };
+  }
+
+  sellProperty(playerId: string, propertyId: number): { success: boolean; error?: string } {
+    if (this.phase !== "playing") return { success: false, error: "Game not active" };
+    const ps = this.playerStates.get(playerId);
+    if (!ps) return { success: false, error: "No player state" };
+    if (!ps.properties.includes(propertyId)) return { success: false, error: "You don't own that property" };
+
+    const cell = this.board[propertyId];
+    if ((ps.houses.get(propertyId) ?? 0) > 0) return { success: false, error: "Sell the houses first" };
+
+    const refund = Math.round(cell.price / 2);
+    ps.money += refund;
+    ps.properties = ps.properties.filter((pid) => pid !== propertyId);
+
+    const color = cell.color;
+    const allColorProps = this.board.filter(c => c.color === color && (c.type === "property" || c.type === "utility")).map(c => c.id);
+    const stillComplete = allColorProps.length > 0 && allColorProps.every((pid) => ps.properties.includes(pid));
+    if (!stillComplete) ps.upgradedColors.delete(color);
+
+    const name = this.getPlayerName(playerId);
+    this.lastAction = `${name} sold ${cell.name} back to the bank for $${refund}.`;
 
     this.lastActivityAt = Date.now();
     this.broadcast();

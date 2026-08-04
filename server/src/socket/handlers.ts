@@ -897,6 +897,38 @@ export function registerSocketHandlers(
       reply(callback, { success: true });
     });
 
+    socket.on("rento_sell_house", (data: unknown, callback: Ack) => {
+      const m = rentoMembership(callback);
+      if (!m) return;
+      const d = data as { propertyId?: number };
+      if (d.propertyId === undefined) {
+        fail(callback, "Missing propertyId");
+        return;
+      }
+      const result = m.room.sellHouse(m.player.id, Number(d.propertyId));
+      if (!result.success) {
+        fail(callback, result.error ?? "Cannot sell house");
+        return;
+      }
+      reply(callback, { success: true });
+    });
+
+    socket.on("rento_sell_property", (data: unknown, callback: Ack) => {
+      const m = rentoMembership(callback);
+      if (!m) return;
+      const d = data as { propertyId?: number };
+      if (d.propertyId === undefined) {
+        fail(callback, "Missing propertyId");
+        return;
+      }
+      const result = m.room.sellProperty(m.player.id, Number(d.propertyId));
+      if (!result.success) {
+        fail(callback, result.error ?? "Cannot sell property");
+        return;
+      }
+      reply(callback, { success: true });
+    });
+
     socket.on("rento_accept_trade", (data: unknown, callback: Ack) => {
       const m = rentoMembership(callback);
       if (!m) return;

@@ -6,11 +6,19 @@ import { VoiceControls } from "@/components/VoiceControls";
 import { MessageCircle, Send, Crown, UserX } from "lucide-react";
 import { flagImageUrl } from "@/lib/utils";
 
-const CELL_SIZE = 78;       // each tile is 78×78 — compact board, less vertical scroll
-const CORNER = CELL_SIZE;   // corners are square
+// Board is a wide, short rectangle rather than a square: CELL_W controls the
+// top/bottom rows' tile width (and thus the board's overall width — wide, to
+// sit close to the sidebar), CELL_H_SIDE controls the left/right columns'
+// tile height (and thus the board's overall height), and TILE_DEPTH is the
+// perpendicular "thickness" shared by every edge tile — height for top/bottom
+// tiles, width for left/right tiles — this is the actual property-box size.
+const CELL_W = 120;         // top/bottom row tile width
+const CELL_H_SIDE = 70;     // left/right column tile height
+const TILE_DEPTH = 58;      // property box depth (was 78 — shorter boxes)
+const CORNER = TILE_DEPTH;  // corners are square, sized to the board's depth
 const INNER_TILES = 9;      // tiles between corners on each side
-const BOARD_W = CORNER + INNER_TILES * CELL_SIZE + CORNER; // 1100
-const BOARD_H = CORNER + INNER_TILES * CELL_SIZE + CORNER; // 1100 square
+const BOARD_W = CORNER + INNER_TILES * CELL_W + CORNER;
+const BOARD_H = CORNER + INNER_TILES * CELL_H_SIDE + CORNER;
 const CANVAS_W = BOARD_W + 40;               // board padding only (sidebar is now DOM, not canvas)
 const CANVAS_H = BOARD_H + 40;
 
@@ -129,24 +137,24 @@ function getTilePos(i: number): { x: number; y: number; w: number; h: number } {
   if (i <= 10) {
     // Bottom row: left → right (0=GO corner, 10=Jail corner)
     if (i === 0)  return { x: 0,                       y: BOARD_H - CORNER, w: CORNER, h: CORNER };
-    if (i === 10) return { x: CORNER + INNER_TILES * CELL_SIZE, y: BOARD_H - CORNER, w: CORNER, h: CORNER };
-    return           { x: CORNER + (i - 1) * CELL_SIZE,   y: BOARD_H - CORNER, w: CELL_SIZE, h: CORNER };
+    if (i === 10) return { x: CORNER + INNER_TILES * CELL_W, y: BOARD_H - CORNER, w: CORNER, h: CORNER };
+    return           { x: CORNER + (i - 1) * CELL_W,   y: BOARD_H - CORNER, w: CELL_W, h: CORNER };
   }
   if (i <= 19) {
     // Right column: bottom → top (11-19, all inner tiles)
     const vi = i - 10; // 1..9
-    return { x: BOARD_W - CORNER, y: BOARD_H - CORNER - vi * CELL_SIZE, w: CORNER, h: CELL_SIZE };
+    return { x: BOARD_W - CORNER, y: BOARD_H - CORNER - vi * CELL_H_SIDE, w: CORNER, h: CELL_H_SIDE };
   }
   if (i <= 30) {
     // Top row: right → left (20=FreeParking corner, 30=GoToJail corner)
     if (i === 20) return { x: BOARD_W - CORNER, y: 0, w: CORNER, h: CORNER };
     if (i === 30) return { x: 0,                       y: 0, w: CORNER, h: CORNER };
     const ri = 30 - i; // 1..9 from left
-    return           { x: CORNER + (ri - 1) * CELL_SIZE, y: 0, w: CELL_SIZE, h: CORNER };
+    return           { x: CORNER + (ri - 1) * CELL_W, y: 0, w: CELL_W, h: CORNER };
   }
   // Left column: top → bottom (31-39, all inner tiles)
   const vi = i - 30; // 1..9
-  return { x: 0, y: CORNER + (vi - 1) * CELL_SIZE, w: CORNER, h: CELL_SIZE };
+  return { x: 0, y: CORNER + (vi - 1) * CELL_H_SIDE, w: CORNER, h: CELL_H_SIDE };
 }
 
 export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: string }) {
@@ -363,6 +371,8 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
   };
 
   const buildHouse = (propertyId: number) => { getSocket().emit("rento_build_house", { propertyId }); };
+  const sellHouse = (propertyId: number) => { getSocket().emit("rento_sell_house", { propertyId }); };
+  const sellProperty = (propertyId: number) => { getSocket().emit("rento_sell_property", { propertyId }); };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -413,8 +423,8 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
       const oy = 20;
 
       // Board interior: soft radial glow instead of a flat fill
-      const interiorX = ox + CELL_SIZE, interiorY = oy + CELL_SIZE;
-      const interiorW = BOARD_W - CELL_SIZE * 2, interiorH = BOARD_H - CELL_SIZE * 2;
+      const interiorX = ox + CORNER, interiorY = oy + CORNER;
+      const interiorW = BOARD_W - CORNER * 2, interiorH = BOARD_H - CORNER * 2;
       const centerX = ox + BOARD_W / 2;
       const centerY = oy + BOARD_H / 2;
 
@@ -674,16 +684,17 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
           ctx.fill();
           ctx.restore();
 
-          // House/hotel badge, top-left corner of the tile
+          // House/hotel badge — big, centered right on top of the flag.
           if (ownerHouses > 0) {
             ctx.save();
-            ctx.font = `bold ${Math.max(9, Math.round(pos.w * 0.15))}px sans-serif`;
-            ctx.textAlign = "left";
-            ctx.textBaseline = "top";
-            ctx.shadowColor = "rgba(0,0,0,0.85)";
-            ctx.shadowBlur = 3;
+            const iconSize = Math.max(16, Math.round(Math.min(pos.w, pos.h) * 0.62));
+            ctx.font = `bold ${iconSize}px sans-serif`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.shadowColor = "rgba(0,0,0,0.9)";
+            ctx.shadowBlur = 5;
             ctx.fillStyle = "#fff";
-            ctx.fillText(ownerHouses >= 5 ? "🏨" : `🏠${ownerHouses}`, px + 3, py + 2);
+            ctx.fillText(ownerHouses >= 5 ? "🏨" : `🏠${ownerHouses}`, px + pos.w / 2, py + pos.h / 2);
             ctx.restore();
           }
         }
@@ -824,6 +835,7 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
       total: "الإجمالي", edit: "تعديل", save: "حفظ", close: "إغلاق", completeSet: "مجموعة كاملة",
       build: "بناء", houseCount: "منزل", hotel: "فندق", notEnoughForHouse: "لا يوجد مال كافٍ",
       editTradeTitle: "تعديل التبادل", viewDetails: "عرض التفاصيل", with: "مع",
+      sellHouse: "بيع منزل", sellProperty: "بيع الملكية", sellHousesFirst: "بع المنازل أولاً",
     },
     en: {
       title: "Rento", roll: "Roll Dice", buy: "Buy Property", endTurn: "End Turn", turn: "Your turn", notTurn: "Waiting...",
@@ -839,6 +851,7 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
       total: "Total", edit: "Edit", save: "Save", close: "Close", completeSet: "Complete set",
       build: "Build", houseCount: "house", hotel: "hotel", notEnoughForHouse: "Not enough money",
       editTradeTitle: "Edit Trade", viewDetails: "View details", with: "with",
+      sellHouse: "Sell house", sellProperty: "Sell property", sellHousesFirst: "Sell houses first",
     },
   }[isAr ? "ar" : "en"];
 
@@ -902,7 +915,7 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
         </div>
       </div>
 
-      <div className="relative z-10 w-full flex flex-col lg:flex-row gap-4 items-start justify-center" style={{ maxWidth: "98vw" }}>
+      <div className="relative z-10 w-full flex flex-col lg:flex-row gap-3 items-start justify-center" style={{ maxWidth: "98vw" }}>
         {/* Board column */}
         <div className="flex-1 min-w-0 flex flex-col items-center gap-2">
           <div className="relative w-full overflow-x-auto">
@@ -1244,28 +1257,55 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
                             <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/15 px-1.5 py-0.5 rounded-full">{i18n.completeSet}</span>
                           )}
                         </div>
-                        <div className="flex flex-col gap-1">
+                        <div className="flex flex-col gap-2">
                           {cells.map((cell: any) => {
                             const houses = me.houses?.[cell.id] ?? 0;
                             const canBuild = isComplete && cell.type === "property" && houses < 5;
-                            const cost = Math.round(cell.price / 2);
-                            const canAfford = me.money >= cost;
+                            const buildCost = Math.round(cell.price / 2);
+                            const canAffordBuild = me.money >= buildCost;
+                            const houseSellRefund = Math.round(buildCost / 2);
+                            const propertySellRefund = Math.round(cell.price / 2);
+                            const canSellProperty = houses === 0;
+                            const flagUrl = flagImageUrl(cell.flag);
                             return (
-                              <div key={cell.id} className="flex items-center justify-between gap-2 animate-pop-in">
-                                <span className="text-white/70 text-xs truncate flex-1">
-                                  {isAr ? cell.nameAr : cell.name}
-                                  {houses > 0 && <span className="ms-1">{houses >= 5 ? "🏨" : "🏠".repeat(houses)}</span>}
+                              <div key={cell.id} className="flex flex-col gap-1 animate-pop-in">
+                                <span className="text-white/70 text-xs truncate flex items-center gap-1.5">
+                                  {flagUrl ? (
+                                    <img src={flagUrl} alt="" className="w-4 h-3 rounded-sm object-cover flex-shrink-0" />
+                                  ) : (
+                                    <span className="flex-shrink-0">🌐</span>
+                                  )}
+                                  <span className="truncate">{isAr ? cell.nameAr : cell.name}</span>
+                                  {houses > 0 && <span className="ms-1 flex-shrink-0">{houses >= 5 ? "🏨" : "🏠".repeat(houses)}</span>}
                                 </span>
-                                {canBuild && (
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  {canBuild && (
+                                    <button
+                                      onClick={() => buildHouse(cell.id)}
+                                      disabled={!canAffordBuild}
+                                      title={!canAffordBuild ? i18n.notEnoughForHouse : undefined}
+                                      className="flex-shrink-0 px-2 py-0.5 rounded-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-[10px] font-bold transition-all hover:scale-105 active:scale-95"
+                                    >
+                                      {houses === 4 ? `🏨 $${buildCost}` : `🏠 $${buildCost}`}
+                                    </button>
+                                  )}
+                                  {houses > 0 && (
+                                    <button
+                                      onClick={() => sellHouse(cell.id)}
+                                      className="flex-shrink-0 px-2 py-0.5 rounded-full bg-amber-600 hover:bg-amber-500 text-white text-[10px] font-bold transition-all hover:scale-105 active:scale-95"
+                                    >
+                                      {i18n.sellHouse} ${houseSellRefund}
+                                    </button>
+                                  )}
                                   <button
-                                    onClick={() => buildHouse(cell.id)}
-                                    disabled={!canAfford}
-                                    title={!canAfford ? i18n.notEnoughForHouse : undefined}
-                                    className="flex-shrink-0 px-2 py-0.5 rounded-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-[10px] font-bold transition-all hover:scale-105 active:scale-95"
+                                    onClick={() => sellProperty(cell.id)}
+                                    disabled={!canSellProperty}
+                                    title={!canSellProperty ? i18n.sellHousesFirst : undefined}
+                                    className="flex-shrink-0 px-2 py-0.5 rounded-full bg-rose-600/80 hover:bg-rose-500 disabled:opacity-30 disabled:cursor-not-allowed text-white text-[10px] font-bold transition-all hover:scale-105 active:scale-95"
                                   >
-                                    {houses === 4 ? `🏨 $${cost}` : `🏠 $${cost}`}
+                                    {i18n.sellProperty} ${propertySellRefund}
                                   </button>
-                                )}
+                                </div>
                               </div>
                             );
                           })}
