@@ -6,17 +6,11 @@ import { VoiceControls } from "@/components/VoiceControls";
 import { MessageCircle, Send, Crown, UserX } from "lucide-react";
 import { flagImageUrl } from "@/lib/utils";
 
-// CELL is the along-edge tile size, shared by every side so top/bottom and
-// left/right tiles are the same size as each other. TILE_DEPTH is the
-// perpendicular "thickness" of every edge tile — height for top/bottom tiles,
-// width for left/right tiles — this is the actual property-box size, kept
-// short independent of CELL.
-const CELL = 96;            // along-edge tile size (all four sides, uniform)
-const TILE_DEPTH = 58;      // property box depth (was 78 — shorter boxes)
-const CORNER = TILE_DEPTH;  // corners are square, sized to the board's depth
+const CELL_SIZE = 78;       // each tile is 78×78 — compact board, less vertical scroll
+const CORNER = CELL_SIZE;   // corners are square
 const INNER_TILES = 9;      // tiles between corners on each side
-const BOARD_W = CORNER + INNER_TILES * CELL + CORNER;
-const BOARD_H = CORNER + INNER_TILES * CELL + CORNER;
+const BOARD_W = CORNER + INNER_TILES * CELL_SIZE + CORNER; // 1100
+const BOARD_H = CORNER + INNER_TILES * CELL_SIZE + CORNER; // 1100 square
 const CANVAS_W = BOARD_W + 40;               // board padding only (sidebar is now DOM, not canvas)
 const CANVAS_H = BOARD_H + 40;
 
@@ -135,24 +129,24 @@ function getTilePos(i: number): { x: number; y: number; w: number; h: number } {
   if (i <= 10) {
     // Bottom row: left → right (0=GO corner, 10=Jail corner)
     if (i === 0)  return { x: 0,                       y: BOARD_H - CORNER, w: CORNER, h: CORNER };
-    if (i === 10) return { x: CORNER + INNER_TILES * CELL, y: BOARD_H - CORNER, w: CORNER, h: CORNER };
-    return           { x: CORNER + (i - 1) * CELL,   y: BOARD_H - CORNER, w: CELL, h: CORNER };
+    if (i === 10) return { x: CORNER + INNER_TILES * CELL_SIZE, y: BOARD_H - CORNER, w: CORNER, h: CORNER };
+    return           { x: CORNER + (i - 1) * CELL_SIZE,   y: BOARD_H - CORNER, w: CELL_SIZE, h: CORNER };
   }
   if (i <= 19) {
     // Right column: bottom → top (11-19, all inner tiles)
     const vi = i - 10; // 1..9
-    return { x: BOARD_W - CORNER, y: BOARD_H - CORNER - vi * CELL, w: CORNER, h: CELL };
+    return { x: BOARD_W - CORNER, y: BOARD_H - CORNER - vi * CELL_SIZE, w: CORNER, h: CELL_SIZE };
   }
   if (i <= 30) {
     // Top row: right → left (20=FreeParking corner, 30=GoToJail corner)
     if (i === 20) return { x: BOARD_W - CORNER, y: 0, w: CORNER, h: CORNER };
     if (i === 30) return { x: 0,                       y: 0, w: CORNER, h: CORNER };
     const ri = 30 - i; // 1..9 from left
-    return           { x: CORNER + (ri - 1) * CELL, y: 0, w: CELL, h: CORNER };
+    return           { x: CORNER + (ri - 1) * CELL_SIZE, y: 0, w: CELL_SIZE, h: CORNER };
   }
   // Left column: top → bottom (31-39, all inner tiles)
   const vi = i - 30; // 1..9
-  return { x: 0, y: CORNER + (vi - 1) * CELL, w: CORNER, h: CELL };
+  return { x: 0, y: CORNER + (vi - 1) * CELL_SIZE, w: CORNER, h: CELL_SIZE };
 }
 
 export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: string }) {
