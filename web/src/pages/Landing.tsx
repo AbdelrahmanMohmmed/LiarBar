@@ -268,7 +268,14 @@ export default function Landing() {
           </p>
         </section>
 
-        <section style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+        <section
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(290px, 1fr))",
+            gap: 20,
+            alignItems: "stretch",
+          }}
+        >
           {/* Liar's Bar — available */}
           <article
             style={{
