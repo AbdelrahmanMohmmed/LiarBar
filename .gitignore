@@ -7,3 +7,5 @@ build/
 .DS_Store
 Thumbs.db
 bun.lock
+temp_screenshots/
+tools_img/
