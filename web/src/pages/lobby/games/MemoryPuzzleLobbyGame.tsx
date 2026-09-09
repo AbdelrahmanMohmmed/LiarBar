@@ -2,13 +2,22 @@ import { useEffect, useRef } from "react";
 import { useGame } from "@/lib/gameContext";
 import { getSocket } from "@/lib/socket";
 import { useLanguage } from "@/lib/languageContext";
+import WinOverlay from "./WinOverlay";
 
 const BOX = 52;
 const GAP = 8;
+const FLIP_MS = 220;
+const PLAYER_COLORS = ["#2dd4bf", "#f5a524", "#38bdf8", "#c084fc", "#fb7185", "#a3e635"];
 
-type Shape = "donut" | "square" | "diamond" | "lines" | "oval";
+type Shape = "donut" | "square" | "diamond" | "lines" | "oval" | "star" | "triangle";
 type Color = { r: number; g: number; b: number };
 type Icon = { shape: Shape; color: Color };
+
+interface CardAnim {
+  fromProgress: number;
+  toProgress: number;
+  start: number;
+}
 
 export default function MemoryPuzzleLobbyGame() {
   const { lobbyState, myPlayerId } = useGame();
@@ -18,6 +27,12 @@ export default function MemoryPuzzleLobbyGame() {
   const state = (lobbyState?.subGameState ?? null) as any;
   const stateRef = useRef(state);
   stateRef.current = state;
+
+  // Flip-animation tween: track each card's revealed-ness (0 = showing the cover
+  // pattern, 1 = showing its icon) and tween between the two whenever the server
+  // toggles `revealed`/`matched`, instead of the previous instant toggle.
+  const cardVisibleRef = useRef<Record<string, boolean>>({});
+  const cardAnimRef = useRef<Record<string, CardAnim>>({});
 
   const handleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const st = stateRef.current;
@@ -52,8 +67,16 @@ export default function MemoryPuzzleLobbyGame() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    const getProgress = (key: string, now: number): number => {
+      const a = cardAnimRef.current[key];
+      if (!a) return cardVisibleRef.current[key] ? 1 : 0;
+      const t = Math.min(1, (now - a.start) / FLIP_MS);
+      return a.fromProgress + (a.toProgress - a.fromProgress) * t;
+    };
+
     let raf = 0;
     const loop = () => {
+      const now = performance.now();
       const st = stateRef.current;
       const bw = st?.boardW || 8;
       const bh = st?.boardH || 6;
@@ -72,15 +95,38 @@ export default function MemoryPuzzleLobbyGame() {
           for (let y = 0; y < bh; y++) {
             const card = st.board[x]?.[y];
             if (!card) continue;
+            const key = `${x},${y}`;
             const px = ox + x * (BOX + GAP);
             const py = oy + y * (BOX + GAP);
+
+            const visible = !!(card.revealed || card.matched);
+            const wasVisible = cardVisibleRef.current[key];
+            if (wasVisible === undefined) {
+              cardVisibleRef.current[key] = visible;
+            } else if (wasVisible !== visible) {
+              cardAnimRef.current[key] = {
+                fromProgress: getProgress(key, now),
+                toProgress: visible ? 1 : 0,
+                start: now,
+              };
+              cardVisibleRef.current[key] = visible;
+            }
+
+            const progress = getProgress(key, now);
+            const showIcon = progress >= 0.5;
+            const scaleX = Math.max(0.04, Math.abs(Math.cos(progress * Math.PI)));
+
+            ctx.save();
+            ctx.translate(px + BOX / 2, py + BOX / 2);
+            ctx.scale(scaleX, 1);
+            ctx.translate(-(px + BOX / 2), -(py + BOX / 2));
 
             ctx.fillStyle = "#2a2040";
             ctx.beginPath();
             ctx.roundRect(px, py, BOX, BOX, 6);
             ctx.fill();
 
-            if (card.revealed || card.matched) {
+            if (showIcon) {
               drawIcon(ctx, card.icon, px, py, BOX);
               if (card.matched) {
                 ctx.strokeStyle = "#a78bfa";
@@ -99,6 +145,7 @@ export default function MemoryPuzzleLobbyGame() {
               ctx.arc(px + BOX / 2, py + BOX / 2, BOX / 4, 0, Math.PI * 2);
               ctx.fill();
             }
+            ctx.restore();
           }
         }
       }
@@ -110,20 +157,23 @@ export default function MemoryPuzzleLobbyGame() {
   }, []);
 
   const i18n = {
-    ar: { title: "لغز الذاكرة", you: "أنت", pairs: "الأزواج", moves: "المحاولات", countdown: "ابدأ!", won: "فزت!" },
-    en: { title: "Memory Puzzle", you: "You", pairs: "Pairs", moves: "Moves", countdown: "Go!", won: "Won!" },
+    ar: { title: "لغز الذاكرة", you: "أنت", pairs: "الأزواج", moves: "المحاولات", countdown: "ابدأ!", won: "فزتم!" },
+    en: { title: "Memory Puzzle", you: "You", pairs: "Pairs", moves: "Moves", countdown: "Go!", won: "Wins!" },
   }[isAr ? "ar" : "en"];
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-3 p-4 bg-[#0b0710]">
       <div className="flex items-center gap-4 flex-wrap justify-center text-sm">
-        {(state?.players ?? []).map((p: any) => (
-          <div key={p.id} className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-sm bg-fuchsia-500" />
-            <span className="text-white/80">{p.name}{p.id === myPlayerId ? ` (${i18n.you})` : ""}</span>
-            <span className="text-fuchsia-300">{p.score}</span>
-          </div>
-        ))}
+        {(state?.players ?? []).map((p: any, i: number) => {
+          const color = PLAYER_COLORS[i % PLAYER_COLORS.length];
+          return (
+            <div key={p.id} className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-sm" style={{ background: color }} />
+              <span className="text-white/80">{p.name}{p.id === myPlayerId ? ` (${i18n.you})` : ""}</span>
+              <span style={{ color }} className="font-bold">{p.score}</span>
+            </div>
+          );
+        })}
         {state?.phase === "playing" && (
           <div className="text-white/70 font-bold ml-2">
             {i18n.pairs}: {state.pairsFound}/{state.totalPairs}
@@ -143,17 +193,16 @@ export default function MemoryPuzzleLobbyGame() {
             {state.countdownLeft > 0 ? state.countdownLeft : i18n.countdown}
           </div>
         )}
-        {state?.phase === "finished" && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/75 rounded-xl">
-            <div className="text-2xl font-bold text-fuchsia-300">{i18n.won}</div>
-            <div className="text-white">
-              {(state.winners ?? []).map((id: string) => {
-                const w = state.players.find((p: any) => p.id === id);
-                return w ? w.name : "";
-              }).join(", ")}
-            </div>
-          </div>
-        )}
+        {state?.phase === "finished" && (() => {
+          const winnerIds: string[] = state.winners ?? [];
+          const winnerNames = winnerIds
+            .map((id) => state.players?.find((p: any) => p.id === id)?.name)
+            .filter(Boolean)
+            .join(", ");
+          const winnerIdx = state.players?.findIndex((p: any) => p.id === winnerIds[0]) ?? -1;
+          const color = winnerIdx >= 0 ? PLAYER_COLORS[winnerIdx % PLAYER_COLORS.length] : undefined;
+          return <WinOverlay winnerName={winnerNames || "?"} color={color} subtitle={i18n.won} />;
+        })()}
       </div>
       <p className="text-white/40 text-xs text-center max-w-md">
         {isAr
@@ -167,27 +216,39 @@ export default function MemoryPuzzleLobbyGame() {
 function drawIcon(ctx: CanvasRenderingContext2D, icon: Icon, px: number, py: number, size: number) {
   const { r, g, b } = icon.color;
   const color = `rgb(${r},${g},${b})`;
+  const darker = `rgb(${Math.floor(r * 0.6)},${Math.floor(g * 0.6)},${Math.floor(b * 0.6)})`;
   const half = size / 2;
   const quarter = size / 4;
 
   ctx.save();
+  ctx.shadowColor = "rgba(0,0,0,0.35)";
+  ctx.shadowBlur = 4;
+  ctx.shadowOffsetY = 1;
+
+  const grad = ctx.createLinearGradient(px, py, px + size, py + size);
+  grad.addColorStop(0, color);
+  grad.addColorStop(1, darker);
+
   switch (icon.shape) {
     case "donut":
-      ctx.fillStyle = color;
+      ctx.fillStyle = grad;
       ctx.beginPath();
       ctx.arc(px + half, py + half, half - 4, 0, Math.PI * 2);
       ctx.fill();
+      ctx.shadowColor = "transparent";
       ctx.fillStyle = "#0e0b16";
       ctx.beginPath();
       ctx.arc(px + half, py + half, quarter - 2, 0, Math.PI * 2);
       ctx.fill();
       break;
     case "square":
-      ctx.fillStyle = color;
-      ctx.fillRect(px + quarter, py + quarter, half, half);
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.roundRect(px + quarter, py + quarter, half, half, 4);
+      ctx.fill();
       break;
     case "diamond":
-      ctx.fillStyle = color;
+      ctx.fillStyle = grad;
       ctx.beginPath();
       ctx.moveTo(px + half, py + 2);
       ctx.lineTo(px + size - 2, py + half);
@@ -197,7 +258,8 @@ function drawIcon(ctx: CanvasRenderingContext2D, icon: Icon, px: number, py: num
       ctx.fill();
       break;
     case "lines":
-      ctx.strokeStyle = color;
+      ctx.shadowColor = "transparent";
+      ctx.strokeStyle = grad;
       ctx.lineWidth = 2;
       for (let i = 0; i < size; i += 4) {
         ctx.beginPath();
@@ -211,9 +273,37 @@ function drawIcon(ctx: CanvasRenderingContext2D, icon: Icon, px: number, py: num
       }
       break;
     case "oval":
-      ctx.fillStyle = color;
+      ctx.fillStyle = grad;
       ctx.beginPath();
       ctx.ellipse(px + half, py + half, half - 2, quarter, 0, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    case "star": {
+      ctx.fillStyle = grad;
+      const cx = px + half, cy = py + half;
+      const spikes = 5;
+      const outerR = half - 3;
+      const innerR = outerR * 0.45;
+      ctx.beginPath();
+      for (let i = 0; i < spikes * 2; i++) {
+        const r2 = i % 2 === 0 ? outerR : innerR;
+        const angle = (Math.PI / spikes) * i - Math.PI / 2;
+        const x = cx + Math.cos(angle) * r2;
+        const y = cy + Math.sin(angle) * r2;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.fill();
+      break;
+    }
+    case "triangle":
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.moveTo(px + half, py + 3);
+      ctx.lineTo(px + size - 3, py + size - 3);
+      ctx.lineTo(px + 3, py + size - 3);
+      ctx.closePath();
       ctx.fill();
       break;
   }

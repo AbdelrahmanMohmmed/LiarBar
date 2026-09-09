@@ -1,31 +1,32 @@
-import { useCallback, useRef, useEffect, useState } from "react";
+import { useCallback, useRef, useEffect, useState, useMemo } from "react";
 import { useGame } from "@/lib/gameContext";
 import { getSocket } from "@/lib/socket";
 import { useLanguage } from "@/lib/languageContext";
 import { VoiceControls } from "@/components/VoiceControls";
-import { MessageCircle, Send } from "lucide-react";
-import { codeToEmoji } from "@/lib/utils";
+import { MessageCircle, Send, Crown, UserX } from "lucide-react";
+import { flagImageUrl } from "@/lib/utils";
 
-const CELL_SIZE = 100;      // each tile is 100×100
+const CELL_SIZE = 78;       // each tile is 78×78 — compact board, less vertical scroll
 const CORNER = CELL_SIZE;   // corners are square
 const INNER_TILES = 9;      // tiles between corners on each side
 const BOARD_W = CORNER + INNER_TILES * CELL_SIZE + CORNER; // 1100
 const BOARD_H = CORNER + INNER_TILES * CELL_SIZE + CORNER; // 1100 square
-const CANVAS_W = BOARD_W + 260;              // extra space for sidebar
-const CANVAS_H = BOARD_H + 40;               // padding
+const CANVAS_W = BOARD_W + 40;               // board padding only (sidebar is now DOM, not canvas)
+const CANVAS_H = BOARD_H + 40;
 
-// Map each cell id to a 2-letter country code for the flag
-const CELL_COUNTRIES: Record<number, string> = {
-  1:"SA",3:"SA",5:"SA",
-  6:"EG",8:"EG",9:"EG",
-  11:"AE",12:"AE",
-  14:"TR",16:"TR",17:"TR",23:"TR",
-  20:"IQ",21:"IQ",
-  24:"MA",25:"MA",27:"MA",
-  28:"QA",29:"KW",
-  31:"OM",32:"JO",
-  34:"LB",35:"LY",37:"TN",39:"DZ",
+const PLAYER_COLORS = ["#2dd4bf", "#f5a524", "#38bdf8", "#c084fc", "#fb7185", "#a3e635"];
+
+// Token hop-animation tuning
+const STEP_MS = 140;          // duration of a single-tile hop during a normal dice move
+const JUMP_MS = 550;          // duration of a teleport-style jump (cards, jail, etc.)
+const JUMP_HEIGHT_STEP = 16;  // arc height (px) for a single-tile hop
+const JUMP_HEIGHT_BIG = 42;   // arc height (px) for a teleport jump
+
+const withAlpha = (hex: string, alpha: number) => {
+  const a = Math.round(Math.max(0, Math.min(1, alpha)) * 255).toString(16).padStart(2, "0");
+  return `${hex}${a}`;
 };
+
 
 interface Particle {
   x: number; y: number; vx: number; vy: number;
@@ -103,6 +104,11 @@ const FLAG_SPECS: Record<string, (c: FCtx, x: number, y: number, w: number, h: n
   MX: (c, x, y, w, h) => vStripes(c, x, y, w, h, ["#006847", "#fff", "#CE1126"]),
   AR: (c, x, y, w, h) => hStripes(c, x, y, w, h, ["#74ACDF", "#fff", "#74ACDF"]),
   ZA: (c, x, y, w, h) => { hStripes(c, x, y, w, h, ["#E03C31", "#fff", "#002395", "#fff", "#007749"]); rect(c, x, y, w * 0.28, h, "#000"); },
+  CO: (c, x, y, w, h) => { rect(c, x, y, w, h * 0.5, "#FCD116"); rect(c, x, y + h * 0.5, w, h * 0.25, "#003893"); rect(c, x, y + h * 0.75, w, h * 0.25, "#CE1126"); },
+  EC: (c, x, y, w, h) => { rect(c, x, y, w, h * 0.5, "#FFDD00"); rect(c, x, y + h * 0.5, w, h * 0.25, "#034EA2"); rect(c, x, y + h * 0.75, w, h * 0.25, "#ED1C24"); circle(c, x + w / 2, y + h / 2, h * 0.14, "#FCD116"); },
+  PE: (c, x, y, w, h) => vStripes(c, x, y, w, h, ["#D91023", "#fff", "#D91023"]),
+  CL: (c, x, y, w, h) => { rect(c, x, y, w, h, "#fff"); rect(c, x, y + h / 2, w, h / 2, "#D52B1E"); rect(c, x, y, w * 0.34, h / 2, "#0039A6"); star(c, x + w * 0.17, y + h * 0.25, h * 0.16, "#fff"); },
+  UY: (c, x, y, w, h) => { hStripes(c, x, y, w, h, ["#fff", "#0038A8", "#fff", "#0038A8", "#fff"]); rect(c, x, y, w * 0.4, h * 0.4, "#fff"); circle(c, x + w * 0.2, y + h * 0.2, h * 0.12, "#FCD116"); },
 };
 
 function drawFlag(ctx: FCtx, code: string | undefined, x: number, y: number, w: number, h: number) {
@@ -153,6 +159,26 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
   stateRef.current = state;
   const myPlayerId = props?.myPlayerId ?? ctxMyId;
 
+  // Flag display preference (CSS-drawn vs real flag photo), persisted per-browser.
+  // Any previously-stored "emoji" value is treated as "image" (the old emoji mode
+  // was replaced by real flagsapi.com photos).
+  const [flagMode, setFlagMode] = useState<"css" | "image">(() => {
+    try {
+      return localStorage.getItem("rento_flag_mode") === "css" ? "css" : "image";
+    } catch {
+      return "css";
+    }
+  });
+  const flagModeRef = useRef(flagMode);
+  flagModeRef.current = flagMode;
+  const toggleFlagMode = () => {
+    setFlagMode((prev) => {
+      const next = prev === "css" ? "image" : "css";
+      try { localStorage.setItem("rento_flag_mode", next); } catch { /* ignore */ }
+      return next;
+    });
+  };
+
   const [chatOpen, setChatOpen] = useState(false);
   const [chatInput, setChatInput] = useState("");
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -172,37 +198,155 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
 
   // Trade state
   const [showTradeModal, setShowTradeModal] = useState(false);
+  const [editingTradeId, setEditingTradeId] = useState<string | null>(null);
+  const [viewingTradeId, setViewingTradeId] = useState<string | null>(null);
   const [tradeTarget, setTradeTarget] = useState<string>("");
   const [offerProperties, setOfferProperties] = useState<number[]>([]);
   const [offerMoney, setOfferMoney] = useState(0);
   const [requestProperties, setRequestProperties] = useState<number[]>([]);
   const [requestMoney, setRequestMoney] = useState(0);
 
+  // Bankrupt confirm state
+  const [showBankruptConfirm, setShowBankruptConfirm] = useState(false);
+
+  // Trades tip dismissal (persisted)
+  const [tipDismissed, setTipDismissed] = useState(() => {
+    try { return localStorage.getItem("rento_trades_tip_dismissed") === "1"; } catch { return false; }
+  });
+  const dismissTip = () => {
+    setTipDismissed(true);
+    try { localStorage.setItem("rento_trades_tip_dismissed", "1"); } catch { /* ignore */ }
+  };
+
   const me = state?.players?.find((p: any) => p.id === myPlayerId);
-  const otherPlayers = state?.players?.filter((p: any) => p.id !== myPlayerId && !p.bankrupt) ?? [];
+  const otherPlayers = state?.players?.filter((p: any) => p.id !== myPlayerId) ?? [];
+  const otherAlivePlayers = otherPlayers.filter((p: any) => !p.bankrupt);
   const pendingTrades = state?.tradeProposals?.filter((t: any) => t.status === "pending") ?? [];
   const myPendingTrades = pendingTrades.filter((t: any) => t.toPlayerId === myPlayerId);
   const sentTrades = pendingTrades.filter((t: any) => t.fromPlayerId === myPlayerId);
 
+  // Stable color per player, based on join order (players array order is stable)
+  const playerColors = useMemo(() => {
+    const map: Record<string, string> = {};
+    (state?.players ?? []).forEach((p: any, i: number) => {
+      map[p.id] = PLAYER_COLORS[i % PLAYER_COLORS.length];
+    });
+    return map;
+  }, [state?.players]);
+
+  // Money delta popups (e.g. "-$50" / "+$300") next to each player's balance
+  const prevMoneyRef = useRef<Record<string, number>>({});
+  const [deltas, setDeltas] = useState<Record<string, { amount: number; key: number }>>({});
+  useEffect(() => {
+    if (!state?.players) return;
+    const next: Record<string, { amount: number; key: number }> = {};
+    let changed = false;
+    for (const p of state.players) {
+      const prev = prevMoneyRef.current[p.id];
+      if (prev !== undefined && prev !== p.money) {
+        next[p.id] = { amount: p.money - prev, key: Date.now() + Math.random() };
+        changed = true;
+      }
+      prevMoneyRef.current[p.id] = p.money;
+    }
+    if (changed) {
+      setDeltas((old) => ({ ...old, ...next }));
+      const ids = Object.keys(next);
+      const t = setTimeout(() => {
+        setDeltas((old) => {
+          const copy = { ...old };
+          for (const id of ids) delete copy[id];
+          return copy;
+        });
+      }, 1600);
+      return () => clearTimeout(t);
+    }
+  }, [state?.players]);
+
+  // Rolling log of recent lastAction messages
+  const [actionLog, setActionLog] = useState<{ id: number; text: string }[]>([]);
+  const lastLoggedRef = useRef<string>("");
+  const actionLogSeq = useRef(0);
+  useEffect(() => {
+    const la = state?.lastAction;
+    if (la && la !== lastLoggedRef.current) {
+      lastLoggedRef.current = la;
+      actionLogSeq.current += 1;
+      setActionLog((prev) => [...prev.slice(-4), { id: actionLogSeq.current, text: la }]);
+    }
+  }, [state?.lastAction]);
+
+  // Track player movement so the board can animate hops instead of snapping tokens
+  const prevPosRef = useRef<Record<string, number>>({});
+  const animRef = useRef<Record<string, { from: number; to: number; start: number; distance: number; mode: "step" | "jump" }>>({});
+  useEffect(() => {
+    if (!state?.players) return;
+    const diceSum = (state.dice?.[0] ?? 0) + (state.dice?.[1] ?? 0);
+    const boardLen = state.board?.length || 40;
+    for (const p of state.players) {
+      const prev = prevPosRef.current[p.id];
+      if (prev !== undefined && prev !== p.position && !p.bankrupt) {
+        const forward = (p.position - prev + boardLen) % boardLen;
+        const isDiceMove = diceSum > 0 && forward === diceSum;
+        animRef.current[p.id] = {
+          from: prev,
+          to: p.position,
+          start: performance.now(),
+          distance: forward,
+          mode: isDiceMove && forward <= 12 ? "step" : "jump",
+        };
+      }
+      prevPosRef.current[p.id] = p.position;
+    }
+  }, [state?.players, state?.dice, state?.board]);
+
   const rollDice = () => { getSocket().emit("rento_roll"); };
   const buyProperty = () => { getSocket().emit("rento_buy"); };
   const endTurn = () => { getSocket().emit("rento_end_turn"); };
+  const declareBankrupt = () => { getSocket().emit("rento_bankrupt"); setShowBankruptConfirm(false); };
+  const voteKick = (targetPlayerId: string) => { getSocket().emit("rento_votekick", { targetPlayerId }); };
 
-  const proposeTrade = () => {
-    if (!tradeTarget) return;
-    getSocket().emit("rento_trade", {
-      toPlayerId: tradeTarget,
-      offerProperties,
-      offerMoney,
-      requestProperties,
-      requestMoney,
-    });
+  const resetTradeForm = () => {
     setShowTradeModal(false);
+    setEditingTradeId(null);
     setTradeTarget("");
     setOfferProperties([]);
     setOfferMoney(0);
     setRequestProperties([]);
     setRequestMoney(0);
+  };
+
+  const submitTrade = () => {
+    if (!tradeTarget) return;
+    if (editingTradeId) {
+      getSocket().emit("rento_edit_trade", {
+        tradeId: editingTradeId,
+        offerProperties,
+        offerMoney,
+        requestProperties,
+        requestMoney,
+      });
+    } else {
+      getSocket().emit("rento_trade", {
+        toPlayerId: tradeTarget,
+        offerProperties,
+        offerMoney,
+        requestProperties,
+        requestMoney,
+      });
+    }
+    resetTradeForm();
+  };
+
+  const openEditTrade = (trade: any) => {
+    setEditingTradeId(trade.id);
+    setTradeTarget(trade.toPlayerId);
+    setOfferProperties([...trade.offerProperties]);
+    setOfferMoney(trade.offerMoney);
+    setRequestProperties([...trade.requestProperties]);
+    setRequestMoney(trade.requestMoney);
+    setViewingTradeId(null);
+    setShowTradeModal(true);
   };
 
   const acceptTrade = (tradeId: string) => {
@@ -215,7 +359,10 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
 
   const cancelTrade = (tradeId: string) => {
     getSocket().emit("rento_cancel_trade", { tradeId });
+    setViewingTradeId(null);
   };
+
+  const buildHouse = (propertyId: number) => { getSocket().emit("rento_build_house", { propertyId }); };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -230,6 +377,25 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
     let flashT = 0;
     let lastTime = performance.now();
     const particles: Particle[] = [];
+    let lastDice: [number, number] = [0, 0];
+    let diceRollStart = 0;
+    const DICE_ROLL_MS = 550;
+
+    // Real flag images (flagsapi.com), lazily loaded and cached per country code.
+    const flagImgCache: Record<string, HTMLImageElement> = {};
+    const getFlagImg = (code: string): HTMLImageElement => {
+      let img = flagImgCache[code];
+      if (!img) {
+        img = new Image();
+        img.src = flagImageUrl(code, 64) || "";
+        flagImgCache[code] = img;
+      }
+      return img;
+    };
+    const pseudoRand = (seed: number) => {
+      const x = Math.sin(seed) * 10000;
+      return x - Math.floor(x);
+    };
 
     const loop = (now: number) => {
       const dt = Math.min(50, now - lastTime);
@@ -246,22 +412,96 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
       const ox = 20;
       const oy = 20;
 
-      // Draw empty center (dark background)
-      ctx.fillStyle = "#1a1030";
-      roundRect(ctx, ox + CELL_SIZE, oy + CELL_SIZE, BOARD_W - CELL_SIZE * 2, BOARD_H - CELL_SIZE * 2, 8);
+      // Board interior: soft radial glow instead of a flat fill
+      const interiorX = ox + CELL_SIZE, interiorY = oy + CELL_SIZE;
+      const interiorW = BOARD_W - CELL_SIZE * 2, interiorH = BOARD_H - CELL_SIZE * 2;
+      const centerX = ox + BOARD_W / 2;
+      const centerY = oy + BOARD_H / 2;
+
+      roundRect(ctx, interiorX, interiorY, interiorW, interiorH, 18);
+      const bgGrad = ctx.createRadialGradient(centerX, centerY, 20, centerX, centerY, interiorW / 1.3);
+      bgGrad.addColorStop(0, "#271a47");
+      bgGrad.addColorStop(1, "#140c24");
+      ctx.fillStyle = bgGrad;
       ctx.fill();
-      ctx.strokeStyle = "rgba(168,85,247,0.15)";
+      ctx.strokeStyle = "rgba(196,145,255,0.2)";
       ctx.lineWidth = 2;
-      roundRect(ctx, ox + CELL_SIZE, oy + CELL_SIZE, BOARD_W - CELL_SIZE * 2, BOARD_H - CELL_SIZE * 2, 8);
+      roundRect(ctx, interiorX, interiorY, interiorW, interiorH, 18);
       ctx.stroke();
 
-      // Center text
-      ctx.fillStyle = "rgba(168,85,247,0.12)";
-      ctx.font = "bold 36px 'Baloo 2', sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText("RENTO", ox + BOARD_W / 2, oy + BOARD_H / 2);
-      ctx.font = "14px 'Baloo 2', sans-serif";
-      ctx.fillText(isAr ? "رينتو — لعبة الم_properties" : "Property Trading Game", ox + BOARD_W / 2, oy + BOARD_H / 2 + 30);
+      if (st.dice && st.dice[0] > 0) {
+        // Detect a fresh roll and kick off the tumble animation
+        if (st.dice[0] !== lastDice[0] || st.dice[1] !== lastDice[1]) {
+          diceRollStart = now;
+          lastDice = [st.dice[0], st.dice[1]];
+        }
+        const rollElapsed = now - diceRollStart;
+        const isRolling = rollElapsed < DICE_ROLL_MS;
+        const justLanded = rollElapsed >= DICE_ROLL_MS && rollElapsed < DICE_ROLL_MS + 200;
+
+        // Dice, centered in the board interior — bigger, with room below for the action buttons
+        const DICE_SIZE = 70;
+        const DICE_GAP = 16;
+        const DICE_HALF = DICE_SIZE / 2;
+        const dTotalW = DICE_SIZE * 2 + DICE_GAP;
+        for (let d = 0; d < 2; d++) {
+          const dx = centerX - dTotalW / 2 + d * (DICE_SIZE + DICE_GAP);
+          const dy = centerY - DICE_HALF;
+
+          let faceValue = st.dice[d];
+          let rotate = 0;
+          let scale = 1;
+          if (isRolling) {
+            const step = Math.floor(rollElapsed / 80);
+            faceValue = 1 + Math.floor(pseudoRand(step * 12.9898 + d * 78.233) * 6);
+            rotate = (pseudoRand(step * 45.164 + d * 3.14) - 0.5) * 0.5;
+            scale = 0.92 + pseudoRand(step * 91.7 + d) * 0.16;
+          } else if (justLanded) {
+            const t = (rollElapsed - DICE_ROLL_MS) / 200;
+            scale = 1.22 - 0.22 * t;
+          }
+
+          ctx.save();
+          ctx.translate(dx + DICE_HALF, dy + DICE_HALF);
+          ctx.rotate(rotate);
+          ctx.scale(scale, scale);
+          ctx.translate(-DICE_HALF, -DICE_HALF);
+
+          const diceGrad = ctx.createLinearGradient(0, 0, 0, DICE_SIZE);
+          diceGrad.addColorStop(0, "#ffffff");
+          diceGrad.addColorStop(1, "#e7e1f5");
+          ctx.save();
+          ctx.shadowColor = "rgba(0,0,0,0.45)";
+          ctx.shadowBlur = 14;
+          ctx.shadowOffsetY = 5;
+          roundRect(ctx, 0, 0, DICE_SIZE, DICE_SIZE, 19);
+          ctx.fillStyle = diceGrad;
+          ctx.fill();
+          ctx.restore();
+          ctx.strokeStyle = "rgba(0,0,0,0.08)";
+          ctx.lineWidth = 1;
+          roundRect(ctx, 0, 0, DICE_SIZE, DICE_SIZE, 19);
+          ctx.stroke();
+
+          ctx.fillStyle = "#241640";
+          ctx.font = "bold 40px 'Baloo 2', sans-serif";
+          ctx.textAlign = "center";
+          ctx.fillText(String(faceValue), DICE_HALF, DICE_HALF + 14);
+          ctx.restore();
+        }
+      } else {
+        // Idle wordmark before the first roll
+        const wordGrad = ctx.createLinearGradient(centerX - 90, centerY, centerX + 90, centerY);
+        wordGrad.addColorStop(0, "rgba(45,212,191,0.35)");
+        wordGrad.addColorStop(1, "rgba(196,145,255,0.35)");
+        ctx.fillStyle = wordGrad;
+        ctx.font = "bold 40px 'Baloo 2', sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("RENTO", centerX, centerY);
+        ctx.fillStyle = "rgba(255,255,255,0.28)";
+        ctx.font = "14px 'Baloo 2', sans-serif";
+        ctx.fillText(isAr ? "رينتو — لعبة تبادل الملكيات" : "Property Trading Game", centerX, centerY + 32);
+      }
 
       // Draw all tiles
       for (let i = 0; i < board.length; i++) {
@@ -271,28 +511,84 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
         const py = oy + pos.y;
 
         const isCorner = i === 0 || i === 10 || i === 20 || i === 30;
-        const cc = CELL_COUNTRIES[cell.id];
+        const cc = cell.flag as string | undefined;
+        const TR = 9; // tile corner radius
 
-        // Tile background: full flag for properties, solid color for corners/specials
-        if (cc) {
-          drawFlag(ctx, cc, px, py, pos.w, pos.h);
-          // Dark overlay for text readability
-          ctx.fillStyle = "rgba(0,0,0,0.55)";
-          ctx.fillRect(px, py, pos.w, pos.h);
-        } else if (isCorner) {
-          ctx.fillStyle = "#1f1535";
-          ctx.fillRect(px, py, pos.w, pos.h);
-        } else {
-          ctx.fillStyle = cell.color || "#333";
-          ctx.globalAlpha = 0.25;
-          ctx.fillRect(px, py, pos.w, pos.h);
-          ctx.globalAlpha = 1;
+        // Ownership lookup — used both to boost the flag's vividness and to draw
+        // the border below, so the player's own color is consistent everywhere.
+        let ownerColor: string | null = null;
+        let ownerHouses = 0;
+        for (let pi = 0; pi < (st.players?.length ?? 0); pi++) {
+          if (st.players[pi].properties?.includes(cell.id)) {
+            ownerColor = PLAYER_COLORS[pi % PLAYER_COLORS.length];
+            ownerHouses = st.players[pi].houses?.[cell.id] ?? 0;
+            break;
+          }
         }
 
-        // Border
-        ctx.strokeStyle = isCorner ? "#6b7280" : "#4b5563";
-        ctx.lineWidth = 1;
-        ctx.strokeRect(px, py, pos.w, pos.h);
+        // Tile background: full flag for properties, gradient for corners/specials — all rounded
+        ctx.save();
+        roundRect(ctx, px + 1, py + 1, pos.w - 2, pos.h - 2, TR);
+        ctx.clip();
+
+        if (cc) {
+          if (flagModeRef.current === "image") {
+            const img = getFlagImg(cc);
+            if (img.complete && img.naturalWidth) {
+              if (ownerColor) ctx.filter = "saturate(180%) brightness(1.12) contrast(1.06)";
+              ctx.drawImage(img, px, py, pos.w, pos.h);
+              ctx.filter = "none";
+            } else {
+              // Still loading — subtle placeholder so the tile isn't blank for a frame.
+              ctx.fillStyle = "rgba(255,255,255,0.06)";
+              ctx.fillRect(px, py, pos.w, pos.h);
+            }
+          } else {
+            // Draw the flag full-bleed and vivid — once it's owned, boost its
+            // saturation so it visibly "pops".
+            if (ownerColor) ctx.filter = "saturate(180%) brightness(1.12) contrast(1.06)";
+            drawFlag(ctx, cc, px, py, pos.w, pos.h);
+            ctx.filter = "none";
+          }
+          // Scrim small strips behind the text (top name, bottom price) either way.
+          const topScrim = ctx.createLinearGradient(px, py, px, py + pos.h * 0.3);
+          topScrim.addColorStop(0, "rgba(0,0,0,0.6)");
+          topScrim.addColorStop(1, "rgba(0,0,0,0)");
+          ctx.fillStyle = topScrim;
+          ctx.fillRect(px, py, pos.w, pos.h * 0.3);
+          const bottomScrim = ctx.createLinearGradient(px, py + pos.h * 0.72, px, py + pos.h);
+          bottomScrim.addColorStop(0, "rgba(0,0,0,0)");
+          bottomScrim.addColorStop(1, "rgba(0,0,0,0.6)");
+          ctx.fillStyle = bottomScrim;
+          ctx.fillRect(px, py + pos.h * 0.72, pos.w, pos.h * 0.28);
+        } else if (isCorner) {
+          const cornerGrad = ctx.createLinearGradient(px, py, px, py + pos.h);
+          cornerGrad.addColorStop(0, "#2c1c4d");
+          cornerGrad.addColorStop(1, "#170e2a");
+          ctx.fillStyle = cornerGrad;
+          ctx.fillRect(px, py, pos.w, pos.h);
+        } else {
+          const tileGrad = ctx.createLinearGradient(px, py, px, py + pos.h);
+          tileGrad.addColorStop(0, withAlpha(ownerColor ?? cell.color ?? "#333333", ownerColor ? 0.5 : 0.4));
+          tileGrad.addColorStop(1, "rgba(16,11,24,0.92)");
+          ctx.fillStyle = tileGrad;
+          ctx.fillRect(px, py, pos.w, pos.h);
+        }
+        ctx.restore();
+
+        // Unowned properties/utilities get a dim overlay so it's obvious at a
+        // glance which tiles are still up for grabs — cleared once bought.
+        if (!ownerColor && (cell.type === "property" || cell.type === "utility")) {
+          ctx.save();
+          roundRect(ctx, px + 1, py + 1, pos.w - 2, pos.h - 2, TR);
+          ctx.clip();
+          ctx.fillStyle = "rgba(10,8,16,0.4)";
+          ctx.fillRect(px, py, pos.w, pos.h);
+          ctx.restore();
+        }
+
+        // No default border — only owned tiles get a border, in the buying
+        // player's own color, so ownership reads identically everywhere.
 
         // Cell name + price
         const name = isAr ? cell.nameAr : cell.name;
@@ -301,32 +597,36 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
         if (isCorner) {
           ctx.font = "bold 13px 'Baloo 2', sans-serif";
           ctx.fillStyle = "#fbbf24";
-          ctx.fillText(name, px + pos.w / 2, py + pos.h / 2 - 4);
+          ctx.fillText(name, px + pos.w / 2, py + pos.h / 2 - 3);
           if (cell.type === "start") {
-            ctx.font = "18px sans-serif";
-            ctx.fillText("▶", px + pos.w / 2, py + pos.h / 2 + 18);
+            ctx.font = "15px sans-serif";
+            ctx.fillText("▶", px + pos.w / 2, py + pos.h / 2 + 14);
           } else if (cell.type === "jail") {
-            ctx.font = "16px sans-serif";
-            ctx.fillText(i === 10 ? "🔒" : "🚔", px + pos.w / 2, py + pos.h / 2 + 18);
+            ctx.font = "13px sans-serif";
+            ctx.fillText(i === 10 ? "🔒" : "🚔", px + pos.w / 2, py + pos.h / 2 + 14);
           } else if (cell.type === "go") {
-            ctx.font = "16px sans-serif";
-            ctx.fillText("🅿", px + pos.w / 2, py + pos.h / 2 + 18);
+            ctx.font = "13px sans-serif";
+            ctx.fillText("🅿", px + pos.w / 2, py + pos.h / 2 + 14);
           }
         } else if (cc) {
-          // Full-flag tile: name at top, price at bottom
-          ctx.font = "bold 11px 'Baloo 2', sans-serif";
+          // Full-flag tile: name at top, price at bottom — bigger, with a drop
+          // shadow (not a solid scrim) so the flag's real colors stay vivid.
+          ctx.save();
+          ctx.shadowColor = "rgba(0,0,0,0.85)";
+          ctx.shadowBlur = 3;
+          ctx.font = "bold 11.5px 'Baloo 2', sans-serif";
           ctx.fillStyle = "#fff";
           // Wrap name at top
-          const maxW = pos.w - 8;
+          const maxW = pos.w - 4;
           const words = name.split(" ");
           let line = "";
-          let ly = py + 14;
+          let ly = py + 13;
           for (const word of words) {
             const test = line ? line + " " + word : word;
             if (ctx.measureText(test).width > maxW && line) {
               ctx.fillText(line, px + pos.w / 2, ly);
               line = word;
-              ly += 11;
+              ly += 12;
             } else {
               line = test;
             }
@@ -334,153 +634,160 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
           ctx.fillText(line, px + pos.w / 2, ly);
           // Price at bottom
           if (cell.price > 0) {
-            ctx.fillStyle = "#fbbf24";
-            ctx.font = "bold 12px 'Baloo 2', sans-serif";
-            ctx.fillText(`$${cell.price}`, px + pos.w / 2, py + pos.h - 6);
+            ctx.fillStyle = "#fde047";
+            ctx.font = "bold 11px 'Baloo 2', sans-serif";
+            ctx.fillText(`$${cell.price}`, px + pos.w / 2, py + pos.h - 5);
           }
+          ctx.restore();
         } else {
           // Non-flag special tiles (chance, chest, tax, etc.)
-          ctx.font = "bold 12px 'Baloo 2', sans-serif";
-          ctx.fillStyle = "#d1d5db";
-          ctx.fillText(name, px + pos.w / 2, py + pos.h / 2 + 4);
+          ctx.font = "bold 11.5px 'Baloo 2', sans-serif";
+          ctx.fillStyle = "#e5e7eb";
+          ctx.fillText(name, px + pos.w / 2, py + pos.h / 2 + 3);
           if (cell.type === "utility") {
-            ctx.font = "14px sans-serif";
-            ctx.fillText(cell.id === 13 ? "💧" : "⚡", px + pos.w / 2, py + pos.h / 2 + 20);
+            ctx.font = "12px sans-serif";
+            ctx.fillText(cell.id === 13 ? "💧" : "⚡", px + pos.w / 2, py + pos.h / 2 + 16);
           } else if (cell.type === "chance") {
-            ctx.font = "14px sans-serif";
-            ctx.fillText("❓", px + pos.w / 2, py + pos.h / 2 + 20);
+            ctx.font = "12px sans-serif";
+            ctx.fillText("❓", px + pos.w / 2, py + pos.h / 2 + 16);
           } else if (cell.type === "chest") {
-            ctx.font = "14px sans-serif";
-            ctx.fillText("📦", px + pos.w / 2, py + pos.h / 2 + 20);
+            ctx.font = "12px sans-serif";
+            ctx.fillText("📦", px + pos.w / 2, py + pos.h / 2 + 16);
           } else if (cell.type === "tax") {
-            ctx.font = "14px sans-serif";
-            ctx.fillText("💰", px + pos.w / 2, py + pos.h / 2 + 20);
+            ctx.font = "12px sans-serif";
+            ctx.fillText("💰", px + pos.w / 2, py + pos.h / 2 + 16);
           }
         }
 
-        // Ownership indicator
-        for (const p of st.players ?? []) {
-          if (p.properties?.includes(cell.id)) {
-            ctx.fillStyle = p.id === myPlayerId ? "#fbbf24" : "#a78bfa";
-            ctx.fillRect(px, py + pos.h - 3, pos.w, 3);
-            break;
+        // Ownership indicator: border + glowing capsule, always in the owner's exact color
+        if (ownerColor) {
+          ctx.strokeStyle = ownerColor;
+          ctx.lineWidth = 3;
+          roundRect(ctx, px + 1.5, py + 1.5, pos.w - 3, pos.h - 3, TR - 1);
+          ctx.stroke();
+
+          ctx.save();
+          ctx.shadowColor = ownerColor;
+          ctx.shadowBlur = 7;
+          ctx.fillStyle = ownerColor;
+          roundRect(ctx, px + pos.w * 0.14, py + pos.h - 8, pos.w * 0.72, 5, 2.5);
+          ctx.fill();
+          ctx.restore();
+
+          // House/hotel badge, top-left corner of the tile
+          if (ownerHouses > 0) {
+            ctx.save();
+            ctx.font = `bold ${Math.max(9, Math.round(pos.w * 0.15))}px sans-serif`;
+            ctx.textAlign = "left";
+            ctx.textBaseline = "top";
+            ctx.shadowColor = "rgba(0,0,0,0.85)";
+            ctx.shadowBlur = 3;
+            ctx.fillStyle = "#fff";
+            ctx.fillText(ownerHouses >= 5 ? "🏨" : `🏠${ownerHouses}`, px + 3, py + 2);
+            ctx.restore();
           }
         }
       }
 
-      // Draw player tokens
+      // ---- Player tokens: bigger, colored, animated hops ----
       const occupiedCells: Record<number, number> = {};
-      for (const p of st.players ?? []) {
+      const boardLen = board.length || 40;
+
+      for (let pi = 0; pi < (st.players?.length ?? 0); pi++) {
+        const p = st.players[pi];
         if (p.bankrupt) continue;
-        const pos = p.position;
-        const tile = getTilePos(pos);
-        const px = ox + tile.x + tile.w / 2;
-        const py = oy + tile.y + tile.h / 2;
-        const offset = (occupiedCells[pos] ?? 0);
-        occupiedCells[pos] = offset + 1;
 
-        const tx = px + (offset % 3 - 1) * 14;
-        const ty = py + Math.floor(offset / 3) * 14;
+        const offset = occupiedCells[p.position] ?? 0;
+        occupiedCells[p.position] = offset + 1;
+        const fanX = (offset % 3 - 1) * 14;
+        const fanY = Math.floor(offset / 3) * 14;
 
-        // Token shadow
-        ctx.fillStyle = "rgba(0,0,0,0.5)";
+        const finalTile = getTilePos(p.position);
+        let cx = ox + finalTile.x + finalTile.w / 2;
+        let cy = oy + finalTile.y + finalTile.h / 2;
+        let jumpY = 0, scaleX = 1, scaleY = 1;
+
+        const anim = animRef.current[p.id];
+        if (anim) {
+          const isStep = anim.mode === "step";
+          const totalMs = isStep ? Math.max(anim.distance, 1) * STEP_MS : JUMP_MS;
+          const elapsed = now - anim.start;
+          if (elapsed >= totalMs) {
+            delete animRef.current[p.id];
+          } else {
+            let ax: number, ay: number, bx: number, by: number, t: number;
+            if (isStep) {
+              const progress = elapsed / totalMs;
+              const stepFloat = progress * anim.distance;
+              const stepIdx = Math.min(anim.distance - 1, Math.floor(stepFloat));
+              t = stepFloat - stepIdx;
+              const tileA = getTilePos((anim.from + stepIdx) % boardLen);
+              const tileB = getTilePos((anim.from + stepIdx + 1) % boardLen);
+              ax = ox + tileA.x + tileA.w / 2; ay = oy + tileA.y + tileA.h / 2;
+              bx = ox + tileB.x + tileB.w / 2; by = oy + tileB.y + tileB.h / 2;
+            } else {
+              t = elapsed / totalMs;
+              const tileA = getTilePos(anim.from);
+              const tileB = getTilePos(anim.to);
+              ax = ox + tileA.x + tileA.w / 2; ay = oy + tileA.y + tileA.h / 2;
+              bx = ox + tileB.x + tileB.w / 2; by = oy + tileB.y + tileB.h / 2;
+            }
+            cx = ax + (bx - ax) * t;
+            cy = ay + (by - ay) * t;
+            const arcH = isStep ? JUMP_HEIGHT_STEP : JUMP_HEIGHT_BIG;
+            jumpY = -arcH * Math.sin(t * Math.PI);
+            scaleY = 1 + 0.22 * Math.sin(t * Math.PI);
+            scaleX = 1 - 0.14 * Math.sin(t * Math.PI);
+          }
+        }
+
+        const groundX = cx + fanX;
+        const groundY = cy + fanY;
+        const tx = groundX;
+        const ty = groundY + jumpY;
+
+        const color = PLAYER_COLORS[pi % PLAYER_COLORS.length];
+        const isCurrent = p.id === st.currentPlayerId;
+
+        // Contact shadow on the tile (shrinks while airborne, for weight)
+        const shadowScale = 1 - Math.min(0.55, Math.abs(jumpY) / 55);
+        ctx.fillStyle = "rgba(0,0,0,0.45)";
         ctx.beginPath();
-        ctx.ellipse(tx + 1, ty + 11, 10, 4, 0, 0, Math.PI * 2);
+        ctx.ellipse(groundX, groundY + 13, 10 * shadowScale, 4 * shadowScale, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        // Token emoji
-        ctx.font = "18px sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText(p.token, tx, ty + 8);
-
-        // Active player glow
-        if (p.id === st.currentPlayerId) {
-          const pulse = 0.3 + 0.2 * Math.sin(flashT * 0.006);
-          ctx.strokeStyle = `rgba(34,197,94,${pulse})`;
-          ctx.lineWidth = 2;
+        // Active-player glow ring
+        if (isCurrent) {
+          const pulse = 0.35 + 0.25 * Math.sin(flashT * 0.006);
+          ctx.strokeStyle = `rgba(45,212,191,${pulse})`;
+          ctx.lineWidth = 2.5;
           ctx.beginPath();
-          ctx.arc(tx, ty + 2, 14, 0, Math.PI * 2);
+          ctx.arc(tx, ty, 17, 0, Math.PI * 2);
           ctx.stroke();
         }
-      }
 
-      // Sidebar
-      const sbx = BOARD_W + 40;
-      let sby = 30;
+        ctx.save();
+        ctx.translate(tx, ty);
+        ctx.scale(scaleX, scaleY);
 
-      // Dice
-      if (st.dice && st.dice[0] > 0) {
-        for (let d = 0; d < 2; d++) {
-          const dx = sbx + d * 50;
-          ctx.fillStyle = "#fff";
-          roundRect(ctx, dx, sby, 42, 42, 8);
-          ctx.fill();
-          ctx.fillStyle = "#0e0b16";
-          ctx.font = "bold 36px 'Baloo 2', sans-serif";
-          ctx.textAlign = "center";
-          ctx.fillText(String(st.dice[d]), dx + 21, sby + 30);
-        }
-      }
-      sby += 60;
+        // Colored plate behind the emoji — this is what makes the token easy to spot
+        ctx.shadowColor = "rgba(0,0,0,0.4)";
+        ctx.shadowBlur = 6;
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(0, 0, 15, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = "rgba(255,255,255,0.9)";
+        ctx.lineWidth = 2;
+        ctx.stroke();
 
-      // Players list
-      ctx.fillStyle = "#a78bfa";
-      ctx.font = "bold 16px 'Baloo 2', sans-serif";
-      ctx.textAlign = "left";
-      ctx.fillText(isAr ? "اللاعبون" : "Players", sbx, sby);
-      sby += 24;
+        ctx.font = "17px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillStyle = "#000";
+        ctx.fillText(p.token, 0, 6);
 
-      for (const p of st.players ?? []) {
-        const me = p.id === myPlayerId;
-        const current = p.id === st.currentPlayerId;
-
-        // Highlight bar
-        if (current) {
-          ctx.fillStyle = "rgba(34,197,94,0.15)";
-          roundRect(ctx, sbx - 5, sby - 14, 240, 26, 4);
-          ctx.fill();
-        }
-
-        ctx.fillStyle = p.bankrupt ? "#6b7280" : me ? "#fbbf24" : current ? "#22c55e" : "#d8b4fe";
-        ctx.font = `${me || current ? "bold " : ""}14px 'Baloo 2', sans-serif`;
-        ctx.textAlign = "left";
-        if (p.flag) drawFlag(ctx, p.flag, sbx, sby - 13, 20, 13);
-        ctx.fillText(`${p.token} ${p.name}${p.bankrupt ? " 💀" : ""}`, sbx + 26, sby);
-
-        ctx.fillStyle = "#9ca3af";
-        ctx.font = "13px 'Baloo 2', sans-serif";
-        ctx.textAlign = "right";
-        ctx.fillText(`$${p.money}`, sbx + 220, sby);
-
-        sby += 26;
-      }
-
-      // Properties owned
-      sby += 10;
-      ctx.fillStyle = "#a78bfa";
-      ctx.font = "bold 12px 'Baloo 2', sans-serif";
-      ctx.textAlign = "left";
-      ctx.fillText(isAr ? "ملكياتك" : "Your Properties", sbx, sby);
-      sby += 18;
-
-      const me = st.players?.find((p: any) => p.id === myPlayerId);
-      if (me?.properties?.length > 0) {
-        for (const pid of me.properties) {
-          const cell = board[pid];
-          if (!cell) continue;
-          ctx.fillStyle = cell.color;
-          ctx.fillRect(sbx, sby - 8, 10, 10);
-          ctx.fillStyle = "#d1d5db";
-          ctx.font = "9px 'Baloo 2', sans-serif";
-          ctx.textAlign = "left";
-          ctx.fillText(isAr ? cell.nameAr : cell.name, sbx + 14, sby);
-          sby += 14;
-        }
-      } else {
-        ctx.fillStyle = "#6b7280";
-        ctx.font = "10px 'Baloo 2', sans-serif";
-        ctx.fillText(isAr ? "لا ملكيات بعد" : "No properties yet", sbx, sby);
-        sby += 14;
+        ctx.restore();
       }
 
       // Particles
@@ -503,173 +810,497 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
   }, [myPlayerId, isAr]);
 
   const i18n = {
-    ar: { title: "رينتو", roll: "ارمي النرد", buy: "شراء الملكية", endTurn: "انتهاء الدور", turn: "دورك", notTurn: "انتظر...", dice: "النرد", trade: "تبادل", tradeTitle: "اقتراح تبادل", selectPlayer: "اختر لاعب", offerProperties: "ملكيات تقدمها", offerMoney: "مال تقدمه", requestProperties: "ملكيات تطلبها", requestMoney: "مال تطلبه", propose: "اقتراح", cancel: "إلغاء", accept: "قبول", reject: "رفض", pendingTrades: "تبادل معلق", sentTrades: "تبادل مرسل" },
-    en: { title: "Rento", roll: "Roll Dice", buy: "Buy Property", endTurn: "End Turn", turn: "Your turn", notTurn: "Waiting...", dice: "Dice", trade: "Trade", tradeTitle: "Propose Trade", selectPlayer: "Select player", offerProperties: "Properties you offer", offerMoney: "Money you offer", requestProperties: "Properties you request", requestMoney: "Money you request", propose: "Propose", cancel: "Cancel", accept: "Accept", reject: "Reject", pendingTrades: "Pending Trades", sentTrades: "Sent Trades" },
+    ar: {
+      title: "رينتو", roll: "ارمي النرد", buy: "شراء الملكية", endTurn: "انتهاء الدور", turn: "دورك", notTurn: "انتظر...",
+      dice: "النرد", trade: "تبادل", tradeTitle: "اقتراح تبادل", selectPlayer: "اختر لاعب", offerProperties: "ملكيات تقدمها",
+      offerMoney: "مال تقدمه", requestProperties: "ملكيات تطلبها", requestMoney: "مال تطلبه", propose: "اقتراح", cancel: "إلغاء",
+      accept: "قبول", reject: "رفض", pendingTrades: "تبادل معلق", sentTrades: "تبادل مرسل",
+      players: "اللاعبون", myProperties: "ملكياتي", noProperties: "لا ملكيات بعد", trades: "التبادلات", create: "إنشاء",
+      tradesDesc: "قم بالتبادل مع اللاعبين الآخرين لمبادلة الملكيات والمال.", gotIt: "فهمت",
+      votekick: "طرد بالتصويت", bankrupt: "إفلاس", bankruptConfirmTitle: "إعلان الإفلاس؟",
+      bankruptConfirmBody: "ستفقد جميع ممتلكاتك وتخرج من اللعبة نهائياً. هل أنت متأكد؟",
+      isPlaying: "يلعب الآن...", waitingTurn: "بانتظار دوره...",
+      flagImage: "صورة حقيقية", flagCss: "رسم", tradeDetails: "تفاصيل التبادل", offering: "يعرض", requesting: "يطلب",
+      total: "الإجمالي", edit: "تعديل", save: "حفظ", close: "إغلاق", completeSet: "مجموعة كاملة",
+      build: "بناء", houseCount: "منزل", hotel: "فندق", notEnoughForHouse: "لا يوجد مال كافٍ",
+      editTradeTitle: "تعديل التبادل", viewDetails: "عرض التفاصيل", with: "مع",
+    },
+    en: {
+      title: "Rento", roll: "Roll Dice", buy: "Buy Property", endTurn: "End Turn", turn: "Your turn", notTurn: "Waiting...",
+      dice: "Dice", trade: "Trade", tradeTitle: "Propose Trade", selectPlayer: "Select player", offerProperties: "Properties you offer",
+      offerMoney: "Money you offer", requestProperties: "Properties you request", requestMoney: "Money you request", propose: "Propose", cancel: "Cancel",
+      accept: "Accept", reject: "Reject", pendingTrades: "Pending Trades", sentTrades: "Sent Trades",
+      players: "Players", myProperties: "My properties", noProperties: "No properties yet", trades: "Trades", create: "Create",
+      tradesDesc: "Make trades with other players to exchange properties and money.", gotIt: "Got it",
+      votekick: "Votekick", bankrupt: "Bankrupt", bankruptConfirmTitle: "Declare bankruptcy?",
+      bankruptConfirmBody: "You'll lose all your properties and be eliminated from the game. Are you sure?",
+      isPlaying: "is playing...", waitingTurn: "is waiting...",
+      flagImage: "Real", flagCss: "Drawn", tradeDetails: "Trade Details", offering: "Offering", requesting: "Requesting",
+      total: "Total", edit: "Edit", save: "Save", close: "Close", completeSet: "Complete set",
+      build: "Build", houseCount: "house", hotel: "hotel", notEnoughForHouse: "Not enough money",
+      editTradeTitle: "Edit Trade", viewDetails: "View details", with: "with",
+    },
   }[isAr ? "ar" : "en"];
 
   const currentCell = me ? state?.board?.[me.position] : null;
+  const currentPlayer = state?.players?.find((p: any) => p.id === state?.currentPlayerId);
+  const bgId = ["nebula", "ocean", "sunset", "emerald"].includes(state?.backgroundId) ? state.backgroundId : "nebula";
 
   return (
-    <div className="min-h-screen flex flex-col items-center gap-3 p-4 bg-[#0b0710]">
-      {/* Top bar: title + mic + chat */}
-      <div className="w-full flex items-center justify-between gap-3" style={{ maxWidth: "98vw" }}>
-        <div className="text-white font-bold text-2xl">{i18n.title}</div>
-        <div className="flex items-center gap-2">
-          {state?.roomId && <VoiceControls />}
-          <button
-            onClick={() => setChatOpen(!chatOpen)}
-            className="flex items-center gap-1 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-white font-bold text-sm"
-            style={{ color: chatOpen ? "#2B2420" : "#fff", background: chatOpen ? "#FED23F" : "rgba(255,255,255,0.1)" }}
-          >
-            <MessageCircle size={14} />
-            {isAr ? "دردشة" : "Chat"}
-            {chatMessages.length > 0 && !chatOpen && (
-              <span className="rounded-full bg-[#E8574A] px-1.5 text-[9px] text-white">{chatMessages.length}</span>
-            )}
-          </button>
-        </div>
-      </div>
-
-      <div className="relative w-full overflow-x-auto" style={{ maxWidth: "100vw" }}>
-        <canvas
-          ref={canvasRef}
-          width={CANVAS_W}
-          height={CANVAS_H}
-          className="rounded-xl border border-white/10 touch-none"
-          style={{ width: "100%", maxWidth: CANVAS_W, imageRendering: "auto", background: "#0e0b16", display: "block" }}
+    <div
+      className="min-h-screen flex flex-col items-center gap-3 p-4 pb-28 relative overflow-hidden"
+      style={{
+        backgroundImage: `url('/rento-bg-${bgId}.svg')`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundAttachment: "fixed",
+        backgroundColor: "#0b0710",
+      }}
+    >
+      {/* Ambient color blobs — a "lovely" generated background instead of flat black */}
+      <div className="pointer-events-none absolute inset-0" style={{ zIndex: 0 }} aria-hidden="true">
+        <div
+          className="absolute rounded-full animate-blob-float"
+          style={{ width: 560, height: 560, top: "-15%", left: "-10%", background: "radial-gradient(circle, rgba(45,212,191,0.30), transparent 70%)", filter: "blur(60px)" }}
+        />
+        <div
+          className="absolute rounded-full animate-blob-float"
+          style={{ width: 620, height: 620, top: "10%", right: "-15%", background: "radial-gradient(circle, rgba(192,132,252,0.28), transparent 70%)", filter: "blur(60px)", animationDelay: "-7s" }}
+        />
+        <div
+          className="absolute rounded-full animate-blob-float"
+          style={{ width: 480, height: 480, bottom: "-10%", left: "15%", background: "radial-gradient(circle, rgba(245,165,36,0.22), transparent 70%)", filter: "blur(60px)", animationDelay: "-13s" }}
+        />
+        <div
+          className="absolute rounded-full animate-blob-float"
+          style={{ width: 420, height: 420, bottom: "5%", right: "10%", background: "radial-gradient(circle, rgba(251,113,133,0.20), transparent 70%)", filter: "blur(60px)", animationDelay: "-3s" }}
         />
       </div>
 
-      {/* Action banner (clear, no board overlap) */}
-      {state?.lastAction && (
+      {/* Top bar: title + mic */}
+      <div className="relative z-10 w-full flex items-center justify-between gap-3" style={{ maxWidth: "98vw" }}>
         <div
-          className="w-full max-w-3xl rounded-xl border border-fuchsia-500/30 bg-black/70 px-4 py-3 text-center"
-          style={{ maxWidth: "min(98vw, 1100px)" }}
+          className="font-extrabold text-2xl tracking-wide"
+          style={{
+            backgroundImage: "linear-gradient(135deg, #2dd4bf, #c084fc)",
+            WebkitBackgroundClip: "text",
+            backgroundClip: "text",
+            color: "transparent",
+          }}
         >
-          <span className="text-amber-300 font-extrabold" style={{ fontSize: 26, lineHeight: 1.3 }}>
-            {state.lastAction}
-          </span>
+          {i18n.title}
         </div>
-      )}
-
-      {/* Action buttons */}
-      <div className="flex gap-3 flex-wrap justify-center">
-        {isMyTurn && state?.phase === "playing" && (
-          <>
-            {state?.canRoll && (
-              <button
-                onClick={rollDice}
-                className="px-6 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 font-bold transition-all text-sm active:scale-95"
-              >
-                🎲 {i18n.roll}
-              </button>
-            )}
-            {!!state?.hasRolled && currentCell && (currentCell.type === "property" || currentCell.type === "utility") && !state.players.some((p: any) => p.properties?.includes(currentCell.id)) && me && me.money >= currentCell.price && (
-              <button
-                onClick={buyProperty}
-                className="px-6 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 font-bold transition-all text-sm active:scale-95"
-              >
-                🏠 {i18n.buy} (${currentCell.price})
-              </button>
-            )}
-            {!!state?.hasRolled && (
-              <button
-                onClick={endTurn}
-                className="px-6 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 font-bold transition-all text-sm active:scale-95"
-              >
-                ⏭ {i18n.endTurn}
-              </button>
-            )}
-            {!!state?.hasRolled && otherPlayers.length > 0 && (
-              <button
-                onClick={() => setShowTradeModal(true)}
-                className="px-6 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 font-bold transition-all text-sm active:scale-95"
-              >
-                🔄 {i18n.trade}
-              </button>
-            )}
-          </>
-        )}
-        {state?.phase === "finished" && (
-          <div className="text-fuchsia-300 font-bold text-lg">
-            🎉 {state.players?.find((p: any) => p.id === state.winnerId)?.name} wins!
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={toggleFlagMode}
+            className="flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-bold text-white/80 transition-colors hover:bg-white/10"
+            title={isAr ? "تبديل نمط الأعلام" : "Toggle flag style"}
+          >
+            {flagMode === "image" ? "🏳️" : "🎨"} {flagMode === "image" ? i18n.flagImage : i18n.flagCss}
+          </button>
+          {state?.roomId && <VoiceControls />}
+        </div>
       </div>
 
-      {/* Pending trades (received) */}
-      {myPendingTrades.length > 0 && (
-        <div className="w-full max-w-lg space-y-2">
-          <div className="text-amber-400 font-bold text-sm">{i18n.pendingTrades}</div>
-          {myPendingTrades.map((trade: any) => {
-            const fromPlayer = state.players?.find((p: any) => p.id === trade.fromPlayerId);
-            return (
-              <div key={trade.id} className="bg-white/5 border border-white/10 rounded-lg p-3 flex items-center justify-between gap-2">
-                <div className="text-white text-sm">
-                  <span className="font-bold">{fromPlayer?.name}</span>
-                  {trade.offerMoney > 0 && <span className="text-amber-400"> offers ${trade.offerMoney}</span>}
-                  {trade.offerProperties.length > 0 && (
-                    <span className="text-emerald-400">
-                      {" "}+ {trade.offerProperties.length} {isAr ? "ملكيات" : "properties"}
-                    </span>
-                  )}
-                  {" → "}
-                  {trade.requestMoney > 0 && <span className="text-amber-400">asks ${trade.requestMoney}</span>}
-                  {trade.requestProperties.length > 0 && (
-                    <span className="text-rose-400">
-                      {" "}+ {trade.requestProperties.length} {isAr ? "ملكيات" : "properties"}
-                    </span>
-                  )}
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => acceptTrade(trade.id)}
-                    className="px-3 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold"
-                  >
-                    {i18n.accept}
-                  </button>
-                  <button
-                    onClick={() => rejectTrade(trade.id)}
-                    className="px-3 py-1 rounded bg-red-600 hover:bg-red-500 text-white text-xs font-bold"
-                  >
-                    {i18n.reject}
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      <div className="relative z-10 w-full flex flex-col lg:flex-row gap-4 items-start justify-center" style={{ maxWidth: "98vw" }}>
+        {/* Board column */}
+        <div className="flex-1 min-w-0 flex flex-col items-center gap-2">
+          <div className="relative w-full overflow-x-auto">
+            <canvas
+              ref={canvasRef}
+              width={CANVAS_W}
+              height={CANVAS_H}
+              className="rounded-2xl border border-white/10 touch-none"
+              style={{
+                width: "100%",
+                maxWidth: CANVAS_W,
+                imageRendering: "auto",
+                background: "#0e0b16",
+                display: "block",
+                boxShadow: "0 20px 60px -20px rgba(124,58,237,0.35), 0 0 0 1px rgba(255,255,255,0.04)",
+              }}
+            />
 
-      {/* Sent trades (waiting for response) */}
-      {sentTrades.length > 0 && (
-        <div className="w-full max-w-lg space-y-2">
-          <div className="text-blue-400 font-bold text-sm">{i18n.sentTrades}</div>
-          {sentTrades.map((trade: any) => {
-            const toPlayer = state.players?.find((p: any) => p.id === trade.toPlayerId);
-            return (
-              <div key={trade.id} className="bg-white/5 border border-white/10 rounded-lg p-3 flex items-center justify-between gap-2">
-                <div className="text-white text-sm">
-                  <span className="font-bold">{toPlayer?.name}</span>
-                  <span className="text-gray-400"> {isAr ? "ينتظر..." : "pending..."}</span>
-                </div>
-                <button
-                  onClick={() => cancelTrade(trade.id)}
-                  className="px-3 py-1 rounded bg-gray-600 hover:bg-gray-500 text-white text-xs font-bold"
+            {/* Speech-bubble notification + status/log, overlaid on the board */}
+            <div
+              className="absolute flex flex-col items-center text-center"
+              style={{ top: "20%", left: "50%", transform: "translateX(-50%)", width: "min(80%, 420px)", pointerEvents: "none" }}
+            >
+              {state?.lastAction && (
+                <div
+                  key={state.lastAction}
+                  className="relative rounded-2xl px-4 py-3 text-white font-bold animate-bubble-in"
+                  style={{
+                    background: "linear-gradient(135deg, #7c3aed, #4f46e5)",
+                    fontSize: "clamp(12px, 1.6vw, 15px)",
+                    lineHeight: 1.3,
+                    boxShadow: "0 10px 30px -8px rgba(124,58,237,0.6)",
+                  }}
                 >
-                  {i18n.cancel}
+                  {state.lastAction}
+                  <div
+                    style={{
+                      position: "absolute", bottom: -8, left: "50%", transform: "translateX(-50%) rotate(45deg)",
+                      width: 14, height: 14, background: "#4f46e5",
+                    }}
+                  />
+                </div>
+              )}
+
+              {state?.phase === "playing" && currentPlayer && (
+                <div className="mt-4 text-white/90 font-bold animate-pop-in" style={{ fontSize: "clamp(11px, 1.4vw, 14px)" }}>
+                  {currentPlayer.token} {currentPlayer.name} {i18n.isPlaying}
+                </div>
+              )}
+
+              {actionLog.length > 1 && (
+                <div className="mt-2 flex flex-col gap-0.5">
+                  {actionLog.slice(0, -1).slice(-4).map((entry) => (
+                    <div key={entry.id} className="text-white/40 animate-pop-in" style={{ fontSize: "clamp(9px, 1.1vw, 11px)" }}>
+                      {entry.text}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Turn actions — sit just below the dice, in the middle of the board */}
+            {isMyTurn && state?.phase === "playing" && (state?.canRoll || !!state?.hasRolled) && (
+              <div
+                className="absolute flex flex-wrap items-center justify-center"
+                style={{ top: "58%", left: "50%", transform: "translate(-50%, 0)", gap: "clamp(6px, 1.5vw, 12px)", maxWidth: "92%" }}
+              >
+                {state?.canRoll && (
+                  <button
+                    onClick={rollDice}
+                    className="rounded-full font-bold text-[#0e0b16] transition-transform duration-150 hover:scale-105 active:scale-95 animate-pulse-glow"
+                    style={{
+                      padding: "clamp(6px, 1.4vw, 14px) clamp(12px, 2.6vw, 28px)",
+                      fontSize: "clamp(10px, 1.5vw, 16px)",
+                      background: "linear-gradient(135deg, #5eead4, #2dd4bf)",
+                      boxShadow: "0 8px 24px -4px rgba(45,212,191,0.65)",
+                    }}
+                  >
+                    🎲 {i18n.roll}
+                  </button>
+                )}
+                {!!state?.hasRolled && currentCell && (currentCell.type === "property" || currentCell.type === "utility") && !state.players.some((p: any) => p.properties?.includes(currentCell.id)) && me && me.money >= currentCell.price && (
+                  <button
+                    onClick={buyProperty}
+                    className="rounded-full font-bold text-[#0e0b16] transition-transform duration-150 hover:scale-105 active:scale-95 animate-pop-in"
+                    style={{
+                      padding: "clamp(6px, 1.4vw, 14px) clamp(12px, 2.6vw, 28px)",
+                      fontSize: "clamp(10px, 1.5vw, 16px)",
+                      background: "linear-gradient(135deg, #fcd34d, #f5a524)",
+                      boxShadow: "0 8px 24px -4px rgba(245,165,36,0.55)",
+                    }}
+                  >
+                    🏠 {i18n.buy} (${currentCell.price})
+                  </button>
+                )}
+                {!!state?.hasRolled && (
+                  <button
+                    onClick={endTurn}
+                    className="rounded-full font-bold text-white transition-transform duration-150 hover:scale-105 active:scale-95 animate-pop-in"
+                    style={{
+                      padding: "clamp(6px, 1.4vw, 14px) clamp(12px, 2.6vw, 28px)",
+                      fontSize: "clamp(10px, 1.5vw, 16px)",
+                      background: "linear-gradient(135deg, #a78bfa, #8b5cf6)",
+                      boxShadow: "0 8px 24px -4px rgba(139,92,246,0.55)",
+                    }}
+                  >
+                    ⏭ {i18n.endTurn}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Branding wordmark */}
+          <div className="w-full flex items-center justify-start">
+            <span
+              className="font-extrabold tracking-wider text-xs"
+              style={{
+                backgroundImage: "linear-gradient(135deg, rgba(45,212,191,0.5), rgba(192,132,252,0.5))",
+                WebkitBackgroundClip: "text",
+                backgroundClip: "text",
+                color: "transparent",
+              }}
+            >
+              RENTO
+            </span>
+          </div>
+
+          {/* Finished-game banner (turn actions now live centered on the board above) */}
+          {state?.phase === "finished" && (
+            <div className="text-fuchsia-300 font-bold text-lg animate-pop-in">
+              🎉 {state.players?.find((p: any) => p.id === state.winnerId)?.name} wins!
+            </div>
+          )}
+
+          <p className="text-white/40 text-xs text-center max-w-lg">
+            {isAr
+              ? "ارمي النرد واشترِ الملكيات. اجمع الإيجار واجعل الخصوم يُفلسون! اللاعبون الآليون يلعبون تلقائياً."
+              : "Roll dice, buy properties, collect rent, and bankrupt your opponents! Bots play automatically."}
+          </p>
+        </div>
+
+        {/* Sidebar column */}
+        <div className="w-full lg:w-[340px] flex-shrink-0 flex flex-col gap-3">
+          {/* Player list */}
+          <div className="rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-sm overflow-hidden shadow-lg shadow-black/30">
+            {state?.players?.map((p: any) => {
+              const isMe = p.id === myPlayerId;
+              const isCurrent = p.id === state?.currentPlayerId;
+              const votes: string[] = state?.kickVotes?.[p.id] ?? [];
+              // 60% of the WHOLE room (bots included) — matches server logic. A 2-player
+              // room (human or bot) can never vote-kick at all, so one player can't win
+              // by unilaterally kicking their only opponent.
+              const totalPlayers = state?.players?.length ?? 0;
+              const eligibleVoters = state?.players?.filter((pp: any) => !pp.isBot && pp.id !== p.id).length ?? 0;
+              const threshold = Math.ceil(totalPlayers * 0.6);
+              const kickPossible = totalPlayers > 2 && eligibleVoters >= threshold;
+              const myVote = votes.includes(myPlayerId ?? "");
+              const delta = deltas[p.id];
+              const color = playerColors[p.id] ?? "#666";
+
+              return (
+                <div
+                  key={p.id}
+                  className="flex items-center gap-2.5 px-3 py-3 border-b border-white/5 last:border-b-0 transition-colors duration-300 hover:bg-white/[0.03]"
+                  style={{
+                    background: isCurrent ? `linear-gradient(90deg, ${withAlpha(color, 0.16)}, transparent)` : "transparent",
+                    borderLeft: `3px solid ${color}`,
+                    opacity: p.bankrupt || !p.isConnected ? 0.45 : 1,
+                  }}
+                >
+                  <div
+                    className="flex items-center justify-center rounded-full flex-shrink-0"
+                    style={{
+                      width: 34, height: 34, background: color, fontSize: 16,
+                      boxShadow: isCurrent ? `0 0 0 2px #0b0710, 0 0 0 4px ${color}` : "0 2px 6px rgba(0,0,0,0.35)",
+                      transition: "box-shadow 0.3s",
+                    }}
+                  >
+                    {p.token}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1 text-white text-sm font-bold truncate">
+                      {p.isHost && <Crown size={12} color="#fbbf24" />}
+                      <span className="truncate">{p.name}</span>
+                      {p.bankrupt && <span>💀</span>}
+                    </div>
+                    {votes.length > 0 && !p.bankrupt && (
+                      <div className="text-[10px] text-rose-400 font-bold animate-pop-in">{votes.length}/{threshold} {i18n.votekick.toLowerCase()}</div>
+                    )}
+                  </div>
+                  <div className="relative flex items-center gap-1.5">
+                    {delta && (
+                      <span
+                        key={delta.key}
+                        className="absolute -top-4 right-0 text-[11px] font-bold animate-float-up"
+                        style={{ color: delta.amount >= 0 ? "#4ade80" : "#f87171" }}
+                      >
+                        {delta.amount >= 0 ? "+" : ""}{delta.amount}
+                      </span>
+                    )}
+                    <span className="text-white/80 text-sm font-semibold">${p.money}</span>
+                    {!isMe && !p.bankrupt && state?.phase === "playing" && (
+                      <button
+                        onClick={() => kickPossible && voteKick(p.id)}
+                        disabled={!kickPossible}
+                        title={kickPossible ? i18n.votekick : (isAr ? "يحتاج المزيد من اللاعبين للتصويت" : "Need more players to vote")}
+                        className={`p-1.5 rounded-full transition-colors ${kickPossible ? "hover:bg-rose-500/15" : "cursor-not-allowed opacity-30"}`}
+                        style={{ color: myVote ? "#f87171" : "rgba(255,255,255,0.35)" }}
+                      >
+                        <UserX size={14} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Bankrupt action */}
+          {me && !me.bankrupt && state?.phase === "playing" && (
+            <button
+              onClick={() => setShowBankruptConfirm(true)}
+              className="w-full py-2.5 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-300 font-bold text-xs hover:bg-rose-500/20 hover:border-rose-500/50 transition-colors"
+            >
+              {i18n.bankrupt}
+            </button>
+          )}
+
+          {/* Trades panel */}
+          <div className="rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-sm p-4 shadow-lg shadow-black/30">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-white font-bold text-sm">{i18n.trades}</span>
+              <button
+                onClick={() => { resetTradeForm(); setShowTradeModal(true); }}
+                disabled={state?.phase !== "playing" || otherAlivePlayers.length === 0}
+                className="px-3.5 py-1.5 rounded-full bg-gradient-to-br from-purple-500 to-purple-700 hover:from-purple-400 hover:to-purple-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold transition-all duration-150 hover:scale-105 active:scale-95"
+              >
+                {i18n.create}
+              </button>
+            </div>
+            {!tipDismissed && (
+              <div className="rounded-lg bg-white/5 p-2 mb-2">
+                <p className="text-white/50 text-[11px] leading-snug mb-1.5">{i18n.tradesDesc}</p>
+                <button
+                  onClick={dismissTip}
+                  className="text-[11px] font-bold text-purple-300 hover:text-purple-200"
+                >
+                  ✓ {i18n.gotIt}
                 </button>
               </div>
-            );
-          })}
+            )}
+
+            {/* Pending trades (received) */}
+            {myPendingTrades.length > 0 && (
+              <div className="space-y-2 mb-2">
+                <div className="text-amber-400 font-bold text-[11px]">{i18n.pendingTrades}</div>
+                {myPendingTrades.map((trade: any) => {
+                  const fromPlayer = state.players?.find((p: any) => p.id === trade.fromPlayerId);
+                  return (
+                    <div
+                      key={trade.id}
+                      onClick={() => setViewingTradeId(trade.id)}
+                      className="bg-white/5 border border-white/10 rounded-xl p-2 flex items-center justify-between gap-2 animate-pop-in cursor-pointer transition-colors hover:bg-white/10"
+                    >
+                      <div className="text-white text-[11px]">
+                        <span className="font-bold">{fromPlayer?.name}</span>
+                        {trade.offerMoney > 0 && <span className="text-amber-400"> ${trade.offerMoney}</span>}
+                        {trade.offerProperties.length > 0 && (
+                          <span className="text-emerald-400"> +{trade.offerProperties.length} {isAr ? "ملكيات" : "props"}</span>
+                        )}
+                        {" → "}
+                        {trade.requestMoney > 0 && <span className="text-amber-400">${trade.requestMoney}</span>}
+                        {trade.requestProperties.length > 0 && (
+                          <span className="text-rose-400"> +{trade.requestProperties.length} {isAr ? "ملكيات" : "props"}</span>
+                        )}
+                      </div>
+                      <div className="flex gap-1 flex-shrink-0">
+                        <button onClick={(e) => { e.stopPropagation(); acceptTrade(trade.id); }} className="px-2 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold transition-colors">{i18n.accept}</button>
+                        <button onClick={(e) => { e.stopPropagation(); rejectTrade(trade.id); }} className="px-2 py-1 rounded-lg bg-red-600 hover:bg-red-500 text-white text-[10px] font-bold transition-colors">{i18n.reject}</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Sent trades (waiting for response) */}
+            {sentTrades.length > 0 && (
+              <div className="space-y-2">
+                <div className="text-blue-400 font-bold text-[11px]">{i18n.sentTrades}</div>
+                {sentTrades.map((trade: any) => {
+                  const toPlayer = state.players?.find((p: any) => p.id === trade.toPlayerId);
+                  return (
+                    <div
+                      key={trade.id}
+                      onClick={() => setViewingTradeId(trade.id)}
+                      className="bg-white/5 border border-white/10 rounded-xl p-2 flex items-center justify-between gap-2 animate-pop-in cursor-pointer transition-colors hover:bg-white/10"
+                    >
+                      <div className="text-white text-[11px]">
+                        <span className="font-bold">{toPlayer?.name}</span>
+                        <span className="text-gray-400"> {isAr ? "ينتظر..." : "pending..."}</span>
+                      </div>
+                      <div className="flex gap-1 flex-shrink-0">
+                        <button onClick={(e) => { e.stopPropagation(); openEditTrade(trade); }} className="px-2 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold transition-colors">{i18n.edit}</button>
+                        <button onClick={(e) => { e.stopPropagation(); cancelTrade(trade.id); }} className="px-2 py-1 rounded-lg bg-gray-600 hover:bg-gray-500 text-white text-[10px] font-bold transition-colors">{i18n.cancel}</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {myPendingTrades.length === 0 && sentTrades.length === 0 && tipDismissed && (
+              <p className="text-white/30 text-[11px] text-center py-1">{isAr ? "لا توجد تبادلات نشطة" : "No active trades"}</p>
+            )}
+          </div>
+
+          {/* My properties panel */}
+          <div className="rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-sm p-4 shadow-lg shadow-black/30">
+            <div className="text-white font-bold text-sm mb-2">{i18n.myProperties} ({me?.properties?.length ?? 0})</div>
+            {me?.properties?.length > 0 ? (
+              <div className="flex flex-col gap-3">
+                {(() => {
+                  const groups: Record<string, any[]> = {};
+                  for (const pid of me.properties) {
+                    const cell = state.board?.[pid];
+                    if (!cell) continue;
+                    (groups[cell.color] ??= []).push(cell);
+                  }
+                  return Object.entries(groups).map(([color, cells]) => {
+                    const allOfColor = (state.board ?? []).filter((c: any) => c.color === color && (c.type === "property" || c.type === "utility"));
+                    const isComplete = allOfColor.length > 0 && allOfColor.every((c: any) => me.properties.includes(c.id));
+                    return (
+                      <div key={color}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: color, boxShadow: `0 0 6px ${withAlpha(color, 0.7)}` }} />
+                          {isComplete && (
+                            <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/15 px-1.5 py-0.5 rounded-full">{i18n.completeSet}</span>
+                          )}
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          {cells.map((cell: any) => {
+                            const houses = me.houses?.[cell.id] ?? 0;
+                            const canBuild = isComplete && cell.type === "property" && houses < 5;
+                            const cost = Math.round(cell.price / 2);
+                            const canAfford = me.money >= cost;
+                            return (
+                              <div key={cell.id} className="flex items-center justify-between gap-2 animate-pop-in">
+                                <span className="text-white/70 text-xs truncate flex-1">
+                                  {isAr ? cell.nameAr : cell.name}
+                                  {houses > 0 && <span className="ms-1">{houses >= 5 ? "🏨" : "🏠".repeat(houses)}</span>}
+                                </span>
+                                {canBuild && (
+                                  <button
+                                    onClick={() => buildHouse(cell.id)}
+                                    disabled={!canAfford}
+                                    title={!canAfford ? i18n.notEnoughForHouse : undefined}
+                                    className="flex-shrink-0 px-2 py-0.5 rounded-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-[10px] font-bold transition-all hover:scale-105 active:scale-95"
+                                  >
+                                    {houses === 4 ? `🏨 $${cost}` : `🏠 $${cost}`}
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            ) : (
+              <p className="text-white/30 text-xs">{i18n.noProperties}</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Bankrupt confirm modal */}
+      {showBankruptConfirm && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-pop-in" onClick={() => setShowBankruptConfirm(false)}>
+          <div className="bg-[#1d0d29] border border-rose-500/30 rounded-2xl p-6 w-full max-w-sm space-y-4 shadow-2xl shadow-rose-900/30 animate-bubble-in" onClick={(e) => e.stopPropagation()}>
+            <div className="text-white font-bold text-lg">{i18n.bankruptConfirmTitle}</div>
+            <p className="text-white/60 text-sm">{i18n.bankruptConfirmBody}</p>
+            <div className="flex gap-3 justify-end">
+              <button onClick={() => setShowBankruptConfirm(false)} className="px-4 py-2 rounded-full bg-gray-600 hover:bg-gray-500 font-bold text-sm text-white transition-all hover:scale-105 active:scale-95">{i18n.cancel}</button>
+              <button onClick={declareBankrupt} className="px-4 py-2 rounded-full bg-rose-600 hover:bg-rose-500 font-bold text-sm text-white transition-all hover:scale-105 active:scale-95">{i18n.bankrupt}</button>
+            </div>
+          </div>
         </div>
       )}
 
       {/* Trade Modal */}
       {showTradeModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-[#1d0d29] border border-purple-500/30 rounded-xl p-6 w-full max-w-md space-y-4">
-            <div className="text-white font-bold text-lg">{i18n.tradeTitle}</div>
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-[#1d0d29] border border-purple-500/30 rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl shadow-purple-900/30 animate-bubble-in max-h-[90vh] overflow-y-auto">
+            <div className="text-white font-bold text-lg">{editingTradeId ? i18n.editTradeTitle : i18n.tradeTitle}</div>
 
             {/* Select player */}
             <div>
@@ -677,10 +1308,11 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
               <select
                 value={tradeTarget}
                 onChange={(e) => setTradeTarget(e.target.value)}
-                className="w-full mt-1 p-2 rounded bg-white/10 border border-white/20 text-white"
+                disabled={!!editingTradeId}
+                className="w-full mt-1 p-2 rounded-lg bg-white/10 border border-white/20 text-white transition-colors focus:border-purple-400 focus:outline-none disabled:opacity-60"
               >
                 <option value="">{isAr ? "اختر لاعب..." : "Select player..."}</option>
-                {otherPlayers.map((p: any) => (
+                {otherAlivePlayers.map((p: any) => (
                   <option key={p.id} value={p.id}>{p.token} {p.name} (${p.money})</option>
                 ))}
               </select>
@@ -703,10 +1335,10 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
                             selected ? prev.filter(p => p !== pid) : [...prev, pid]
                           );
                         }}
-                        className={`px-2 py-1 rounded text-xs font-bold border ${
+                        className={`px-2.5 py-1 rounded-full text-xs font-bold border transition-all duration-150 hover:scale-105 active:scale-95 ${
                           selected
                             ? "bg-amber-500/30 border-amber-400 text-amber-300"
-                            : "bg-white/5 border-white/20 text-white"
+                            : "bg-white/5 border-white/20 text-white hover:border-white/40"
                         }`}
                       >
                         {isAr ? cell.nameAr : cell.name}
@@ -723,7 +1355,7 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
                 max={me?.money ?? 0}
                 value={offerMoney}
                 onChange={(e) => setOfferMoney(Math.max(0, parseInt(e.target.value) || 0))}
-                className="w-full p-2 rounded bg-white/10 border border-white/20 text-white"
+                className="w-full p-2 rounded-lg bg-white/10 border border-white/20 text-white transition-colors focus:border-amber-400 focus:outline-none"
                 placeholder="$0"
               />
             </div>
@@ -749,10 +1381,10 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
                                 selected ? prev.filter(p => p !== pid) : [...prev, pid]
                               );
                             }}
-                            className={`px-2 py-1 rounded text-xs font-bold border ${
+                            className={`px-2.5 py-1 rounded-full text-xs font-bold border transition-all duration-150 hover:scale-105 active:scale-95 ${
                               selected
                                 ? "bg-rose-500/30 border-rose-400 text-rose-300"
-                                : "bg-white/5 border-white/20 text-white"
+                                : "bg-white/5 border-white/20 text-white hover:border-white/40"
                             }`}
                           >
                             {isAr ? cell.nameAr : cell.name}
@@ -773,7 +1405,7 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
                   })()}
                   value={requestMoney}
                   onChange={(e) => setRequestMoney(Math.max(0, parseInt(e.target.value) || 0))}
-                  className="w-full p-2 rounded bg-white/10 border border-white/20 text-white"
+                  className="w-full p-2 rounded-lg bg-white/10 border border-white/20 text-white transition-colors focus:border-rose-400 focus:outline-none"
                   placeholder="$0"
                 />
               </div>
@@ -782,39 +1414,122 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
             {/* Action buttons */}
             <div className="flex gap-3 justify-end">
               <button
-                onClick={() => {
-                  setShowTradeModal(false);
-                  setTradeTarget("");
-                  setOfferProperties([]);
-                  setOfferMoney(0);
-                  setRequestProperties([]);
-                  setRequestMoney(0);
-                }}
-                className="px-4 py-2 rounded-lg bg-gray-600 hover:bg-gray-500 font-bold text-sm"
+                onClick={resetTradeForm}
+                className="px-4 py-2 rounded-full bg-gray-600 hover:bg-gray-500 font-bold text-sm transition-all hover:scale-105 active:scale-95"
               >
                 {i18n.cancel}
               </button>
               <button
-                onClick={proposeTrade}
+                onClick={submitTrade}
                 disabled={!tradeTarget || (offerProperties.length === 0 && offerMoney === 0 && requestProperties.length === 0 && requestMoney === 0)}
-                className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 rounded-full bg-blue-600 hover:bg-blue-500 font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:scale-105 active:scale-95 disabled:hover:scale-100"
               >
-                {i18n.propose}
+                {editingTradeId ? i18n.save : i18n.propose}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      <p className="text-white/40 text-xs text-center max-w-lg">
-        {isAr
-          ? "ارمي النرد واشترِ الملكيات. اجمع الإيجار واجعل الخصوم يُفلسون! اللاعبون الآليون يلعبون تلقائياً."
-          : "Roll dice, buy properties, collect rent, and bankrupt your opponents! Bots play automatically."}
-      </p>
+      {/* Trade Detail Modal */}
+      {viewingTradeId && (() => {
+        const trade = state?.tradeProposals?.find((t: any) => t.id === viewingTradeId);
+        if (!trade) return null;
+        const fromPlayer = state.players?.find((p: any) => p.id === trade.fromPlayerId);
+        const toPlayer = state.players?.find((p: any) => p.id === trade.toPlayerId);
+        const offerProps = trade.offerProperties.map((pid: number) => state.board?.[pid]).filter(Boolean);
+        const requestProps = trade.requestProperties.map((pid: number) => state.board?.[pid]).filter(Boolean);
+        const offerTotal = trade.offerMoney + offerProps.reduce((s: number, c: any) => s + (c.price || 0), 0);
+        const requestTotal = trade.requestMoney + requestProps.reduce((s: number, c: any) => s + (c.price || 0), 0);
+        const isSender = trade.fromPlayerId === myPlayerId;
+        const isReceiver = trade.toPlayerId === myPlayerId;
+
+        const renderSide = (title: string, player: any, money: number, props: any[], total: number, accent: string) => (
+          <div className="flex-1 rounded-xl border border-white/10 bg-white/5 p-3 min-w-0">
+            <div className="text-xs font-bold mb-2 truncate" style={{ color: accent }}>{title}: {player?.token} {player?.name}</div>
+            {money > 0 && <div className="text-amber-300 text-sm font-bold mb-1">${money}</div>}
+            <div className="flex flex-col gap-1.5">
+              {props.map((cell: any) => (
+                <div key={cell.id} className="flex items-center justify-between gap-2 text-white/80 text-xs">
+                  <span className="flex items-center gap-1.5 truncate">
+                    {flagImageUrl(cell.flag) ? (
+                      <img src={flagImageUrl(cell.flag)!} alt="" className="w-4 h-3 rounded-sm object-cover flex-shrink-0" />
+                    ) : (
+                      <span>🌐</span>
+                    )}
+                    <span className="truncate">{isAr ? cell.nameAr : cell.name}</span>
+                  </span>
+                  <span className="text-amber-300 font-semibold flex-shrink-0">${cell.price}</span>
+                </div>
+              ))}
+              {props.length === 0 && money === 0 && <div className="text-white/30 text-xs">—</div>}
+            </div>
+            <div className="mt-2 pt-2 border-t border-white/10 flex justify-between text-xs font-bold">
+              <span className="text-white/50">{i18n.total}</span>
+              <span style={{ color: accent }}>${total}</span>
+            </div>
+          </div>
+        );
+
+        return (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setViewingTradeId(null)}>
+            <div className="bg-[#1d0d29] border border-purple-500/30 rounded-2xl p-6 w-full max-w-lg space-y-4 shadow-2xl shadow-purple-900/30 animate-bubble-in max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+              <div className="text-white font-bold text-lg">{i18n.tradeDetails}</div>
+              <div className="text-white/50 text-xs -mt-2">{fromPlayer?.name} {i18n.with} {toPlayer?.name}</div>
+              <div className="flex gap-3">
+                {renderSide(i18n.offering, fromPlayer, trade.offerMoney, offerProps, offerTotal, "#34d399")}
+                {renderSide(i18n.requesting, toPlayer, trade.requestMoney, requestProps, requestTotal, "#fb7185")}
+              </div>
+              <div className="flex gap-3 justify-end flex-wrap">
+                {isSender && (
+                  <>
+                    <button onClick={() => cancelTrade(trade.id)} className="px-4 py-2 rounded-full bg-gray-600 hover:bg-gray-500 font-bold text-sm text-white transition-all hover:scale-105 active:scale-95">{i18n.cancel}</button>
+                    <button onClick={() => openEditTrade(trade)} className="px-4 py-2 rounded-full bg-indigo-600 hover:bg-indigo-500 font-bold text-sm text-white transition-all hover:scale-105 active:scale-95">{i18n.edit}</button>
+                  </>
+                )}
+                {isReceiver && (
+                  <>
+                    <button onClick={() => { rejectTrade(trade.id); setViewingTradeId(null); }} className="px-4 py-2 rounded-full bg-red-600 hover:bg-red-500 font-bold text-sm text-white transition-all hover:scale-105 active:scale-95">{i18n.reject}</button>
+                    <button onClick={() => { acceptTrade(trade.id); setViewingTradeId(null); }} className="px-4 py-2 rounded-full bg-emerald-600 hover:bg-emerald-500 font-bold text-sm text-white transition-all hover:scale-105 active:scale-95">{i18n.accept}</button>
+                  </>
+                )}
+                <button onClick={() => setViewingTradeId(null)} className="px-4 py-2 rounded-full bg-white/10 hover:bg-white/20 font-bold text-sm text-white transition-all hover:scale-105 active:scale-95">{i18n.close}</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Floating chat bubble */}
+      <button
+        onClick={() => setChatOpen(!chatOpen)}
+        className="fixed flex items-center justify-center rounded-full z-40 transition-all duration-200 hover:scale-110 active:scale-95"
+        style={{
+          [isAr ? "left" : "right"]: 20,
+          bottom: "max(20px, env(safe-area-inset-bottom))",
+          width: 54,
+          height: 54,
+          background: chatOpen ? "#FED23F" : "linear-gradient(135deg, #a78bfa, #7c3aed)",
+          color: chatOpen ? "#2B2420" : "#fff",
+          boxShadow: chatOpen ? "0 8px 24px -6px rgba(254,210,63,0.6)" : "0 8px 24px -6px rgba(124,58,237,0.6)",
+        } as React.CSSProperties}
+        aria-label="Chat"
+      >
+        <MessageCircle size={22} />
+        {chatMessages.length > 0 && !chatOpen && (
+          <span
+            className="absolute -top-1 -right-1 rounded-full bg-[#E8574A] text-white text-[10px] font-bold flex items-center justify-center animate-pulse-glow"
+            style={{ minWidth: 18, height: 18, padding: "0 4px" }}
+          >
+            {chatMessages.length}
+          </span>
+        )}
+      </button>
 
       {/* Slide-out Chat Drawer */}
       {chatOpen && (
         <div
+          className="animate-pop-in"
           style={{
             position: "fixed",
             top: 0,
@@ -823,6 +1538,7 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
             width: "100%",
             maxWidth: 340,
             background: "rgba(13, 14, 18, 0.98)",
+            backdropFilter: "blur(8px)",
             borderLeft: isAr ? "none" : "2px solid rgba(255,255,255,0.15)",
             borderRight: isAr ? "2px solid rgba(255,255,255,0.15)" : "none",
             boxShadow: "0 0 30px rgba(0,0,0,0.7)",
@@ -830,6 +1546,7 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
             display: "flex",
             flexDirection: "column",
             boxSizing: "border-box",
+            paddingBottom: "env(safe-area-inset-bottom)",
           }}
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px", borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
@@ -845,8 +1562,11 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
           <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8, padding: 16 }}>
             {chatMessages.map((msg, i) => (
               <div key={i} style={{ fontSize: 12, wordBreak: "break-word" }}>
-                <strong style={{ color: "#FED23F" }}>
-                  {msg.flag ? codeToEmoji(msg.flag) + " " : ""}{msg.playerName}:
+                <strong style={{ color: "#FED23F", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                  {flagImageUrl(msg.flag) && (
+                    <img src={flagImageUrl(msg.flag)!} alt="" style={{ width: 14, height: 11, borderRadius: 2, objectFit: "cover" }} />
+                  )}
+                  {msg.playerName}:
                 </strong>{" "}
                 <span style={{ color: "rgba(255,255,255,0.9)" }}>{msg.message}</span>
               </div>

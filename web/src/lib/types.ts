@@ -69,6 +69,9 @@ export interface PlayerData {
   cardCount: number;
   isConnected: boolean;
   avatarUrl?: string;
+  flag?: string;
+  icon?: string;
+  characterId?: string;
   stats?: PlayerStats;
 }
 
@@ -354,6 +357,7 @@ export interface RentoPlayerState {
   bankrupt: boolean;
   token: string;
   flag?: string;
+  icon?: string;
 }
 
 export interface RentoTradeProposal {

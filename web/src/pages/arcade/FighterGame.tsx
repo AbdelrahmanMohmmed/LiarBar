@@ -45,8 +45,8 @@ class Fighter {
   hit = false;
   hitTimer = 0;
   cooldown = 0;
-  parryTimer = 0;
-  parryActive = false;
+  /** True only for the current tick — holding away-from-opponent absorbs a hit landing right now. */
+  blocking = false;
   parryFlash = 0;
   parryStamina = 100;
   guardBreak = false;
@@ -89,8 +89,7 @@ class Fighter {
     this.hit = false;
     this.hitTimer = 0;
     this.cooldown = 0;
-    this.parryTimer = 0;
-    this.parryActive = false;
+    this.blocking = false;
     this.parryFlash = 0;
     this.parryStamina = 100;
     this.guardBreak = false;
@@ -111,14 +110,6 @@ class Fighter {
     return true;
   }
 
-  tryParry() {
-    if (this.attacking || !this.alive || this.stun > 0 || this.parryStamina <= 0) return false;
-    this.parryTimer = 26;
-    this.parryActive = true;
-    this.parryFlash = 8;
-    return true;
-  }
-
   trySpecial(opponent: Fighter) {
     if (this.specialMeter < 100 || this.cooldown > 0 || this.attacking || !this.alive) return false;
     this.attacking = true;
@@ -136,7 +127,7 @@ class Fighter {
     const dx = Math.abs(this.x - target.x);
     const dy = Math.abs(this.y - target.y);
     if (dx < 130 && dy < 120) {
-      if (target.parryActive && target.parryStamina > 0) {
+      if (target.blocking && target.parryStamina > 0) {
         // Blocked! Cost stamina
         const cost = dmg * 0.6;
         target.parryStamina = Math.max(0, target.parryStamina - cost);
@@ -147,8 +138,7 @@ class Fighter {
         if (target.parryStamina <= 0) {
           target.guardBreak = true;
           target.stun = 40;
-          target.parryActive = false;
-          target.parryTimer = 0;
+          target.blocking = false;
           target.parryFlash = 20;
         }
         return;
@@ -179,13 +169,8 @@ class Fighter {
     this.animT += f;
     if (this.cooldown > 0) this.cooldown -= f;
     if (this.stun > 0) this.stun -= f;
-    if (this.parryTimer > 0) {
-      this.parryTimer -= f;
-      if (this.parryTimer <= 0) { this.parryActive = false; }
-      else if (this.parryTimer < 12) this.parryActive = false;
-    }
     // Stamina recharge when not blocking
-    if (!this.parryActive && this.parryStamina < 100) {
+    if (!this.blocking && this.parryStamina < 100) {
       this.parryStamina = Math.min(100, this.parryStamina + 0.8 * f);
     }
     if (this.parryFlash > 0) this.parryFlash -= f;
@@ -209,22 +194,20 @@ class Fighter {
     else {
       let move = 0;
       this.walkDir = 0;
-      if (canMove && this.parryTimer <= 0 && !this.attacking && this.stun <= 0) {
+      this.blocking = false;
+      if (canMove && !this.attacking && this.stun <= 0) {
         if (input.left) move -= 10;
         if (input.right) move += 10;
         if (input.jump && !this.jumping) { this.vy = -40; this.jumping = true; }
 
-        // Auto-block when walking AWAY from enemy (block stance)
-        if (move !== 0 && this.parryStamina > 0) {
-          const awayFromEnemy = (opponent.x > this.x && move < 0) || (opponent.x < this.x && move > 0);
-          if (awayFromEnemy) {
-            this.parryTimer = 26;
-            this.parryActive = true;
-            move = 0;
-          }
-        }
+        // Holding the direction AWAY from the opponent = guarding, like a normal
+        // fighting game: you keep walking backward at full speed, but a hit that
+        // lands on you while you're doing it is blocked (costs stamina) instead of
+        // dealing damage. No freeze, no timer — just a reactive per-tick flag.
+        const awayFromEnemy = move !== 0 && ((opponent.x > this.x && move < 0) || (opponent.x < this.x && move > 0));
+        this.blocking = awayFromEnemy && this.parryStamina > 0 && !this.jumping;
 
-        if (!this.parryActive && !this.attacking) {
+        if (!this.blocking) {
           if (input.special && this.specialMeter >= 100 && this.cooldown <= 0) {
             this.trySpecial(opponent);
           } else if (input.attack1 || input.attack2) {
@@ -246,7 +229,7 @@ class Fighter {
       else if (opponent.x > this.x) this.facing = 1;
       else this.facing = -1;
 
-      if (this.parryTimer > 0) this.action = "parry";
+      if (this.blocking) this.action = "parry";
       else if (this.attacking) this.action = this.attackStyle === 2 ? "kick" : this.attackStyle === 3 ? "special" : "hand";
       else if (this.jumping) this.action = "jump";
       else if (move !== 0) this.action = "walk";

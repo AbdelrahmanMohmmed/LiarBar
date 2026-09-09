@@ -2,7 +2,7 @@ import { nanoid } from "nanoid";
 import { Player } from "../liars-bar/Player.js";
 import type { GameRoom, GameRoomCallbacks } from "../types.js";
 
-type Shape = "donut" | "square" | "diamond" | "lines" | "oval";
+type Shape = "donut" | "square" | "diamond" | "lines" | "oval" | "star" | "triangle";
 type Color = { r: number; g: number; b: number };
 type Icon = { shape: Shape; color: Color };
 
@@ -15,7 +15,7 @@ const COLORS: Color[] = [
   { r: 255, g: 0, b: 255 },
   { r: 0, g: 255, b: 255 },
 ];
-const SHAPES: Shape[] = ["donut", "square", "diamond", "lines", "oval"];
+const SHAPES: Shape[] = ["donut", "square", "diamond", "lines", "oval", "star", "triangle"];
 const ALL_ICONS: Icon[] = [];
 for (const c of COLORS) for (const s of SHAPES) ALL_ICONS.push({ shape: s, color: c });
 
@@ -65,11 +65,13 @@ export class MemoryPuzzleGame implements GameRoom {
   private countdownTimer: NodeJS.Timeout | null = null;
   private flipLock = false;
   private botMemory: Map<string, BotMemory> = new Map();
+  private difficulty: "easy" | "medium" | "hard";
 
-  constructor(roomId: string, maxPlayers: number, callbacks: GameRoomCallbacks) {
+  constructor(roomId: string, maxPlayers: number, callbacks: GameRoomCallbacks, difficulty: "easy" | "medium" | "hard" = "medium") {
     this.roomId = roomId;
     this.maxPlayers = Math.max(2, Math.min(10, maxPlayers || 2));
     this.callbacks = callbacks;
+    this.difficulty = difficulty;
   }
 
   addPlayer(name: string, socketId: string, isHost = false, playerId?: string): Player {
@@ -327,11 +329,17 @@ export class MemoryPuzzleGame implements GameRoom {
     // Clear any existing timer
     if (mem.timer) { clearTimeout(mem.timer); mem.timer = null; }
 
+    const [minDelay, maxDelay] =
+      this.difficulty === "easy" ? [1400, 2400] : this.difficulty === "hard" ? [400, 900] : [800, 1500];
     mem.timer = setTimeout(() => {
       if (this.phase !== "playing" || this.flipLock) return;
       this.runBotFlip(bot.id);
-    }, 800 + Math.random() * 700);
+    }, minDelay + Math.random() * (maxDelay - minDelay));
     mem.timer.unref?.();
+  }
+
+  private recallChance(): number {
+    return this.difficulty === "easy" ? 0.45 : this.difficulty === "hard" ? 1 : 0.8;
   }
 
   private runBotFlip(botId: string) {
@@ -350,8 +358,8 @@ export class MemoryPuzzleGame implements GameRoom {
     if (candidates.length === 0) return;
 
     if (!mem.firstFlip) {
-      // First flip: try to find a known match
-      if (mem.seen.size > 0) {
+      // First flip: try to find a known match (chance of recall scales with difficulty)
+      if (mem.seen.size > 0 && Math.random() < this.recallChance()) {
         // Group known cards by icon
         const groups = new Map<string, { x: number; y: number }[]>();
         for (const [key, icon] of mem.seen) {
@@ -379,9 +387,9 @@ export class MemoryPuzzleGame implements GameRoom {
       mem.firstFlip = pick;
       this.flip(botId, pick.x, pick.y);
     } else {
-      // Second flip: try to match first pick
+      // Second flip: try to match first pick (chance of recall scales with difficulty)
       const firstCard = this.board[mem.firstFlip.x]?.[mem.firstFlip.y];
-      if (firstCard && firstCard.revealed && !firstCard.matched) {
+      if (firstCard && firstCard.revealed && !firstCard.matched && Math.random() < this.recallChance()) {
         // Look for matching card in memory
         const matchKey = `${firstCard.icon.shape}_${firstCard.icon.color.r}_${firstCard.icon.color.g}_${firstCard.icon.color.b}`;
         for (const [key, icon] of mem.seen) {

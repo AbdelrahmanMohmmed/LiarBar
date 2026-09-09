@@ -45,6 +45,10 @@ export interface CreateRoomOptions {
   freeParkingBonus?: number;
   turnTimer?: number;
   aiDifficulty?: "easy" | "medium" | "hard";
+  mapId?: string;
+  backgroundId?: string;
+  // Memory Puzzle options
+  difficulty?: "easy" | "medium" | "hard";
 }
 
 export type GameFactory = (
@@ -163,7 +167,8 @@ registerGame("domino", (roomId, options, callbacks) => {
 });
 
 registerGame("memory-puzzle", (roomId, options, callbacks) => {
-  return new MemoryPuzzleGame(roomId, options.maxPlayers, callbacks);
+  const difficulty = options.difficulty === "easy" || options.difficulty === "hard" ? options.difficulty : "medium";
+  return new MemoryPuzzleGame(roomId, options.maxPlayers, callbacks, difficulty);
 });
 
 registerGame("tetris", (roomId, options, callbacks) => {
@@ -180,6 +185,8 @@ registerGame("rento", (roomId, options, callbacks) => {
       freeParkingBonus: Number(options.freeParkingBonus) || 0,
       turnTimer: Number(options.turnTimer) || 15000,
       aiDifficulty: options.aiDifficulty === "easy" || options.aiDifficulty === "hard" ? options.aiDifficulty : "medium",
+      mapId: options.mapId,
+      backgroundId: options.backgroundId,
     },
     callbacks,
   );

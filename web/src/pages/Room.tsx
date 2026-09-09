@@ -17,7 +17,7 @@ export default function Room() {
   const navigate = useNavigate();
   const {
     gameState, myPlayerId, myRoomId, joinRoom, startGame, addBot, removeBot,
-    addToast, reconnectRoom, sendChat, chatMessages,
+    addToast, reconnectRoom, sendChat, chatMessages, leaveRoom,
   } = useGame();
   const { lang, toggleLang, t } = useLanguage();
 
@@ -222,8 +222,7 @@ export default function Room() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
           <button
             onClick={() => {
-              localStorage.removeItem("liarsbar_roomId");
-              localStorage.removeItem("liarsbar_playerId");
+              leaveRoom();
               navigate("/");
             }}
             style={pillButtonStyle}

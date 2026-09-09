@@ -2,14 +2,12 @@ import { useEffect, useRef } from "react";
 import { useGame } from "@/lib/gameContext";
 import { getSocket } from "@/lib/socket";
 import { useLanguage } from "@/lib/languageContext";
+import { CHARACTERS, getCharacter, actionKey } from "./fighterCharacters";
 
 const W = 1024;
 const H = 720;
 const GROUND = H - 100;
 const MAX_HP = 160;
-
-const CAT_FRAMES = [4, 2, 4, 6, 1, 4, 4, 6];
-const MON_FRAMES = [4, 4, 4, 4, 1, 3, 7, 7];
 
 interface Particle {
   x: number;
@@ -25,6 +23,11 @@ interface Particle {
 function loadImage(src: string): HTMLImageElement {
   const i = new Image();
   i.src = src;
+  // Eagerly decode as soon as possible — otherwise the browser can defer full
+  // decode until the first drawImage() call, which for an image that's only
+  // ever drawn mid-attack (rather than every frame like idle) can render a
+  // blank/placeholder box on that first paint instead of the actual sprite.
+  i.decode?.().catch(() => { /* ignore — drawImage still falls back fine once loaded */ });
   return i;
 }
 
@@ -65,9 +68,16 @@ export default function FighterLobbyGame() {
   useEffect(() => {
     const canvas = canvasRef.current!;
     const ctx = canvas.getContext("2d")!;
-    const cat = loadImage("/arcade-assets/fighter/fighters/cat_fighter_sprite1.png");
-    const mon = loadImage("/arcade-assets/fighter/fighters/mon2_sprite_base.png");
     const bg = loadImage("/arcade-assets/fighter/9e0a805a0d4420a555df6741aebffd4b.gif");
+
+    // Load every image referenced by every playable character once, keyed by src.
+    const imageCache: Record<string, HTMLImageElement> = {};
+    const allSrcs = new Set<string>();
+    for (const def of CHARACTERS) {
+      if (def.sheetSrc) allSrcs.add(def.sheetSrc);
+      if (def.stripSrcs) for (const src of Object.values(def.stripSrcs)) if (src) allSrcs.add(src);
+    }
+    for (const src of allSrcs) imageCache[src] = loadImage(src);
 
     // Parry is automatic — no key needed. L is removed.
     const held = { left: false, right: false, jump: false, attack1: false, attack2: false, special: false };
@@ -89,8 +99,10 @@ export default function FighterLobbyGame() {
     window.addEventListener("keyup", onKeyUp);
 
     let raf = 0;
-    let frameT = 0;
     const frames: Record<string, number> = {};
+    // Per-fighter frame-advance accumulator (was a single shared counter, which
+    // meant the second fighter processed each pass only advanced half as often).
+    const frameAcc: Record<string, number> = {};
     const particles: Particle[] = [];
     let flashT = 0;
     let screenShake = 0;
@@ -171,7 +183,6 @@ export default function FighterLobbyGame() {
       const dt = Math.min(50, now - lastTime);
       lastTime = now;
       const st = stateRef.current;
-      frameT += dt;
       flashT += dt;
 
       // Screen shake
@@ -220,18 +231,42 @@ export default function FighterLobbyGame() {
 
       const fs = st?.fighters ?? [];
       fs.forEach((f: any, i: number) => {
-        const sheet = i === 0 ? cat : mon;
-        const fr = i === 0 ? CAT_FRAMES : MON_FRAMES;
-        const tile = i === 0 ? 50 : 60;
-        const scale = i === 0 ? 4 : 3;
-        const row = actionRow(f.action);
-        const count = fr[row] || 1;
+        const def = getCharacter(f.characterId, i);
+        const tile = def.tile;
+        const scale = def.scale;
+        let sheet: HTMLImageElement | undefined;
+        let count = 1;
+        let fy = 0;
+        if (def.kind === "sheet") {
+          sheet = def.sheetSrc ? imageCache[def.sheetSrc] : undefined;
+          const row = actionRow(f.action);
+          count = def.frameCounts?.[row] || 1;
+          fy = row * tile;
+        } else {
+          const key = actionKey(f.action);
+          const src = def.stripSrcs?.[key] ?? def.stripSrcs?.idle;
+          sheet = src ? imageCache[src] : undefined;
+          count = (def.stripFrameCounts?.[key] ?? def.stripFrameCounts?.idle) || 1;
+        }
         frames[f.playerId] = frames[f.playerId] ?? 0;
-        if (frameT > 100) { frameT = 0; frames[f.playerId] = (frames[f.playerId] + 1) % count; }
-        const fx = frames[f.playerId] * tile;
-        const fy = row * tile;
-        const dw = tile * scale;
-        const dh = tile * scale;
+        // Advance each fighter's own animation frame independently (was a single
+        // shared counter before). Attacks cycle faster so a short attack window
+        // reliably reaches the pack's actual strike frame, not just the wind-up.
+        frameAcc[f.playerId] = (frameAcc[f.playerId] ?? 0) + dt;
+        const isAttackAction = f.action === "hand" || f.action === "kick" || f.action === "special";
+        const frameInterval = isAttackAction ? 55 : 100;
+        if (frameAcc[f.playerId] > frameInterval) {
+          frameAcc[f.playerId] = 0;
+          frames[f.playerId] = (frames[f.playerId] + 1) % count;
+        }
+        const cropX = def.crop?.x ?? 0;
+        const cropY = def.crop?.y ?? 0;
+        const cropW = def.crop?.w ?? tile;
+        const cropH = def.crop?.h ?? tile;
+        const fx = (frames[f.playerId] % count) * tile + cropX;
+        fy += cropY;
+        const dw = cropW * scale;
+        const dh = cropH * scale;
         const dir = f.facing || 1;
 
         // Shadow
@@ -380,7 +415,7 @@ export default function FighterLobbyGame() {
         ctx.save();
         ctx.translate(f.x, f.y);
         ctx.scale(f.facing, 1);
-        if (sheet.width) ctx.drawImage(sheet, fx, fy, tile, tile, -dw / 2, -dh, dw, dh);
+        if (sheet && sheet.width) ctx.drawImage(sheet, fx, fy, cropW, cropH, -dw / 2, -dh, dw, dh);
         else { ctx.fillStyle = f.color; ctx.fillRect(-35, -150, 70, 150); }
         ctx.restore();
 

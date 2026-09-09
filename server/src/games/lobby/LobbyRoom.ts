@@ -22,16 +22,19 @@ export class LobbyRoom implements GameRoom {
     this.lastActivityAt = Date.now();
   }
 
-  addPlayer(name: string, socketId: string, isHost = false, playerId?: string): Player {
+  addPlayer(name: string, socketId: string, isHost = false, playerId?: string, flag?: string, icon?: string, characterId?: string): Player {
     const id = playerId || nanoid(8);
     const player = new Player(id, name, false, isHost);
     player.socketId = socketId;
     player.isConnected = true;
+    if (flag) player.flag = flag;
+    if (icon) player.icon = icon;
+    if (characterId) player.characterId = characterId;
     this.players.push(player);
     this.lastActivityAt = Date.now();
 
     if (this.activeSubRoom) {
-      const subPlayer = this.activeSubRoom.addPlayer(name, socketId, isHost, id);
+      const subPlayer = this.activeSubRoom.addPlayer(name, socketId, isHost, id, player.flag, player.icon, player.characterId);
       subPlayer.isConnected = true;
     }
 
@@ -137,7 +140,10 @@ export class LobbyRoom implements GameRoom {
           player.name,
           player.socketId ?? "",
           player.isHost,
-          player.id
+          player.id,
+          player.flag,
+          player.icon,
+          player.characterId
         );
         subPlayer.isConnected = player.isConnected;
       }

@@ -10,6 +10,8 @@ export interface PlayerData {
   isConnected: boolean;
   avatarUrl?: string;
   flag?: string;
+  icon?: string;
+  characterId?: string;
   stats?: PlayerStats;
 }
 
@@ -32,6 +34,10 @@ export class Player {
   isConnected: boolean;
   avatarUrl?: string;
   flag?: string;
+  /** Emoji piece chosen by the player for board games (Rento, Snake & Ladder). */
+  icon?: string;
+  /** Fighter character id chosen by the player. */
+  characterId?: string;
   socketId?: string;
   stats: PlayerStats;
   consecutiveTimeouts: number;
@@ -130,6 +136,8 @@ export class Player {
       isConnected: this.isConnected,
       avatarUrl: this.avatarUrl,
       flag: this.flag,
+      icon: this.icon,
+      characterId: this.characterId,
       stats: this.stats,
     };
   }
@@ -146,6 +154,8 @@ export class Player {
       isConnected: this.isConnected,
       avatarUrl: this.avatarUrl,
       flag: this.flag,
+      icon: this.icon,
+      characterId: this.characterId,
       stats: this.stats,
     };
   }
@@ -162,6 +172,9 @@ export class Player {
     player.hand = data.hand || [];
     player.isConnected = data.isConnected;
     player.avatarUrl = data.avatarUrl;
+    player.flag = data.flag;
+    player.icon = data.icon;
+    player.characterId = data.characterId;
     return player;
   }
 }

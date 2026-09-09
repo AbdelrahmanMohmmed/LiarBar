@@ -1,12 +1,34 @@
-import { useRef, useEffect, useState, useCallback } from "react";
+import { useRef, useEffect, useState } from "react";
 import { useGame } from "@/lib/gameContext";
 import { getSocket } from "@/lib/socket";
 import { useLanguage } from "@/lib/languageContext";
+import WinOverlay from "./WinOverlay";
 
 const COLS = 10;
 const ROWS = 10;
 const CELL = 50;
 const PAD = 20;
+
+// Token hop-animation tuning — mirrors Rento's tile-by-tile hop + arc mechanism:
+// normal dice movement hops one tile at a time with a small arc, while landing on
+// a ladder/snake plays one bigger single-arc "leap" from the landing tile to the
+// ladder top / snake tail, distinct from the regular hops.
+const STEP_MS = 140;
+const JUMP_MS_LADDER = 550;
+const JUMP_MS_SNAKE = 420;
+const ARC_STEP = 14;
+const ARC_LADDER = 40;
+const ARC_SNAKE = 16;
+
+interface SnlAnim {
+  from: number;
+  mid: number;
+  to: number;
+  start: number;
+  stepDistance: number;
+  hasJump: boolean;
+  jumpKind: "ladder" | "snake" | null;
+}
 
 function cellToPos(n: number): { x: number; y: number } {
   const idx = n - 1;
@@ -17,8 +39,6 @@ function cellToPos(n: number): { x: number; y: number } {
 }
 
 function drawSnake(ctx: CanvasRenderingContext2D, fx: number, fy: number, tx: number, ty: number, t: number) {
-  const midx = (fx + tx) / 2;
-  const midy = (fy + ty) / 2;
   const dx = tx - fx;
   const dy = ty - fy;
   const len = Math.sqrt(dx * dx + dy * dy);
@@ -26,27 +46,51 @@ function drawSnake(ctx: CanvasRenderingContext2D, fx: number, fy: number, tx: nu
   const ny = dx / len;
   const amp = 20 + 15 * Math.sin(t * 0.002 + fx * 0.1);
 
-  ctx.strokeStyle = "#ef4444";
-  ctx.lineWidth = 4;
+  const grad = ctx.createLinearGradient(fx, fy, tx, ty);
+  grad.addColorStop(0, "#f87171");
+  grad.addColorStop(0.5, "#b91c1c");
+  grad.addColorStop(1, "#7f1d1d");
+
+  ctx.save();
+  ctx.shadowColor = "rgba(0,0,0,0.5)";
+  ctx.shadowBlur = 5;
+  ctx.strokeStyle = grad;
+  ctx.lineWidth = 7;
   ctx.lineCap = "round";
   ctx.beginPath();
-  const steps = 20;
+  const steps = 24;
+  const points: { x: number; y: number }[] = [];
   for (let i = 0; i <= steps; i++) {
     const p = i / steps;
     const x = fx + dx * p + nx * amp * Math.sin(p * Math.PI * 4);
     const y = fy + dy * p + ny * amp * Math.sin(p * Math.PI * 4);
+    points.push({ x, y });
     if (i === 0) ctx.moveTo(x, y);
     else ctx.lineTo(x, y);
   }
   ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // scale pattern — small dark ellipses along the body
+  ctx.fillStyle = "rgba(0,0,0,0.25)";
+  for (let i = 2; i < points.length - 2; i += 3) {
+    const pt = points[i];
+    ctx.beginPath();
+    ctx.ellipse(pt.x, pt.y, 3, 2, (Math.atan2(dy, dx) || 0), 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
 
   // snake head
   const hx = fx + dx * 0.95 + nx * amp * Math.sin(0.95 * Math.PI * 4);
   const hy = fy + dy * 0.95 + ny * amp * Math.sin(0.95 * Math.PI * 4);
-  ctx.fillStyle = "#ef4444";
+  ctx.fillStyle = "#b91c1c";
   ctx.beginPath();
-  ctx.arc(hx, hy, 8, 0, Math.PI * 2);
+  ctx.arc(hx, hy, 9, 0, Math.PI * 2);
   ctx.fill();
+  ctx.strokeStyle = "rgba(0,0,0,0.3)";
+  ctx.lineWidth = 1;
+  ctx.stroke();
   ctx.fillStyle = "#fff";
   ctx.beginPath();
   ctx.arc(hx - 3, hy - 2, 2.5, 0, Math.PI * 2);
@@ -54,17 +98,40 @@ function drawSnake(ctx: CanvasRenderingContext2D, fx: number, fy: number, tx: nu
   ctx.beginPath();
   ctx.arc(hx + 3, hy - 2, 2.5, 0, Math.PI * 2);
   ctx.fill();
+  ctx.fillStyle = "#111";
+  ctx.beginPath();
+  ctx.arc(hx - 3, hy - 2, 1.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(hx + 3, hy - 2, 1.2, 0, Math.PI * 2);
+  ctx.fill();
+  // flicking tongue
+  ctx.strokeStyle = "#ef4444";
+  ctx.lineWidth = 1.2;
+  const tongueLen = 6 + 2 * Math.sin(t * 0.006);
+  ctx.beginPath();
+  ctx.moveTo(hx + (dx / len) * 9, hy + (dy / len) * 9);
+  ctx.lineTo(hx + (dx / len) * (9 + tongueLen), hy + (dy / len) * (9 + tongueLen));
+  ctx.stroke();
 }
 
 function drawLadder(ctx: CanvasRenderingContext2D, fx: number, fy: number, tx: number, ty: number) {
   const dx = tx - fx;
   const dy = ty - fy;
   const len = Math.sqrt(dx * dx + dy * dy);
-  const nx = -dy / len * 8;
-  const ny = dx / len * 8;
+  const nx = (-dy / len) * 8;
+  const ny = (dx / len) * 8;
 
-  ctx.strokeStyle = "#22c55e";
-  ctx.lineWidth = 3;
+  const woodGrad = ctx.createLinearGradient(fx, fy, tx, ty);
+  woodGrad.addColorStop(0, "#a3e635");
+  woodGrad.addColorStop(0.5, "#65a30d");
+  woodGrad.addColorStop(1, "#3f6212");
+
+  ctx.save();
+  ctx.shadowColor = "rgba(0,0,0,0.45)";
+  ctx.shadowBlur = 4;
+  ctx.strokeStyle = woodGrad;
+  ctx.lineWidth = 4;
   ctx.lineCap = "round";
 
   // two rails
@@ -76,10 +143,12 @@ function drawLadder(ctx: CanvasRenderingContext2D, fx: number, fy: number, tx: n
   ctx.moveTo(fx + nx, fy + ny);
   ctx.lineTo(tx + nx, ty + ny);
   ctx.stroke();
+  ctx.shadowBlur = 0;
 
   // rungs
-  const rungs = 5;
-  ctx.lineWidth = 2;
+  const rungs = 6;
+  ctx.strokeStyle = "#84cc16";
+  ctx.lineWidth = 3;
   for (let i = 1; i < rungs; i++) {
     const p = i / rungs;
     const rx = fx + dx * p;
@@ -89,14 +158,7 @@ function drawLadder(ctx: CanvasRenderingContext2D, fx: number, fy: number, tx: n
     ctx.lineTo(rx + nx, ry + ny);
     ctx.stroke();
   }
-}
-
-function lerp(a: number, b: number, t: number): number {
-  return a + (b - a) * Math.min(1, Math.max(0, t));
-}
-
-function easeInOut(t: number): number {
-  return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+  ctx.restore();
 }
 
 export default function SnakeLadderLobbyGame() {
@@ -110,14 +172,33 @@ export default function SnakeLadderLobbyGame() {
   const [rolling, setRolling] = useState(false);
   const [diceFace, setDiceFace] = useState(1);
 
-  // Smooth movement animation state
-  const animStateRef = useRef<{
-    prevPositions: Record<string, number>;
-    animating: Record<string, { from: number; to: number; startTime: number; duration: number }>;
-  }>({
-    prevPositions: {},
-    animating: {},
-  });
+  // Track player movement so the board can animate tile-by-tile hops (+ a bigger
+  // single-arc leap for ladder climbs/snake slides) instead of snapping tokens.
+  const prevPosRef = useRef<Record<string, number>>({});
+  const animRef = useRef<Record<string, SnlAnim>>({});
+  useEffect(() => {
+    if (!state?.players) return;
+    const dice = state.dice || 0;
+    const sl = state.snakesLadders ?? [];
+    for (const p of state.players) {
+      const prev = prevPosRef.current[p.id];
+      const cur = p.position || 0;
+      if (prev !== undefined && prev !== cur && prev > 0 && dice > 0) {
+        const mid = Math.min(100, prev + dice);
+        const entry = sl.find((e: any) => e.from === mid);
+        animRef.current[p.id] = {
+          from: prev,
+          mid,
+          to: cur,
+          start: performance.now(),
+          stepDistance: Math.max(1, mid - prev),
+          hasJump: !!entry && mid !== cur,
+          jumpKind: entry ? entry.type : null,
+        };
+      }
+      prevPosRef.current[p.id] = cur;
+    }
+  }, [state?.players, state?.dice, state?.snakesLadders]);
 
   const isMyTurn = state?.currentPlayerId === myPlayerId;
 
@@ -161,24 +242,7 @@ export default function SnakeLadderLobbyGame() {
 
       if (!st) { raf = requestAnimationFrame(loop); return; }
 
-      // Detect position changes and start animations
-      const anim = animStateRef.current;
-      for (const p of st.players ?? []) {
-        const curPos = p.position || 0;
-        const prevPos = anim.prevPositions[p.id];
-        if (prevPos !== undefined && prevPos !== curPos) {
-          // Position changed — animate from old to new
-          anim.animating[p.id] = {
-            from: prevPos,
-            to: curPos,
-            startTime: now,
-            duration: Math.min(1200, 200 + Math.abs(curPos - prevPos) * 40),
-          };
-        }
-        anim.prevPositions[p.id] = curPos;
-      }
-
-      // Draw cells
+      // Draw cells with subtle gradients per cell type
       for (let n = 1; n <= 100; n++) {
         const { x, y } = cellToPos(n);
         const isEven = (Math.floor((n - 1) / COLS)) % 2 === 0;
@@ -186,19 +250,27 @@ export default function SnakeLadderLobbyGame() {
         const rowIdx = Math.floor((n - 1) / COLS);
 
         const light = (colIdx + rowIdx) % 2 === 0;
+        const cellGrad = ctx.createLinearGradient(x, y, x, y + CELL);
         if (n === 1) {
-          ctx.fillStyle = "#14532d";
+          cellGrad.addColorStop(0, "#22c55e");
+          cellGrad.addColorStop(1, "#14532d");
         } else if (n === 100) {
-          ctx.fillStyle = "#7c3aed";
+          cellGrad.addColorStop(0, "#a855f7");
+          cellGrad.addColorStop(1, "#581c87");
+        } else if (light) {
+          cellGrad.addColorStop(0, "#242038");
+          cellGrad.addColorStop(1, "#1a1729");
         } else {
-          ctx.fillStyle = light ? "#1e1b2e" : "#15122a";
+          cellGrad.addColorStop(0, "#1a1730");
+          cellGrad.addColorStop(1, "#120f22");
         }
+        ctx.fillStyle = cellGrad;
         ctx.fillRect(x, y, CELL, CELL);
         ctx.strokeStyle = "#2d2545";
         ctx.lineWidth = 0.5;
         ctx.strokeRect(x, y, CELL, CELL);
 
-        ctx.fillStyle = n === 1 ? "#4ade80" : n === 100 ? "#c084fc" : "#6b7280";
+        ctx.fillStyle = n === 1 ? "#4ade80" : n === 100 ? "#e9d5ff" : "#6b7280";
         ctx.font = "bold 9px sans-serif";
         ctx.textAlign = "center";
         ctx.fillText(String(n), x + CELL / 2, y + 10);
@@ -230,40 +302,77 @@ export default function SnakeLadderLobbyGame() {
         ctx.strokeRect(cp.x - 1, cp.y - 1, CELL + 2, CELL + 2);
       }
 
-      // Draw player tokens with smooth animation
+      // Draw player tokens — tile-by-tile hop with a parabolic arc + squash/stretch,
+      // and a bigger single-arc leap when a ladder/snake teleport kicks in.
       for (const p of st.players ?? []) {
         const targetPos = p.position || 0;
         if (targetPos <= 0) continue;
 
-        const a = anim.animating[p.id];
-        let drawPos = targetPos;
+        const anim = animRef.current[p.id];
+        let cx: number, cy: number;
+        let jumpY = 0, scaleX = 1, scaleY = 1;
+        let labelX: number, labelY: number;
 
-        if (a) {
-          const elapsed = now - a.startTime;
-          const progress = Math.min(1, elapsed / a.duration);
-          const eased = easeInOut(progress);
+        if (anim) {
+          const stepDuration = anim.stepDistance * STEP_MS;
+          const jumpDuration = anim.jumpKind === "snake" ? JUMP_MS_SNAKE : JUMP_MS_LADDER;
+          const totalDuration = stepDuration + (anim.hasJump ? jumpDuration : 0);
+          const elapsed = now - anim.start;
 
-          // Interpolate position along the path step by step
-          if (progress < 1) {
-            // Calculate current visual position
-            const totalSteps = a.to - a.from;
-            const currentStep = Math.round(a.from + totalSteps * eased);
-            drawPos = Math.max(1, Math.min(100, currentStep));
+          if (elapsed >= totalDuration) {
+            delete animRef.current[p.id];
+            const final = cellToPos(anim.to);
+            cx = final.x + CELL / 2;
+            cy = final.y + CELL / 2;
+            labelX = final.x + CELL / 2;
+            labelY = final.y + CELL - 4;
+          } else if (elapsed < stepDuration) {
+            const progress = elapsed / stepDuration;
+            const stepFloat = progress * anim.stepDistance;
+            const stepIdx = Math.min(anim.stepDistance - 1, Math.floor(stepFloat));
+            const t = stepFloat - stepIdx;
+            const a = cellToPos(anim.from + stepIdx);
+            const b = cellToPos(Math.min(anim.mid, anim.from + stepIdx + 1));
+            const ax = a.x + CELL / 2, ay = a.y + CELL / 2;
+            const bx = b.x + CELL / 2, by = b.y + CELL / 2;
+            cx = ax + (bx - ax) * t;
+            cy = ay + (by - ay) * t;
+            jumpY = -ARC_STEP * Math.sin(t * Math.PI);
+            scaleY = 1 + 0.22 * Math.sin(t * Math.PI);
+            scaleX = 1 - 0.14 * Math.sin(t * Math.PI);
+            labelX = bx; labelY = by + CELL / 2 - 4;
           } else {
-            drawPos = a.to;
-            delete anim.animating[p.id];
+            const t = (elapsed - stepDuration) / jumpDuration;
+            const a = cellToPos(anim.mid);
+            const b = cellToPos(anim.to);
+            const ax = a.x + CELL / 2, ay = a.y + CELL / 2;
+            const bx = b.x + CELL / 2, by = b.y + CELL / 2;
+            cx = ax + (bx - ax) * t;
+            cy = ay + (by - ay) * t;
+            const arcH = anim.jumpKind === "snake" ? ARC_SNAKE : ARC_LADDER;
+            jumpY = -arcH * Math.sin(t * Math.PI);
+            const stretch = anim.jumpKind === "snake" ? 0.14 : 0.3;
+            scaleY = 1 + stretch * Math.sin(t * Math.PI);
+            scaleX = 1 - stretch * 0.6 * Math.sin(t * Math.PI);
+            labelX = bx; labelY = by + CELL / 2 - 4;
           }
+        } else {
+          const final = cellToPos(targetPos);
+          cx = final.x + CELL / 2;
+          cy = final.y + CELL / 2;
+          labelX = final.x + CELL / 2;
+          labelY = final.y + CELL - 4;
         }
 
-        const { x, y } = cellToPos(drawPos);
-        const cx = x + CELL / 2;
-        const cy = y + CELL / 2;
         const color = p.color || "#fff";
+        const tx = cx;
+        const ty = cy + jumpY;
 
-        // token shadow
+        // contact shadow — shrinks while airborne, for a sense of weight
+        const shadowScale = 1 - Math.min(0.55, Math.abs(jumpY) / 55);
         ctx.fillStyle = "rgba(0,0,0,0.4)";
         ctx.beginPath();
-        ctx.ellipse(cx + 1, cy + 8, 9, 3, 0, 0, Math.PI * 2);
+        ctx.ellipse(cx + 1, cy + 10, 9 * shadowScale, 3 * shadowScale, 0, 0, Math.PI * 2);
         ctx.fill();
 
         // token circle with glow for current player
@@ -271,31 +380,40 @@ export default function SnakeLadderLobbyGame() {
           const pulse = 0.3 + 0.2 * Math.sin(animT * 0.005);
           ctx.fillStyle = `rgba(251,191,36,${pulse})`;
           ctx.beginPath();
-          ctx.arc(cx, cy - 2, 13, 0, Math.PI * 2);
+          ctx.arc(tx, ty - 2, 13, 0, Math.PI * 2);
           ctx.fill();
         }
 
+        ctx.save();
+        ctx.translate(tx, ty - 2);
+        ctx.scale(scaleX, scaleY);
         ctx.fillStyle = color;
         ctx.beginPath();
-        ctx.arc(cx, cy - 2, 9, 0, Math.PI * 2);
+        ctx.arc(0, 0, 9, 0, Math.PI * 2);
         ctx.fill();
         ctx.strokeStyle = "rgba(255,255,255,0.4)";
         ctx.lineWidth = 1.5;
         ctx.stroke();
 
-        // initial letter
-        ctx.fillStyle = "#fff";
-        ctx.font = "bold 12px sans-serif";
+        // piece icon (falls back to the player's initial letter if none assigned)
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText(p.name.charAt(0).toUpperCase(), cx, cy - 2);
+        if (p.icon) {
+          ctx.font = "13px sans-serif";
+          ctx.fillText(p.icon, 0, 0);
+        } else {
+          ctx.fillStyle = "#fff";
+          ctx.font = "bold 12px sans-serif";
+          ctx.fillText(p.name.charAt(0).toUpperCase(), 0, 0);
+        }
+        ctx.restore();
 
         // Player name label
         ctx.fillStyle = color;
         ctx.font = "bold 8px sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "top";
-        ctx.fillText(p.name.slice(0, 5), x + CELL / 2, y + CELL - 4);
+        ctx.fillText(p.name.slice(0, 5), labelX, labelY);
       }
 
       // Draw start and finish icons
@@ -377,6 +495,17 @@ export default function SnakeLadderLobbyGame() {
             {state.countdownLeft > 0 ? state.countdownLeft : "Go!"}
           </div>
         )}
+
+        {state?.phase === "finished" && (() => {
+          const winner = state.players?.find((p: any) => p.id === state.winnerId);
+          return (
+            <WinOverlay
+              winnerName={winner?.name ?? "?"}
+              color={winner?.color}
+              subtitle={i18n.win}
+            />
+          );
+        })()}
       </div>
 
       {/* Roll button */}
@@ -389,11 +518,6 @@ export default function SnakeLadderLobbyGame() {
           >
             🎲 {i18n.roll}
           </button>
-        )}
-        {state?.phase === "finished" && (
-          <div className="text-fuchsia-300 font-bold text-xl">
-            🎉 {state.players?.find((p: any) => p.id === state.winnerId)?.name} {i18n.win}
-          </div>
         )}
       </div>
 

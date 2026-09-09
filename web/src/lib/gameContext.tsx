@@ -47,6 +47,9 @@ interface GameActions {
     freeParkingBonus?: number,
     turnTimer?: number,
     aiDifficulty?: "easy" | "medium" | "hard",
+    flag?: string,
+    mapId?: string,
+    backgroundId?: string,
   ) => Promise<{ roomId: string; playerId: string }>;
   joinRoom: (
     roomId: string,
@@ -59,6 +62,8 @@ interface GameActions {
   startGame: () => Promise<void>;
   addBot: (botName?: string, difficulty?: BotDifficulty) => Promise<void>;
   removeBot: (botId: string) => Promise<void>;
+  setPlayerIcon: (icon: string) => Promise<void>;
+  setPlayerCharacter: (characterId: string) => Promise<void>;
     playCards: (
     cardIndices: number[],
     declaration: CardDeclaration,
@@ -74,6 +79,7 @@ interface GameActions {
   ) => void;
   clearToasts: () => void;
   resetGame: () => void;
+  leaveRoom: () => void;
   codenamesJoinTeam: (team: CodenamesTeam, role: CodenamesRole) => Promise<void>;
   codenamesGiveClue: (word: string, count: number) => Promise<void>;
   codenamesGuess: (cardIndex: number) => Promise<void>;
@@ -146,6 +152,10 @@ export const [GameProvider, useGame] = createContextHook(() => {
   const clearToasts = useCallback(() => setToasts([]), []);
 
   const resetGame = useCallback(() => {
+    // Force a real disconnect so the server immediately unbinds this socket's
+    // room session — otherwise the same connection is still "in a room" server-side
+    // and the next create_room/join_room fails with "Already in a room".
+    disconnectSocket();
     setLobbyState(null);
     setGameState(null);
     setCodenamesState(null);
@@ -156,7 +166,21 @@ export const [GameProvider, useGame] = createContextHook(() => {
     setChatMessages([]);
     setToasts([]);
     setError(null);
+    setMyRoomId(null);
+    setMyPlayerId(null);
   }, []);
+
+  // Single entry point for "leave the room and go home" — every leave button
+  // across the app should call this instead of duplicating the reset + cleanup.
+  const leaveRoom = useCallback(() => {
+    resetGame();
+    try {
+      localStorage.removeItem(LS_ROOM_ID);
+      localStorage.removeItem(LS_PLAYER_ID);
+    } catch {
+      /* ignore */
+    }
+  }, [resetGame]);
 
   // Socket setup
   useEffect(() => {
@@ -385,6 +409,8 @@ export const [GameProvider, useGame] = createContextHook(() => {
       turnTimer?: number,
       aiDifficulty?: "easy" | "medium" | "hard",
       flag?: string,
+      mapId?: string,
+      backgroundId?: string,
     ): Promise<{ roomId: string; playerId: string }> => {
       connectSocket();
       const res = await emitWithAck<{
@@ -415,6 +441,8 @@ export const [GameProvider, useGame] = createContextHook(() => {
         turnTimer,
         aiDifficulty,
         flag,
+        mapId,
+        backgroundId,
       });
 
       setMyRoomId(res.roomId);
@@ -479,6 +507,22 @@ export const [GameProvider, useGame] = createContextHook(() => {
     async (botId: string) => {
       if (!myRoomId) throw new Error("Not in a room");
       await emitWithAck("remove_bot", { roomId: myRoomId, botId });
+    },
+    [myRoomId, emitWithAck],
+  );
+
+  const setPlayerIcon = useCallback(
+    async (icon: string) => {
+      if (!myRoomId) throw new Error("Not in a room");
+      await emitWithAck("set_player_icon", { roomId: myRoomId, icon });
+    },
+    [myRoomId, emitWithAck],
+  );
+
+  const setPlayerCharacter = useCallback(
+    async (characterId: string) => {
+      if (!myRoomId) throw new Error("Not in a room");
+      await emitWithAck("set_player_character", { roomId: myRoomId, characterId });
     },
     [myRoomId, emitWithAck],
   );
@@ -676,6 +720,8 @@ export const [GameProvider, useGame] = createContextHook(() => {
     startGame,
     addBot,
     removeBot,
+    setPlayerIcon,
+    setPlayerCharacter,
     playCards,
     callLiar,
     passTurn,
@@ -685,6 +731,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
     addToast,
     clearToasts,
     resetGame,
+    leaveRoom,
     codenamesJoinTeam,
     codenamesGiveClue,
     codenamesGuess,
