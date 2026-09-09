@@ -136,7 +136,7 @@ export default function Landing() {
           justifyContent: "space-between",
           gap: 12,
           padding: "18px 20px",
-          maxWidth: 720,
+          maxWidth: 1180,
           width: "100%",
           margin: "0 auto",
           boxSizing: "border-box",
@@ -224,7 +224,7 @@ export default function Landing() {
       <main
         style={{
           flex: 1,
-          maxWidth: 720,
+          maxWidth: 1180,
           width: "100%",
           margin: "0 auto",
           padding: "8px 20px 40px",
