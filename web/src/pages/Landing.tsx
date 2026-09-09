@@ -285,11 +285,14 @@ export default function Landing() {
               border: "3px solid #2B2420",
               overflow: "hidden",
               boxShadow: "6px 6px 0 #2B2420",
+              display: "flex",
+              flexDirection: "column",
             }}
           >
             <div
               style={{
                 height: 140,
+                flexShrink: 0,
                 background: "#F4C89A",
                 display: "flex",
                 alignItems: "center",
@@ -323,6 +326,7 @@ export default function Landing() {
             <div
               style={{
                 padding: "16px 20px 20px",
+                flex: 1,
                 display: "flex",
                 flexDirection: "column",
                 gap: 10,
@@ -345,7 +349,7 @@ export default function Landing() {
                 className="dc-play-btn"
                 style={{
                   alignSelf: buttonAlign,
-                  marginTop: 4,
+                  marginTop: "auto",
                   background: "#E8574A",
                   color: "#FDF6EC",
                   border: "none",
@@ -371,11 +375,14 @@ export default function Landing() {
               border: "3px solid #2B2420",
               overflow: "hidden",
               boxShadow: "6px 6px 0 #2B2420",
+              display: "flex",
+              flexDirection: "column",
             }}
           >
             <div
               style={{
                 height: 140,
+                flexShrink: 0,
                 background: "#CFE3E1",
                 display: "flex",
                 alignItems: "center",
@@ -416,6 +423,7 @@ export default function Landing() {
             <div
               style={{
                 padding: "16px 20px 20px",
+                flex: 1,
                 display: "flex",
                 flexDirection: "column",
                 gap: 10,
@@ -438,7 +446,7 @@ export default function Landing() {
                 className="dc-play-btn"
                 style={{
                   alignSelf: buttonAlign,
-                  marginTop: 4,
+                  marginTop: "auto",
                   background: "#3AA6A6",
                   color: "#FDF6EC",
                   border: "none",
@@ -464,11 +472,14 @@ export default function Landing() {
               border: "3px solid #2B2420",
               overflow: "hidden",
               boxShadow: "6px 6px 0 #2B2420",
+              display: "flex",
+              flexDirection: "column",
             }}
           >
             <div
               style={{
                 height: 140,
+                flexShrink: 0,
                 background: "#FEF3C7", // Soft warm yellow
                 display: "flex",
                 alignItems: "center",
@@ -536,6 +547,7 @@ export default function Landing() {
             <div
               style={{
                 padding: "16px 20px 20px",
+                flex: 1,
                 display: "flex",
                 flexDirection: "column",
                 gap: 10,
@@ -558,7 +570,7 @@ export default function Landing() {
                 className="dc-play-btn"
                 style={{
                   alignSelf: buttonAlign,
-                  marginTop: 4,
+                  marginTop: "auto",
                   background: "#E8574A",
                   color: "#FDF6EC",
                   border: "none",
@@ -584,11 +596,14 @@ export default function Landing() {
               border: "3px solid #2B2420",
               overflow: "hidden",
               boxShadow: "6px 6px 0 #2B2420",
+              display: "flex",
+              flexDirection: "column",
             }}
           >
             <div
               style={{
                 height: 140,
+                flexShrink: 0,
                 background: "#D1FAE5", // Soft mint green
                 display: "flex",
                 alignItems: "center",
@@ -647,6 +662,7 @@ export default function Landing() {
             <div
               style={{
                 padding: "16px 20px 20px",
+                flex: 1,
                 display: "flex",
                 flexDirection: "column",
                 gap: 10,
@@ -669,7 +685,7 @@ export default function Landing() {
                 className="dc-play-btn"
                 style={{
                   alignSelf: buttonAlign,
-                  marginTop: 4,
+                  marginTop: "auto",
                   background: "#3AA6A6",
                   color: "#FDF6EC",
                   border: "none",
@@ -695,11 +711,14 @@ export default function Landing() {
               border: "3px solid #2B2420",
               overflow: "hidden",
               boxShadow: "6px 6px 0 #2B2420",
+              display: "flex",
+              flexDirection: "column",
             }}
           >
             <div
               style={{
                 height: 140,
+                flexShrink: 0,
                 background: "#E9D5FF", // Soft warm purple
                 display: "flex",
                 alignItems: "center",
@@ -764,6 +783,7 @@ export default function Landing() {
             <div
               style={{
                 padding: "16px 20px 20px",
+                flex: 1,
                 display: "flex",
                 flexDirection: "column",
                 gap: 10,
@@ -786,7 +806,7 @@ export default function Landing() {
                 className="dc-play-btn"
                 style={{
                   alignSelf: buttonAlign,
-                  marginTop: 4,
+                  marginTop: "auto",
                   background: "#A855F7", // Purple theme button
                   color: "#FDF6EC",
                   border: "none",
@@ -812,11 +832,14 @@ export default function Landing() {
               border: "3px solid #2B2420",
               overflow: "hidden",
               boxShadow: "6px 6px 0 #2B2420",
+              display: "flex",
+              flexDirection: "column",
             }}
           >
             <div
               style={{
                 height: 140,
+                flexShrink: 0,
                 background: "#FEF3C7",
                 display: "flex",
                 alignItems: "center",
@@ -880,6 +903,7 @@ export default function Landing() {
             <div
               style={{
                 padding: "16px 20px 20px",
+                flex: 1,
                 display: "flex",
                 flexDirection: "column",
                 gap: 10,
@@ -902,7 +926,7 @@ export default function Landing() {
                 className="dc-play-btn"
                 style={{
                   alignSelf: buttonAlign,
-                  marginTop: 4,
+                  marginTop: "auto",
                   background: "#E8574A",
                   color: "#FDF6EC",
                   border: "none",
@@ -928,11 +952,14 @@ export default function Landing() {
               border: "3px solid #2B2420",
               overflow: "hidden",
               boxShadow: "6px 6px 0 #2B2420",
+              display: "flex",
+              flexDirection: "column",
             }}
           >
             <div
               style={{
                 height: 140,
+                flexShrink: 0,
                 background: "#E0E7FF",
                 display: "flex",
                 alignItems: "center",
@@ -996,6 +1023,7 @@ export default function Landing() {
             <div
               style={{
                 padding: "16px 20px 20px",
+                flex: 1,
                 display: "flex",
                 flexDirection: "column",
                 gap: 10,
@@ -1018,7 +1046,7 @@ export default function Landing() {
                 className="dc-play-btn"
                 style={{
                   alignSelf: buttonAlign,
-                  marginTop: 4,
+                  marginTop: "auto",
                   background: "#7C3AED",
                   color: "#FDF6EC",
                   border: "none",
