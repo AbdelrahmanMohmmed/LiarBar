@@ -339,7 +339,7 @@ export default function HigherLowerGame() {
           >
             {c.howToPlay}
           </button>
-          {!lobbyState && <VoiceControls roomId={higherLowerState.roomId} />}
+          {!lobbyState && <VoiceControls />}
         </div>
       </div>
 

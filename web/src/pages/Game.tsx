@@ -315,7 +315,7 @@ export default function Game() {
           >
             <HelpCircle className="w-4 h-4" />
           </button>
-          {!lobbyState && <VoiceControls roomId={paramRoomId!} />}
+          {!lobbyState && <VoiceControls />}
         </div>
       </div>
 

@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { GameProvider, useGame } from "@/lib/gameContext";
+import { VoiceProvider } from "@/lib/voiceContext";
 import { LanguageProvider } from "@/lib/languageContext";
 import { ThemeProvider } from "@/lib/themeContext";
 import { toast, Toaster } from "sonner";
@@ -75,6 +76,8 @@ const App = () => (
     <ThemeProvider>
     <QueryClientProvider client={queryClient}>
       <GameProvider>
+        {/* Above the router on purpose: route changes must not tear down voice. */}
+        <VoiceProvider>
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Landing />} />
@@ -108,6 +111,7 @@ const App = () => (
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
+        </VoiceProvider>
         <ToastRenderer />
         <Toaster position="top-center" richColors closeButton />
     </GameProvider>

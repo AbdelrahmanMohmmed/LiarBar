@@ -305,6 +305,7 @@ export default function DominoHome() {
                   <option value="15">15 {c.seconds}</option>
                   <option value="30">30 {c.seconds}</option>
                   <option value="45">45 {c.seconds}</option>
+                  <option value="90">90 {c.seconds} (1:30)</option>
                 </select>
               </div>
             </div>

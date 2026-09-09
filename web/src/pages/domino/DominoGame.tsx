@@ -1128,7 +1128,7 @@ export default function DominoGame() {
           >
             <HelpCircle size={18} />
           </button>
-          <VoiceControls roomId={dominoState.roomId} />
+          <VoiceControls />
           
           {/* Top Navbar Chat Toggle */}
           <button
@@ -1271,10 +1271,8 @@ export default function DominoGame() {
             borderRadius: 32,
             margin: "0 0 16px 0",
             padding: 16,
-            overflowY: "auto",
             position: "relative",
-            minHeight: 220,
-            maxHeight: "55vh",
+            overflow: "hidden",
           }}
         >
           {/* Draw pile / Boneyard */}
@@ -1332,14 +1330,16 @@ export default function DominoGame() {
             <div
               style={{
                 width: "100%",
+                maxHeight: "100%",
                 display: "flex",
                 flexWrap: "wrap",
                 alignItems: "center",
-                justifyContent: "center",
+                justifyContent: "flex-start",
                 alignContent: "center",
                 padding: "16px",
                 boxSizing: "border-box",
                 gap: 8,
+                overflowY: "auto",
               }}
             >
               {dominoState.board.map((tile, idx) => {
@@ -1364,7 +1364,7 @@ export default function DominoGame() {
                       right={tile.right}
                       isVertical={isDouble}
                       tileTheme={dominoState.tileTheme}
-                      scale={isMobile ? 0.7 : 0.85}
+                      scale={0.75}
                     />
                   </div>
                 );

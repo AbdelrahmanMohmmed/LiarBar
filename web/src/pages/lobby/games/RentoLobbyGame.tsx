@@ -898,7 +898,7 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
           >
             {flagMode === "image" ? "🏳️" : "🎨"} {flagMode === "image" ? i18n.flagImage : i18n.flagCss}
           </button>
-          {state?.roomId && <VoiceControls roomId={state.roomId} />}
+          {state?.roomId && <VoiceControls />}
         </div>
       </div>
 
