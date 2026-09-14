@@ -2,50 +2,391 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ==========================================================================
+   DESIGN TOKENS
+   --------------------------------------------------------------------------
+   The runtime source of truth for colour, spacing, elevation and motion.
+   Mirrored (as raw hex) in web/src/lib/brand.ts -> COLORS for the places CSS
+   can't reach: canvas games, <meta theme-color>, the manifest, SVG generation.
+   KEEP THE TWO IN SYNC. Rationale: docs/DESIGN_SYSTEM.md
+   ========================================================================== */
+
 @layer base {
   :root {
-    --background: 0 7% 5%;
-    --foreground: 48 30% 92%;
-    --card: 0 15% 8%;
-    --card-foreground: 48 30% 92%;
-    --popover: 0 15% 8%;
-    --popover-foreground: 48 30% 92%;
-    --primary: 38 92% 50%;
+    /* ---- Raw palette ------------------------------------------------- */
+    /* Warm near-black. Never #000 — pure black reads as a hole on OLED and
+       kills the depth the whole UI relies on. */
+    --ink-900: 18 16% 6%;     /* #14100E page ground */
+    --ink-800: 20 15% 9%;     /* #1C1714 sunken */
+    --ink-700: 22 17% 12%;    /* #251E1A cards, sheets */
+    --ink-600: 22 18% 17%;    /* #332A24 raised / hover */
+    --ink-500: 22 18% 22%;    /* #43382F hairlines */
+
+    --cream: 33 46% 92%;      /* #F5EDE2 body text */
+    --sand: 28 22% 65%;       /* #B9A895 secondary text */
+
+    /* THE accent. Every primary action is this and nothing else is. */
+    --coral: 8 79% 58%;       /* #E8563F */
+    --coral-dim: 9 61% 45%;   /* #B83E2C */
+
+    /* Reserved for realtime state ONLY: connected, voice live, your turn. */
+    --mint: 161 68% 54%;      /* #3BD9A4 */
+    --mint-dim: 162 66% 36%;  /* #1F9B72 */
+
+    --gold: 39 88% 61%;       /* #F2B441 scores, room code, wins */
+    --ruby: 350 74% 56%;      /* #E23D57 errors, elimination */
+    --violet: 261 82% 68%;    /* #9A6BF0 team B, secondary game accents */
+    --sky: 209 89% 63%;       /* #4EA8F5 team A, info */
+
+    /* ---- Semantic aliases -------------------------------------------- */
+    /* These are what components should use. Swapping a raw value above
+       re-themes the whole app; referencing raw values directly in a
+       component defeats that, so don't. */
+    --background: var(--ink-900);
+    --foreground: var(--cream);
+    --surface: var(--ink-700);
+    --surface-raised: var(--ink-600);
+    --surface-sunken: var(--ink-800);
+
+    --card: var(--ink-700);
+    --card-foreground: var(--cream);
+    --popover: var(--ink-700);
+    --popover-foreground: var(--cream);
+
+    --primary: var(--coral);
     --primary-foreground: 0 0% 100%;
-    --secondary: 0 10% 14%;
-    --secondary-foreground: 48 30% 92%;
-    --muted: 0 10% 14%;
-    --muted-foreground: 36 20% 60%;
-    --accent: 0 10% 19%;
-    --accent-foreground: 48 30% 92%;
-    --destructive: 0 84% 60%;
+    --secondary: var(--ink-600);
+    --secondary-foreground: var(--cream);
+    --muted: var(--ink-600);
+    --muted-foreground: var(--sand);
+    --accent: var(--ink-600);
+    --accent-foreground: var(--cream);
+    --destructive: var(--ruby);
     --destructive-foreground: 0 0% 100%;
-    --border: 38 20% 20%;
-    --input: 38 20% 20%;
-    --ring: 38 92% 38%;
-    --radius: 0.5rem;
+    --live: var(--mint);
+
+    --border: var(--ink-500);
+    --input: var(--ink-500);
+    --ring: var(--coral);
+
+    /* ---- Shape -------------------------------------------------------- */
+    /* One radius scale. Interactive things are pill-ish, containers are
+       soft-square. Mixing more than three radii makes a UI look assembled
+       from parts, which is exactly what this one used to look like. */
+    --radius-sm: 0.5rem;
+    --radius: 0.875rem;
+    --radius-lg: 1.25rem;
+    --radius-xl: 1.75rem;
+    --radius-pill: 999px;
+
+    /* ---- Elevation ---------------------------------------------------- */
+    /* Shadows are warm, not neutral — a grey shadow on a warm ground looks
+       dirty. Each level is a tight contact shadow plus a wide ambient one. */
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-2: 0 2px 4px rgba(0, 0, 0, 0.35), 0 8px 20px -8px rgba(0, 0, 0, 0.6);
+    --shadow-3: 0 4px 8px rgba(0, 0, 0, 0.35), 0 20px 48px -12px rgba(0, 0, 0, 0.7);
+    --shadow-coral: 0 6px 24px -6px hsl(var(--coral) / 0.5);
+    --shadow-mint: 0 6px 24px -6px hsl(var(--mint) / 0.45);
+
+    /* ---- Motion ------------------------------------------------------- */
+    /* Two durations and two curves. `--ease-out` for things entering or
+       responding to a tap; `--ease-spring` only for things that should feel
+       physical (a tile landing, a card dealt). */
+    --dur-fast: 140ms;
+    --dur: 240ms;
+    --dur-slow: 420ms;
+    --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+    /* ---- Layout ------------------------------------------------------- */
+    /* Safe-area aware so the mobile bottom bar clears the iOS home indicator. */
+    --gutter: 1rem;
+    --safe-b: env(safe-area-inset-bottom, 0px);
+    --safe-t: env(safe-area-inset-top, 0px);
+
+    /* Legacy alias kept so pre-existing components keep compiling. */
+    --radius-legacy: 0.5rem;
+  }
+
+  @media (min-width: 768px) {
+    :root {
+      --gutter: 1.5rem;
+    }
   }
 
   * {
     @apply border-border;
   }
 
+  html {
+    /* Stops iOS bumping font size when the device rotates. */
+    -webkit-text-size-adjust: 100%;
+  }
+
   body {
     @apply bg-background text-foreground;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-family: "Tajawal", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+      sans-serif;
+    /* The ground is not flat: a very slight warm glow from the top centre
+       gives every page a light source, which is what makes the elevation
+       shadows read as elevation rather than as smudges. */
+    background-image: radial-gradient(
+      120% 80% at 50% -10%,
+      hsl(var(--ink-700) / 0.9) 0%,
+      hsl(var(--ink-900)) 60%
+    );
+    background-attachment: fixed;
+    overflow-x: hidden;
+  }
+
+  /* Display face for anything that should read as "score" or "headline". */
+  .font-display {
+    font-family: "Baloo 2", "Tajawal", system-ui, sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  /* Room codes, scores, timers: tabular so digits don't jitter as they tick. */
+  .font-numeric {
+    font-family: "Baloo 2", "Tajawal", system-ui, sans-serif;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+    letter-spacing: 0.06em;
+  }
+
+  /* Anyone who asked their OS for less motion gets a still UI. This is one
+     rule rather than per-animation opt-outs so new animations are covered
+     automatically. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  /* Focus is visible for keyboard users and invisible for mouse users —
+     :focus-visible does that split for free. Never remove it outright. */
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
   }
 }
 
-/* Custom scrollbar */
+/* ==========================================================================
+   PRIMITIVES
+   ========================================================================== */
+
+@layer components {
+  /* ---- Surfaces ------------------------------------------------------- */
+
+  .surface {
+    background: hsl(var(--surface));
+    border: 1px solid hsl(var(--border) / 0.7);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-2);
+  }
+
+  /* A surface with a 1px light edge along the top, which is what actually
+     sells "this is lifted toward the light source" rather than "this is a
+     lighter rectangle". */
+  .surface-lit {
+    position: relative;
+    background: linear-gradient(
+      hsl(var(--surface-raised)) 0%,
+      hsl(var(--surface)) 100%
+    );
+    border: 1px solid hsl(var(--border) / 0.8);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-2);
+  }
+  .surface-lit::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      hsl(var(--cream) / 0.14) 20%,
+      hsl(var(--cream) / 0.14) 80%,
+      transparent
+    );
+    border-radius: inherit;
+    pointer-events: none;
+  }
+
+  /* ---- Buttons -------------------------------------------------------- */
+  /* Every button is at least 44px tall. This is not a style choice; below
+     44px a thumb misses it, and the entire product is used on phones while
+     the user is also talking. */
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 44px;
+    padding: 0 1.25rem;
+    border-radius: var(--radius-pill);
+    font-weight: 700;
+    font-size: 0.95rem;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform var(--dur-fast) var(--ease-out),
+      background var(--dur-fast) var(--ease-out),
+      box-shadow var(--dur-fast) var(--ease-out),
+      opacity var(--dur-fast) var(--ease-out);
+  }
+  .btn:active:not(:disabled) {
+    transform: scale(0.96);
+  }
+  .btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .btn-primary {
+    background: hsl(var(--coral));
+    color: #fff;
+    box-shadow: var(--shadow-coral);
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: hsl(var(--coral) / 0.9);
+  }
+
+  .btn-live {
+    background: hsl(var(--mint));
+    color: hsl(var(--ink-900));
+    box-shadow: var(--shadow-mint);
+  }
+  .btn-live:hover:not(:disabled) {
+    background: hsl(var(--mint) / 0.9);
+  }
+
+  .btn-ghost {
+    background: hsl(var(--surface-raised) / 0.6);
+    color: hsl(var(--foreground));
+    border: 1px solid hsl(var(--border));
+  }
+  .btn-ghost:hover:not(:disabled) {
+    background: hsl(var(--surface-raised));
+  }
+
+  .btn-quiet {
+    background: transparent;
+    color: hsl(var(--muted-foreground));
+  }
+  .btn-quiet:hover:not(:disabled) {
+    color: hsl(var(--foreground));
+    background: hsl(var(--surface-raised) / 0.5);
+  }
+
+  .btn-sm {
+    min-height: 36px;
+    padding: 0 0.85rem;
+    font-size: 0.85rem;
+  }
+  .btn-lg {
+    min-height: 54px;
+    padding: 0 1.75rem;
+    font-size: 1.05rem;
+  }
+
+  /* ---- Inputs --------------------------------------------------------- */
+
+  .field {
+    width: 100%;
+    min-height: 48px;
+    padding: 0 1rem;
+    background: hsl(var(--surface-sunken));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
+    color: hsl(var(--foreground));
+    /* 16px minimum: anything smaller makes iOS Safari zoom the page on
+       focus, which throws the player out of the game layout. */
+    font-size: 16px;
+    transition: border-color var(--dur-fast) var(--ease-out),
+      box-shadow var(--dur-fast) var(--ease-out);
+  }
+  .field::placeholder {
+    color: hsl(var(--muted-foreground) / 0.7);
+  }
+  .field:focus {
+    outline: none;
+    border-color: hsl(var(--coral));
+    box-shadow: 0 0 0 3px hsl(var(--coral) / 0.18);
+  }
+
+  /* ---- Badges / chips -------------------------------------------------- */
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.25rem 0.65rem;
+    border-radius: var(--radius-pill);
+    font-size: 0.75rem;
+    font-weight: 700;
+    background: hsl(var(--surface-raised));
+    color: hsl(var(--muted-foreground));
+    border: 1px solid hsl(var(--border) / 0.8);
+  }
+  .chip-live {
+    background: hsl(var(--mint) / 0.14);
+    color: hsl(var(--mint));
+    border-color: hsl(var(--mint) / 0.3);
+  }
+  .chip-hot {
+    background: hsl(var(--coral) / 0.14);
+    color: hsl(var(--coral));
+    border-color: hsl(var(--coral) / 0.3);
+  }
+  .chip-gold {
+    background: hsl(var(--gold) / 0.14);
+    color: hsl(var(--gold));
+    border-color: hsl(var(--gold) / 0.3);
+  }
+
+  /* ---- Layout helpers -------------------------------------------------- */
+
+  .page {
+    min-height: 100dvh;
+    padding-inline: var(--gutter);
+    padding-block: calc(1rem + var(--safe-t)) calc(1rem + var(--safe-b));
+  }
+
+  .stack > * + * {
+    margin-top: var(--stack-gap, 1rem);
+  }
+}
+
+/* ==========================================================================
+   MOTION
+   ========================================================================== */
+
+/* Scrollbar: thin and warm so it doesn't read as a system chrome element
+   sitting on top of the design. */
 ::-webkit-scrollbar {
-  width: 4px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: hsl(38 20% 20%);
-  border-radius: 2px;
+  background: hsl(var(--ink-500));
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--ink-600));
 }
 
 /* ===== 3D Perspective Utilities ===== */
@@ -64,7 +405,7 @@
 
 /* ===== Card Animations ===== */
 .card-enter {
-  animation: card-enter 0.3s ease-out both;
+  animation: card-enter 0.3s var(--ease-out) both;
 }
 @keyframes card-enter {
   from {
@@ -92,7 +433,7 @@
 }
 
 .card-deal {
-  animation: card-deal 0.5s ease-out both;
+  animation: card-deal 0.5s var(--ease-out) both;
 }
 @keyframes card-deal {
   from {
@@ -109,36 +450,57 @@
   animation: card-float 3s ease-in-out infinite;
 }
 @keyframes card-float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-4px); }
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
 }
 
-/* ===== Fade / Slide / Zoom Animations ===== */
+/* ===== Fade / Slide / Zoom ===== */
 @keyframes fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 .animate-in {
-  animation: fade-in 0.3s ease-out;
+  animation: fade-in 0.3s var(--ease-out);
 }
 .fade-in {
-  animation: fade-in 0.3s ease-out both;
+  animation: fade-in 0.3s var(--ease-out) both;
 }
 
 @keyframes slide-up {
-  from { opacity: 0; transform: translateY(1rem); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 .slide-in-from-bottom-4 {
-  animation: slide-up 0.3s ease-out;
+  animation: slide-up 0.3s var(--ease-out);
 }
 
 @keyframes zoom-in {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 .zoom-in-95 {
-  animation: zoom-in 0.2s ease-out;
+  animation: zoom-in 0.2s var(--ease-out);
 }
 
 @keyframes confetti-fade {
@@ -155,23 +517,90 @@
   animation: confetti-fade 2s ease-out forwards;
 }
 
-/* ===== Pulse for active elements ===== */
+/* Attention ring on the coral accent — used for "it's your turn". */
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.4); }
-  50% { box-shadow: 0 0 0 6px rgba(251, 191, 36, 0); }
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 hsl(var(--coral) / 0.45);
+  }
+  50% {
+    box-shadow: 0 0 0 8px hsl(var(--coral) / 0);
+  }
 }
 .pulse-glow {
   animation: pulse-glow 2s infinite;
 }
 
-/* ===== Select styles (for native selects used in the app) ===== */
+/* Same ring in the live colour — used for "voice is transmitting". */
+@keyframes pulse-live {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 hsl(var(--mint) / 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 8px hsl(var(--mint) / 0);
+  }
+}
+.pulse-live {
+  animation: pulse-live 1.6s infinite;
+}
+
+/* A tile/card settling onto the table. Spring curve on purpose: this is the
+   one place in the UI where overshoot reads as weight rather than as noise. */
+@keyframes drop-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-28px) scale(1.08) rotate(var(--drop-rot, 0deg));
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotate(0deg);
+  }
+}
+.drop-in {
+  animation: drop-in var(--dur-slow) var(--ease-spring) both;
+}
+
+/* Shimmer used for skeletons while a room is loading. */
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: hsl(var(--surface-raised));
+  border-radius: var(--radius-sm);
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    hsl(var(--cream) / 0.06),
+    transparent
+  );
+  animation: shimmer 1.4s infinite;
+}
+
+/* ===== Native selects ===== */
 select {
   -webkit-appearance: none;
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23a0875e' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23B9A895' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 0.75rem center;
   padding-right: 2rem;
+}
+/* RTL: the chevron has to move to the other side or it collides with text. */
+[dir="rtl"] select {
+  background-position: left 0.75rem center;
+  padding-right: 1rem;
+  padding-left: 2rem;
 }
 
 /* ===== Responsive ===== */
@@ -181,17 +610,39 @@ select {
   }
 }
 
-/* ===== Safariyat Games landing (imported design) ===== */
+/* ===== Legacy landing animations (kept until Landing.tsx is retired) ===== */
 @keyframes dc-pop-in {
-  0% { opacity: 0; transform: translateY(14px) scale(0.98); }
-  100% { opacity: 1; transform: translateY(0) scale(1); }
+  0% {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 @keyframes dc-float-badge {
-  0%, 100% { transform: translateY(0) rotate(-4deg); }
-  50% { transform: translateY(-4px) rotate(-4deg); }
+  0%,
+  100% {
+    transform: translateY(0) rotate(-4deg);
+  }
+  50% {
+    transform: translateY(-4px) rotate(-4deg);
+  }
 }
-.dc-lang-btn { transition: background 0.15s ease, color 0.15s ease; }
-.dc-lang-btn:hover { background: #2B2420 !important; color: #FDF6EC !important; }
-.dc-play-btn { transition: background 0.15s ease, transform 0.1s ease; }
-.dc-play-btn:hover { background: #d1483c !important; }
-.dc-play-btn:active { transform: scale(0.96); }
+.dc-lang-btn {
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.dc-lang-btn:hover {
+  background: #2b2420 !important;
+  color: #fdf6ec !important;
+}
+.dc-play-btn {
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+.dc-play-btn:hover {
+  background: #d1483c !important;
+}
+.dc-play-btn:active {
+  transform: scale(0.96);
+}
