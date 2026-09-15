@@ -143,6 +143,25 @@ Two defensive details in `getIceServers()` that are load-bearing:
 - **Constructor failure falls back to STUN-only** rather than propagating.
   Degraded voice beats no voice.
 
+### Missing TURN is now visible in two places, because it used to be visible in none
+
+Both of the above make a misconfiguration *survivable*, which is right, and both
+also make it **silent**, which was the problem: a deploy that forgot these
+variables works perfectly for the person who deployed it (one wifi network) and
+fails days later for somebody's cousin on mobile data.
+
+1. **At build time.** `web/scripts/check-env.mjs` runs as part of `npm run
+   build` and prints a warning into the build log — which is the one place an
+   operator reliably looks after a deploy. It warns rather than fails, because
+   STUN-only is a legitimate choice for a preview deploy or a first launch; the
+   point is only that it should be a choice somebody made.
+
+2. **At the moment it matters.** When a peer connection has exhausted its ICE
+   restarts, the voice panel used to say "someone can't connect to you", which
+   is true and unactionable. If the build shipped without a relay it now says
+   so instead — because that is almost certainly the cause and the fix is an
+   ops change the player cannot make.
+
 ---
 
 ## 5. What was broken, and what fixed it

@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "node scripts/check-env.mjs && tsc && vite build",
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx",
-    "brand:sync": "node scripts/sync-brand.mjs"
+    "brand:sync": "node scripts/sync-brand.mjs",
+    "check:env": "node scripts/check-env.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.28.0",

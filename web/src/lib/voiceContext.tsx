@@ -17,6 +17,25 @@ import { VoiceLevelMonitor } from "./voiceLevels";
  *   VITE_TURN_USERNAME=...
  *   VITE_TURN_CREDENTIAL=...
  */
+/**
+ * Whether this build shipped with a usable TURN relay.
+ *
+ * Read by the voice panel, not just the console. A deployment with no relay
+ * works perfectly for everyone on the same wifi and fails for a meaningful
+ * share of people on mobile data — symmetric NAT, which most carriers use,
+ * cannot be traversed by STUN alone. The two cases are indistinguishable to
+ * the person reporting it ("I can't hear Omar"), and one of them is an ops
+ * change nobody will make unless the product says so.
+ *
+ * Reads the same two variables `getIceServers` does, so it cannot drift from
+ * what the peer connections were actually given.
+ */
+export function hasTurnRelay(): boolean {
+  const url = (import.meta.env.VITE_TURN_URL as string | undefined)?.trim();
+  const credential = (import.meta.env.VITE_TURN_CREDENTIAL as string | undefined)?.trim();
+  return Boolean(url && credential);
+}
+
 function getIceServers(): RTCIceServer[] {
   const servers: RTCIceServer[] = [
     { urls: "stun:stun.l.google.com:19302" },

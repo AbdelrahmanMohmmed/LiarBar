@@ -312,6 +312,7 @@ const translations: Record<Language, Record<string, string>> = {
     "common.room_gone": "Room not found, or you were disconnected.",
     "common.reconnecting": "Reconnecting to the room…",
     "common.seconds_short": "s",
+    "voice.no_relay": "Someone can't connect to you. This deployment has no voice relay configured, which is the usual cause on mobile data — see docs/VOICE.md.",
     "voice.n_online": "{n} on voice",
     "voice.nobody": "nobody on voice",
 
@@ -819,6 +820,7 @@ const translations: Record<Language, Record<string, string>> = {
     "common.room_gone": "الأوضة مش موجودة، أو اتقطع اتصالك.",
     "common.reconnecting": "بيعيد الاتصال بالأوضة…",
     "common.seconds_short": "ث",
+    "voice.no_relay": "في حد مش قادر يتوصّل بيك. النسخة دي متظبّطش عليها سيرفر تحويل للصوت، وده السبب المعتاد على بيانات الموبايل.",
     "voice.n_online": "{n} على الصوت",
     "voice.nobody": "محدش على الصوت",
 

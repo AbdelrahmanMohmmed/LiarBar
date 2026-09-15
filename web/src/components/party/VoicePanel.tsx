@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Mic, MicOff, Volume2, AlertTriangle, Radio, Loader2 } from "lucide-react";
-import { useVoice, type PeerHealth } from "@/lib/voiceContext";
+import { useVoice, hasTurnRelay, type PeerHealth } from "@/lib/voiceContext";
 import { useGame } from "@/lib/gameContext";
 import { useLanguage } from "@/lib/languageContext";
 import type { PlayerData } from "@/lib/types";
@@ -112,10 +112,15 @@ export default function VoicePanel({ players }: { players: PlayerData[] }) {
         </p>
       )}
 
+      {/* "Someone can't connect to you" is true but unactionable. When this
+          build shipped without a TURN relay it is also almost certainly the
+          cause — STUN alone cannot cross the symmetric NAT most mobile
+          carriers use — and that is a deployment fix, not something the
+          player can do anything about. Say which one it is. */}
       {anyoneFailed && (
         <p className="text-xs text-gold flex items-start gap-1.5 px-1">
           <AlertTriangle size={13} className="mt-0.5 shrink-0" />
-          {t("voice.some_failed")}
+          {hasTurnRelay() ? t("voice.some_failed") : t("voice.no_relay")}
         </p>
       )}
 
