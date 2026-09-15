@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useGame, storedSession } from "@/lib/gameContext";
 import { useLanguage } from "@/lib/languageContext";
+import { pickBotName } from "@/lib/botNames";
 import { COLORS, uiFont } from "./theme";
 import { Panel, PrimaryButton, SecondaryButton, Badge } from "./ui";
 import { Users, Bot, Share2, Copy, Trash2, ArrowLeft } from "lucide-react";
@@ -153,11 +154,10 @@ export default function DominoRoom() {
   const handleAddBot = useCallback(async () => {
     if (!dominoState) return;
     try {
-      const names = [
-        "عبده", "أبو حميد", "الحريف", "المعلم", "حبيبة", "زياد", "فارس",
-        "Spark", "Logic", "Bluffer", "Quantum", "DominoKing", "IvoryChamp"
-      ];
-      const botName = (isAr ? "آلي " : "Bot ") + (names[Math.floor(Math.random() * names.length)]);
+      const botName = pickBotName(
+        isAr ? "ar" : "en",
+        dominoState.players.map((p) => p.name),
+      );
       await addBot(botName, botDifficulty);
     } catch (err) {
       addToast(err instanceof Error ? err.message : "Failed to add bot", "error");

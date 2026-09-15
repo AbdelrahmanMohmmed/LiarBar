@@ -39,7 +39,6 @@ interface BotMemory {
   // Map of "x,y" -> icon that the bot has seen
   seen: Map<string, Icon>;
   timer: NodeJS.Timeout | null;
-  firstFlip: { x: number; y: number } | null;
 }
 
 export class MemoryPuzzleGame implements GameRoom {
@@ -198,7 +197,7 @@ export class MemoryPuzzleGame implements GameRoom {
       if (!p.isBot) continue;
       let mem = this.botMemory.get(p.id);
       if (!mem) {
-        mem = { seen: new Map(), timer: null, firstFlip: null };
+        mem = { seen: new Map(), timer: null };
         this.botMemory.set(p.id, mem);
       }
       // All cards are revealed right now, remember them all
@@ -311,47 +310,74 @@ export class MemoryPuzzleGame implements GameRoom {
       if (!p.isBot) continue;
       let mem = this.botMemory.get(p.id);
       if (!mem) {
-        mem = { seen: new Map(), timer: null, firstFlip: null };
+        mem = { seen: new Map(), timer: null };
         this.botMemory.set(p.id, mem);
       }
       mem.seen.set(`${x},${y}`, { ...card.icon });
     }
   }
 
+  /**
+   * Give *every* bot a pending flip.
+   *
+   * This used to schedule `players.find((p) => p.isBot)` — only ever the first
+   * bot in the roster. That was invisible while bots were a rare second seat,
+   * and wrong the moment a host could fill a Memory board with three of them:
+   * bots two and three never flipped a card and finished on nought, which
+   * reads as the game quietly ignoring them. Memory has no turn order — it is
+   * a race arbitrated by `flipLock` — so each bot just runs its own timer.
+   */
   private scheduleBotFlip() {
     if (this.flipLock || this.phase !== "playing") return;
-    // Find the next bot to act
-    const bot = this.players.find((p) => p.isBot);
-    if (!bot) return;
-
-    let mem = this.botMemory.get(bot.id);
-    if (!mem) {
-      mem = { seen: new Map(), timer: null, firstFlip: null };
-      this.botMemory.set(bot.id, mem);
-    }
-
-    // Clear any existing timer
-    if (mem.timer) { clearTimeout(mem.timer); mem.timer = null; }
 
     const [minDelay, maxDelay] =
       this.difficulty === "easy" ? [1400, 2400] : this.difficulty === "hard" ? [400, 900] : [800, 1500];
-    mem.timer = setTimeout(() => {
-      if (this.phase !== "playing" || this.flipLock) return;
-      this.runBotFlip(bot.id);
-    }, minDelay + Math.random() * (maxDelay - minDelay));
-    mem.timer.unref?.();
+
+    for (const bot of this.players) {
+      if (!bot.isBot) continue;
+
+      let mem = this.botMemory.get(bot.id);
+      if (!mem) {
+        mem = { seen: new Map(), timer: null };
+        this.botMemory.set(bot.id, mem);
+      }
+
+      // Clear any existing timer
+      if (mem.timer) { clearTimeout(mem.timer); mem.timer = null; }
+
+      mem.timer = setTimeout(() => {
+        if (this.phase !== "playing" || this.flipLock) return;
+        this.runBotFlip(bot.id);
+      }, minDelay + Math.random() * (maxDelay - minDelay));
+      mem.timer.unref?.();
+    }
   }
 
   private recallChance(): number {
     return this.difficulty === "easy" ? 0.45 : this.difficulty === "hard" ? 1 : 0.8;
   }
 
+  /**
+   * One flip, decided from the board rather than from what this bot did last.
+   *
+   * The old version kept a private `firstFlip` per bot and assumed the two
+   * flips of a turn were its own. Memory has no turns — it is a race settled
+   * by `flipLock` — so with more than one bot that assumption was wrong on
+   * roughly every other flip: bot A would open a card it knew the partner of,
+   * bot B would fire its own "first" flip into the same open pick, the two
+   * cards wouldn't match, and both would turn back over. Three bots ran for
+   * twelve seconds across a 48-card board they had *memorised in full* and
+   * found nothing, which looks precisely like bots that can't play.
+   *
+   * `this.firstPick` is the truth and everyone can see it, so that is what a
+   * bot decides from: complete the card that is face up, or open one you know.
+   */
   private runBotFlip(botId: string) {
     if (this.phase !== "playing" || this.flipLock) return;
     const mem = this.botMemory.get(botId);
     if (!mem) return;
 
-    // Build list of unmatched, unrevealed cards
+    // Unmatched, face-down cards — everything that is legal to flip.
     const candidates: { x: number; y: number }[] = [];
     for (let x = 0; x < this.boardW; x++) {
       for (let y = 0; y < this.boardH; y++) {
@@ -361,58 +387,70 @@ export class MemoryPuzzleGame implements GameRoom {
     }
     if (candidates.length === 0) return;
 
-    if (!mem.firstFlip) {
-      // First flip: try to find a known match (chance of recall scales with difficulty)
-      if (mem.seen.size > 0 && Math.random() < this.recallChance()) {
-        // Group known cards by icon
-        const groups = new Map<string, { x: number; y: number }[]>();
-        for (const [key, icon] of mem.seen) {
-          const cardKey = `${icon.shape}_${icon.color.r}_${icon.color.g}_${icon.color.b}`;
-          if (!groups.has(cardKey)) groups.set(cardKey, []);
-          const [sx, sy] = key.split(",").map(Number);
-          // Only include unmatched, unrevealed
-          const card = this.board[sx]?.[sy];
-          if (card && !card.matched && !card.revealed) {
-            groups.get(cardKey)!.push({ x: sx, y: sy });
-          }
-        }
-        // Find a pair we know
-        for (const [, positions] of groups) {
-          if (positions.length >= 2) {
-            const pick = positions[Math.floor(Math.random() * positions.length)];
-            mem.firstFlip = pick;
-            this.flip(botId, pick.x, pick.y);
-            return;
-          }
+    const randomPick = () => candidates[Math.floor(Math.random() * candidates.length)];
+    const open = this.firstPick;
+
+    if (open) {
+      // A card is already face up — anyone's. Finish it if we remember where
+      // its partner is, which is what a person does when they see one.
+      const openCard = this.board[open.x]?.[open.y];
+      if (openCard && !openCard.matched && Math.random() < this.recallChance()) {
+        const partner = this.recall(mem, openCard.icon, open);
+        if (partner) {
+          this.flip(botId, partner.x, partner.y);
+          return;
         }
       }
-      // No known match: pick random
-      const pick = candidates[Math.floor(Math.random() * candidates.length)];
-      mem.firstFlip = pick;
-      this.flip(botId, pick.x, pick.y);
-    } else {
-      // Second flip: try to match first pick (chance of recall scales with difficulty)
-      const firstCard = this.board[mem.firstFlip.x]?.[mem.firstFlip.y];
-      if (firstCard && firstCard.revealed && !firstCard.matched && Math.random() < this.recallChance()) {
-        // Look for matching card in memory
-        const matchKey = `${firstCard.icon.shape}_${firstCard.icon.color.r}_${firstCard.icon.color.g}_${firstCard.icon.color.b}`;
-        for (const [key, icon] of mem.seen) {
-          const ik = `${icon.shape}_${icon.color.r}_${icon.color.g}_${icon.color.b}`;
-          if (ik === matchKey) {
-            const [sx, sy] = key.split(",").map(Number);
-            if ((sx !== mem.firstFlip.x || sy !== mem.firstFlip.y) && !this.board[sx][sy].matched && !this.board[sx][sy].revealed) {
-              mem.firstFlip = null;
-              this.flip(botId, sx, sy);
-              return;
-            }
-          }
-        }
-      }
-      // No known match found, pick random
-      mem.firstFlip = null;
-      const pick = candidates[Math.floor(Math.random() * candidates.length)];
-      this.flip(botId, pick.x, pick.y);
+      const blind = randomPick();
+      this.flip(botId, blind.x, blind.y);
+      return;
     }
+
+    // Board is clear. Open a pair we know both halves of, so the flip after
+    // this one can close it.
+    if (mem.seen.size > 0 && Math.random() < this.recallChance()) {
+      const groups = new Map<string, { x: number; y: number }[]>();
+      for (const [key, icon] of mem.seen) {
+        const [sx, sy] = key.split(",").map(Number);
+        const card = this.board[sx]?.[sy];
+        if (!card || card.matched || card.revealed) continue;
+        const cardKey = this.iconKey(icon);
+        if (!groups.has(cardKey)) groups.set(cardKey, []);
+        groups.get(cardKey)!.push({ x: sx, y: sy });
+      }
+      for (const [, positions] of groups) {
+        if (positions.length >= 2) {
+          const pick = positions[Math.floor(Math.random() * positions.length)];
+          this.flip(botId, pick.x, pick.y);
+          return;
+        }
+      }
+    }
+
+    const pick = randomPick();
+    this.flip(botId, pick.x, pick.y);
+  }
+
+  private iconKey(icon: Icon): string {
+    return `${icon.shape}_${icon.color.r}_${icon.color.g}_${icon.color.b}`;
+  }
+
+  /** Where this bot remembers the twin of `icon` being, if anywhere. */
+  private recall(
+    mem: BotMemory,
+    icon: Icon,
+    not: { x: number; y: number },
+  ): { x: number; y: number } | null {
+    const want = this.iconKey(icon);
+    for (const [key, seen] of mem.seen) {
+      if (this.iconKey(seen) !== want) continue;
+      const [sx, sy] = key.split(",").map(Number);
+      if (sx === not.x && sy === not.y) continue;
+      const card = this.board[sx]?.[sy];
+      if (!card || card.matched || card.revealed) continue;
+      return { x: sx, y: sy };
+    }
+    return null;
   }
 
   toState(): unknown {

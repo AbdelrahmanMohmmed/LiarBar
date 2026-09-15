@@ -15,6 +15,7 @@ import RentoLobbyGame from "./games/RentoLobbyGame";
 import SnakeLadderLobbyGame from "./games/SnakeLadderLobbyGame";
 import FighterLobbyGame from "./games/FighterLobbyGame";
 import { PIECE_ICONS } from "@/lib/pieceIcons";
+import { pickBotName } from "@/lib/botNames";
 import { CHARACTERS } from "./games/fighterCharacters";
 import {
   ArrowLeft,
@@ -491,8 +492,10 @@ export default function LobbyRoom() {
 
             {isHost && (
               <button
-                onClick={() => addBot()}
-                className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-dashed border-coral/40 text-sand/70 hover:text-white hover:bg-surface-raised hover:border-coral/60 transition-all text-xs font-bold"
+                onClick={() =>
+                  addBot(pickBotName(lang, shell.players.map((p) => p.name)))
+                }
+                className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-dashed border-coral/50 bg-coral/10 text-coral-dim hover:bg-coral/20 hover:border-coral/70 transition-all text-xs font-bold"
               >
                 <Bot className="w-4 h-4" />
                 Add Bot

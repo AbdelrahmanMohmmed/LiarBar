@@ -3,10 +3,12 @@
  *
  *   node test/seat-bots.mjs <ROOM_CODE> [count]
  *
- * A development aid, not a test. Three of the party games (Spyfall, Chameleon,
- * Would You Rather) deliberately have no bots — a bot that can't bluff under
- * questioning is worse than an empty seat — which makes them impossible to
- * look at in a browser on your own.
+ * A development aid, not a test. Six games (Spyfall, Chameleon, Taboo, Bluff,
+ * Would You Rather, Codenames) deliberately have no bots — a bot that can't
+ * bluff under questioning is worse than an empty seat — which makes them
+ * impossible to look at in a browser on your own. Everything else in the
+ * catalogue takes real bots via "Add bot"; `test/bot-games.e2e.mjs` is what
+ * checks those actually play.
  *
  * These are not bots in the game sense: they take the minimum legal action
  * after a short delay so the round advances, and nothing more. That's enough

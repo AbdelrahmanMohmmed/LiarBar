@@ -193,7 +193,9 @@ export const GAME_SPECS: Record<string, GameSpec> = {
     minPlayers: 2,
     maxPlayers: 6,
     seating: "party",
-    bots: false,
+    // Bots guess a number in the live range, which is the whole turn. Not a
+    // clever opponent, but a complete one — the game never stalls on them.
+    bots: true,
     voiceMatters: false,
   },
 
@@ -222,7 +224,9 @@ export const GAME_SPECS: Record<string, GameSpec> = {
     minPlayers: 2,
     maxPlayers: 6,
     seating: "party",
-    bots: false,
+    // A bot rolls and moves. There is no decision in Snakes & Ladders to be
+    // bad at, so a bot plays it exactly as well as a person does.
+    bots: true,
     voiceMatters: false,
   },
 
@@ -231,7 +235,9 @@ export const GAME_SPECS: Record<string, GameSpec> = {
     minPlayers: 2,
     maxPlayers: 10,
     seating: "party",
-    bots: false,
+    // Bots flip cards and remember what they saw, with a recall that gets
+    // more reliable as difficulty rises.
+    bots: true,
     voiceMatters: false,
     validate: (o) => oneOf(o.difficulty, ["easy", "medium", "hard"], "Difficulty"),
   },
@@ -241,7 +247,9 @@ export const GAME_SPECS: Record<string, GameSpec> = {
     minPlayers: 2,
     maxPlayers: 10,
     seating: "duel",
-    bots: false,
+    // A bot takes the win, then blocks the loss, then takes centre. Beatable
+    // on easy, a wall on hard.
+    bots: true,
     voiceMatters: false,
   },
 
@@ -250,7 +258,9 @@ export const GAME_SPECS: Record<string, GameSpec> = {
     minPlayers: 2,
     maxPlayers: 4,
     seating: "duel",
-    bots: false,
+    // Bots close distance, attack in range, and block — enough to be a
+    // sparring partner while you wait for someone to join.
+    bots: true,
     voiceMatters: false,
   },
 
@@ -259,7 +269,9 @@ export const GAME_SPECS: Record<string, GameSpec> = {
     minPlayers: 2,
     maxPlayers: 4,
     seating: "parallel",
-    bots: false,
+    // Every seat runs its own board, so a bot is simply another snake
+    // steering itself toward food and away from walls.
+    bots: true,
     voiceMatters: false,
   },
 
@@ -268,7 +280,8 @@ export const GAME_SPECS: Record<string, GameSpec> = {
     minPlayers: 2,
     maxPlayers: 8,
     seating: "parallel",
-    bots: false,
+    // Same as Snake: parallel boards, so a bot just plays its own.
+    bots: true,
     voiceMatters: false,
   },
 
@@ -277,7 +290,9 @@ export const GAME_SPECS: Record<string, GameSpec> = {
     minPlayers: 1,
     maxPlayers: 10,
     seating: "parallel",
-    bots: false,
+    // Bots place each piece by scoring the landing (holes, bumpiness, height)
+    // and take the best one.
+    bots: true,
     voiceMatters: false,
   },
 };

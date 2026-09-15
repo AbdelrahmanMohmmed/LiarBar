@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useGame, storedSession } from "@/lib/gameContext";
 import { useLanguage } from "@/lib/languageContext";
+import { pickBotName } from "@/lib/botNames";
 import { COLORS, uiFont } from "./theme";
 import { Panel, Field, PrimaryButton, SecondaryButton, inputStyle } from "./ui";
 import { Users, Bot, Share2, Copy, Trash2, ArrowLeft } from "lucide-react";
@@ -144,11 +145,10 @@ export default function HigherLowerRoom() {
   const handleAddBot = useCallback(async () => {
     if (!higherLowerState) return;
     try {
-      const names = [
-        "سندباد", "علاء الدين", "شهريار", "شهد", "ياسمين", "زين",
-        "Spark", "Logic", "Bluffer", "Quantum", "Alpha", "Omega"
-      ];
-      const botName = (isAr ? "آلي " : "Bot ") + (names[Math.floor(Math.random() * names.length)]);
+      const botName = pickBotName(
+        isAr ? "ar" : "en",
+        higherLowerState.players.map((p) => p.name),
+      );
       await addBot(botName, botDifficulty);
     } catch (err) {
       addToast(err instanceof Error ? err.message : "Failed to add bot", "error");

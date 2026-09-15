@@ -88,9 +88,11 @@ cd server && npm run dev        # terminal 1
 cd server && npm run test:live  # terminal 2
 ```
 
-`node test/seat-bots.mjs <ROOM_CODE>` fills a room with scripted players. Three
-of the party games deliberately have no bots, which otherwise makes them
-impossible to look at in a browser on your own.
+`node test/seat-bots.mjs <ROOM_CODE>` fills a room with scripted players. Six
+of the games deliberately have no bots — Spyfall, Chameleon, Taboo, Bluff,
+Would You Rather and Codenames, all of which are conversation first — which
+otherwise makes them impossible to look at in a browser on your own. Every
+other game seats real bots, and `npm run test:bot-games` checks they play.
 
 ## Environment
 

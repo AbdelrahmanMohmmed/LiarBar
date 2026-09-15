@@ -7,6 +7,7 @@ import { COLORS, uiFont } from "@/pages/domino/theme";
 import { Panel, PrimaryButton, SecondaryButton, Badge } from "@/pages/domino/ui";
 import { Users, Bot, Share2, Copy, Trash2 } from "lucide-react";
 import { PIECE_ICONS } from "@/lib/pieceIcons";
+import { pickBotName } from "@/lib/botNames";
 
 const COPY = {
   ar: {
@@ -132,10 +133,10 @@ export default function RentoRoom() {
   const handleAddBot = useCallback(async () => {
     if (!rentoState) return;
     try {
-      const names = isAr
-        ? ["عبده", "أبو حميد", "الحريف", "المعلم", "زياد", "فارس"]
-        : ["Spark", "Logic", "Bluffer", "Quantum", "King", "Champ"];
-      const botName = (isAr ? "آلي " : "Bot ") + (names[Math.floor(Math.random() * names.length)]);
+      const botName = pickBotName(
+        isAr ? "ar" : "en",
+        rentoState.players.map((p) => p.name),
+      );
       await addBot(botName, botDifficulty);
     } catch (err) {
       addToast(err instanceof Error ? err.message : "Failed to add bot", "error");

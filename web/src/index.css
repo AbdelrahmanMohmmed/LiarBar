@@ -345,6 +345,30 @@
     background: hsl(var(--surface-raised) / 0.5);
   }
 
+  /**
+   * A secondary action that still has to be *findable*: the accent's colour
+   * without the accent's fill.
+   *
+   * "Add bot" was `btn-quiet` — grey text on nothing — sitting beside the
+   * roster of a room containing one person. The single thing a lone host can
+   * do to start playing was the least visible control on the page, and it
+   * read as a caption rather than a button. It is not a primary action (that
+   * is "Pick a game", and the rule of one per screen still holds), so it
+   * borrows the coral and leaves the fill alone.
+   *
+   * Text is `--coral-dim` for the same reason `.chip-hot` is: coral at 60%
+   * lightness on its own tint is too pale to read at 13px on cream.
+   */
+  .btn-accent-quiet {
+    background: hsl(var(--coral) / 0.12);
+    color: hsl(var(--coral-dim));
+    border: 1.5px solid hsl(var(--coral) / 0.40);
+  }
+  .btn-accent-quiet:hover:not(:disabled) {
+    background: hsl(var(--coral) / 0.20);
+    border-color: hsl(var(--coral) / 0.65);
+  }
+
   .btn-sm {
     min-height: 36px;
     padding: 0 0.85rem;

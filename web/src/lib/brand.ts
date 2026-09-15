@@ -387,7 +387,7 @@ export const GAMES: GameMeta[] = [
     emoji: "🔢",
     accent: "gold",
     voiceMatters: false,
-    supportsBots: false,
+    supportsBots: true,
     art: "/art/games/higher-lower.webp",
   },
   {

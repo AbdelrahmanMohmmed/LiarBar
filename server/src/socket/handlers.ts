@@ -72,6 +72,39 @@ function cleanName(raw: unknown): string | null {
   return name.length > 0 ? name : null;
 }
 
+/**
+ * A name for a bot the client didn't name.
+ *
+ * The client picks from a much longer bilingual list (`web/src/lib/botNames`)
+ * because only it knows which language the host is reading. This is the floor
+ * under that: an older cached client, or a test harness, calling `add_bot`
+ * with no name at all. It used to return `Bot 2` / `Bot 3`, which is how a
+ * room of one human ended up looking like a spreadsheet.
+ */
+const FALLBACK_BOT_NAMES = [
+  "Beep Bopson",
+  "Sir Loses-a-Lot",
+  "Captain Obvious",
+  "Tin Can Tony",
+  "Wobbly Steve",
+  "Doctor Dice",
+  "Sneaky Pete",
+  "Grandmaster Bleep",
+  "The Intern",
+  "Clanky",
+];
+
+function fallbackBotName(taken: string[]): string {
+  const used = new Set(taken);
+  const free = FALLBACK_BOT_NAMES.filter((n) => !used.has(n));
+  const pool = free.length > 0 ? free : FALLBACK_BOT_NAMES;
+  const name = pool[Math.floor(Math.random() * pool.length)];
+  if (!used.has(name)) return name;
+  for (let i = 2; ; i++) {
+    if (!used.has(`${name} ${i}`)) return `${name} ${i}`;
+  }
+}
+
 export function registerSocketHandlers(
   io: Server,
   registry: RoomRegistry,
@@ -384,7 +417,8 @@ export function registerSocketHandlers(
         }
 
         const botName =
-          cleanName(data?.botName) || `Bot ${room.players.length + 1}`;
+          cleanName(data?.botName) ||
+          fallbackBotName(room.players.map((p) => p.name));
         room.addBot(botName, data?.difficulty || "medium");
 
         broadcastState(io, room);

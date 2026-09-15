@@ -26,7 +26,8 @@
     "types:check": "node scripts/sync-types.mjs --check",
     "test:wyr": "node test/wyr.e2e.mjs",
     "test:lifecycle": "node test/lifecycle.e2e.mjs",
-    "test:live": "node test/party.e2e.mjs && node test/lifecycle.e2e.mjs && node test/spyfall.e2e.mjs && node test/chameleon.e2e.mjs && node test/wyr.e2e.mjs && node test/bluff.e2e.mjs && node test/taboo.e2e.mjs && node test/domino.e2e.mjs"
+    "test:bot-games": "node test/bot-games.e2e.mjs",
+    "test:live": "node test/party.e2e.mjs && node test/lifecycle.e2e.mjs && node test/spyfall.e2e.mjs && node test/chameleon.e2e.mjs && node test/wyr.e2e.mjs && node test/bluff.e2e.mjs && node test/taboo.e2e.mjs && node test/domino.e2e.mjs && node test/bot-games.e2e.mjs"
   },
   "dependencies": {
     "cors": "^2.8.5",

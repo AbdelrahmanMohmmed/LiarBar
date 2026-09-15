@@ -55,6 +55,9 @@ export default {
 
         /* Brand hues, addressable directly for game-specific accents. */
         coral: "hsl(var(--coral))",
+        /* The darker coral. Small text on a coral tint fails contrast at the
+           base hue — see the note above `.chip-hot` in index.css. */
+        "coral-dim": "hsl(var(--coral-dim))",
         mint: "hsl(var(--mint))",
         gold: "hsl(var(--gold))",
         ruby: "hsl(var(--ruby))",

@@ -4,6 +4,7 @@ import { Play, Bot, Trophy, Wifi, WifiOff, Crown, Grid3x3 } from "lucide-react";
 import { useGame } from "@/lib/gameContext";
 import { useLanguage } from "@/lib/languageContext";
 import { getGame, BRAND } from "@/lib/brand";
+import { pickBotName } from "@/lib/botNames";
 import { Seo } from "@/lib/seo";
 import { Logo } from "@/components/brand/Logo";
 import GamePicker from "@/components/party/GamePicker";
@@ -174,8 +175,12 @@ export default function PartyHub() {
           </h2>
           {isHost && partyState.players.length < partyState.maxPlayers && (
             <button
-              onClick={() => addBot().catch(() => addToast(t("party.bot_failed"), "error"))}
-              className="btn btn-quiet btn-sm"
+              onClick={() =>
+                addBot(
+                  pickBotName(lang, partyState.players.map((p) => p.name)),
+                ).catch(() => addToast(t("party.bot_failed"), "error"))
+              }
+              className="btn btn-accent-quiet btn-sm"
             >
               <Bot size={15} />
               {t("party.add_bot")}
