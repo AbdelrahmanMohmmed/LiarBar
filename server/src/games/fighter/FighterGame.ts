@@ -393,6 +393,9 @@ export class FighterGame implements GameRoom {
 
       if (w !== "draw" && this.scores[w] >= this.winTarget) {
         this.matchWinner = w;
+        // Match win only — a round win would over-count relative to every
+        // other game in the party scoreboard.
+        this.callbacks.onGameEnd(this.roomId, w);
       } else {
         this.roundTimer = setTimeout(() => this.nextRound(), 2500);
         this.roundTimer.unref?.();

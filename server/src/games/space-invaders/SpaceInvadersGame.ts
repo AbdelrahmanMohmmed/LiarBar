@@ -355,12 +355,24 @@ export class SpaceInvadersGame implements GameRoom {
       if (this.kills >= this.level * 10) this.level += 1;
     }
 
+    const stillFlying = this.ships.filter((s) => s.alive);
+    if (stillFlying.length === 1) this.lastShipStandingId = stillFlying[0].playerId;
+
     if (this.ships.every((s) => !s.alive)) {
       this.phase = "finished";
       if (this.tickTimer) { clearInterval(this.tickTimer); this.tickTimer = null; }
+      // Co-operative: there is one shared score and no individual winner, so
+      // credit the player who survived longest. Leaving the round
+      // unattributed would mean it contributed nothing to the party's
+      // scoreboard, which is worse than an imperfect attribution.
+      const last = this.lastShipStandingId ?? this.ships[0]?.playerId;
+      if (last) this.callbacks.onGameEnd(this.roomId, last);
     }
     this.broadcast();
   }
+
+  /** Player id of the last ship still flying — the closest thing co-op has to a winner. */
+  private lastShipStandingId: string | null = null;
 
   private damageShip(s: Ship, amount: number) {
     if (!s.alive) return;

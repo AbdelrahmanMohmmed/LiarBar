@@ -3,6 +3,7 @@ import { Player } from "../liars-bar/Player.js";
 import type { GameRoom, GameRoomCallbacks } from "../types.js";
 import { createGameRoom, type CreateRoomOptions } from "../registry.js";
 import { validateGameOptions, getSpec } from "../catalog.js";
+import { acceptsRosterChanges } from "../phases.js";
 
 /**
  * A party is a group of people who stay together while the games change.
@@ -151,7 +152,7 @@ export class PartyRoom implements GameRoom {
   private canSeatInActiveGame(): boolean {
     const sub = this.activeSubRoom;
     if (!sub) return false;
-    if (sub.phase !== "lobby") return false;
+    if (!acceptsRosterChanges(sub)) return false;
     return sub.players.length < sub.maxPlayers;
   }
 

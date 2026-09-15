@@ -679,9 +679,7 @@ export class RentoGame implements GameRoom {
     this.pendingDoublesRoll = false;
 
     if (alive.length <= 1) {
-      this.phase = "finished";
-      this.winnerId = alive[0]?.id || null;
-      this.lastAction = alive[0] ? `${this.getPlayerName(alive[0].id)} wins!` : "Game over!";
+      this.declareWinner(alive[0]?.id ?? null);
       this.broadcast();
       return;
     }
@@ -1009,11 +1007,24 @@ export class RentoGame implements GameRoom {
       return ps && !ps.bankrupt;
     });
     if (alive.length <= 1) {
-      this.phase = "finished";
-      this.winnerId = alive[0]?.id || null;
-      this.lastAction = alive[0] ? `${this.getPlayerName(alive[0].id)} wins!` : "Game over!";
-      if (this.turnTimer) clearTimeout(this.turnTimer);
+      this.declareWinner(alive[0]?.id ?? null);
     }
+  }
+
+  /**
+   * Declare the match over. Both end paths go through here so the party
+   * scoreboard callback cannot be attached to one and forgotten on the other —
+   * which is precisely how seven engines ended up never reporting a winner.
+   */
+  private declareWinner(winnerId: string | null): void {
+    this.phase = "finished";
+    this.winnerId = winnerId;
+    this.lastAction = winnerId ? `${this.getPlayerName(winnerId)} wins!` : "Game over!";
+    if (this.turnTimer) {
+      clearTimeout(this.turnTimer);
+      this.turnTimer = null;
+    }
+    if (winnerId) this.callbacks.onGameEnd(this.roomId, winnerId);
   }
 
   private getPlayerName(id: string): string {

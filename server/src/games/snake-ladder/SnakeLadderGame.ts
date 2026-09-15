@@ -244,6 +244,8 @@ export class SnakeLadderGame implements GameRoom {
       if (this.turnTimer) clearTimeout(this.turnTimer);
       this.moveLock = false;
       this.broadcast();
+      // Report the winner so the party's cross-game scoreboard records it.
+      this.callbacks.onGameEnd(this.roomId, playerId);
       return { success: true, dice };
     }
 

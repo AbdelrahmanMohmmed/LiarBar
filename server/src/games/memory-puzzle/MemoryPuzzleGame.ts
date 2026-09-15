@@ -275,6 +275,10 @@ export class MemoryPuzzleGame implements GameRoom {
           this.winners = Object.entries(this.scores)
             .filter(([_, s]) => s === maxScore)
             .map(([id]) => id);
+          // Report the winner so the party's cross-game scoreboard records it.
+          if (this.winners.length > 0) {
+            this.callbacks.onGameEnd(this.roomId, this.winners[0]);
+          }
         } else {
           this.scheduleBotFlip();
         }

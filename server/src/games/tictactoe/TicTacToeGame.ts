@@ -152,6 +152,13 @@ export class TicTacToeGame implements GameRoom {
       if (res.winner !== "tie") {
         if (this.scores[res.winner] >= this.winTarget) {
           this.matchWinner = res.winner;
+          // Only a MATCH win counts for the party scoreboard. Reporting every
+          // round would make a best-of-three worth three points here and one
+          // point in every other game.
+          const champion = this.players.find(
+            (p) => this.symbolFor(p.id) === res.winner,
+          );
+          if (champion) this.callbacks.onGameEnd(this.roomId, champion.id);
         }
       }
     } else {

@@ -22,6 +22,7 @@ import { FighterGame } from "../games/fighter/FighterGame.js";
 import { LobbyRoom } from "../games/lobby/LobbyRoom.js";
 import { PartyRoom } from "../games/party/PartyRoom.js";
 import { validateGameOptions, publicCatalog } from "../games/catalog.js";
+import { acceptsRosterChanges } from "../games/phases.js";
 import { DominoGame } from "../games/domino/DominoGame.js";
 import { MemoryPuzzleGame } from "../games/memory-puzzle/MemoryPuzzleGame.js";
 import { TetrisGame } from "../games/tetris/TetrisGame.js";
@@ -42,16 +43,17 @@ function fail(callback: Ack, error: string): void {
 /**
  * Is this room still in a pre-game state where the roster can change?
  *
- * A standalone engine calls that phase "lobby"; a party calls it "hub" and
- * additionally allows roster changes while a game is staged but not yet dealt.
- * Callers care about the question, not about which vocabulary the room uses.
+ * A party is open while it's in the hub, or while a game is staged but not yet
+ * dealt. Every other room defers to games/phases.ts, which knows every phase
+ * spelling the engines use — see that file for the three bugs the mismatch
+ * was causing.
  */
 function isAcceptingRosterChanges(room: GameRoom): boolean {
   if (room instanceof PartyRoom) {
     if (room.phase === "hub") return true;
-    return room.activeSubRoom?.phase === "lobby";
+    return room.activeSubRoom ? acceptsRosterChanges(room.activeSubRoom) : true;
   }
-  return room.phase === "lobby";
+  return acceptsRosterChanges(room);
 }
 
 /** Validate and normalize a player-provided display name. */
@@ -247,7 +249,7 @@ export function registerSocketHandlers(
           // is the entire reason parties exist. Only standalone game rooms
           // (created before this change, or by a direct engine route) still
           // reject a mid-game join, because their engines cannot seat one.
-          if (!(room instanceof PartyRoom) && room.phase !== "lobby") {
+          if (!(room instanceof PartyRoom) && !acceptsRosterChanges(room)) {
             fail(callback, "Game already in progress");
             return;
           }

@@ -1,5 +1,6 @@
 import { customAlphabet } from "nanoid";
 import type { GameRoom } from "../games/types.js";
+import { isGameOver } from "../games/phases.js";
 import { config } from "../config.js";
 
 /** Which room/player a connected socket belongs to. */
@@ -91,7 +92,11 @@ export class RoomRegistry {
 
       const expired =
         (!hasConnectedHumans && idleMs > config.emptyRoomGraceMs) ||
-        (room.phase === "game_over" && idleMs > config.finishedRoomTtlMs) ||
+        // isGameOver, not a string match: engines spell the terminal phase
+        // "finished" as often as "game_over", and a literal comparison meant
+        // finished rooms of half the games sat in memory for the full 2-hour
+        // idle TTL instead of ten minutes. See games/phases.ts.
+        (isGameOver(room) && idleMs > config.finishedRoomTtlMs) ||
         idleMs > config.idleRoomTtlMs;
 
       if (expired) {

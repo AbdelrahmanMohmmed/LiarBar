@@ -283,6 +283,13 @@ export class SnakeGame implements GameRoom {
     this.winners = max > 0 ? this.snakes.filter((s) => s.score === max).map((s) => s.playerId) : [];
     this.lastActivityAt = Date.now();
     this.broadcast();
+      // Report the winner so the party's cross-game scoreboard records it.
+      // Seven of thirteen engines were missing this call, which meant more
+      // than half the catalogue silently contributed nothing to the night's
+      // standings — the room's main reason to keep playing.
+      if (this.winners.length > 0) {
+      this.callbacks.onGameEnd(this.roomId, this.winners[0]);
+    }
   }
 
   toState(): unknown {

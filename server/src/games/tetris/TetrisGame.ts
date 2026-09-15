@@ -258,6 +258,13 @@ export class TetrisGame implements GameRoom {
       }
       if (this.tickTimer) clearInterval(this.tickTimer);
       this.tickTimer = null;
+      // Report the winner so the party's cross-game scoreboard records it.
+      // Seven of thirteen engines were missing this call, which meant more
+      // than half the catalogue silently contributed nothing to the night's
+      // standings — the room's main reason to keep playing.
+      if (this.winners.length > 0) {
+        this.callbacks.onGameEnd(this.roomId, this.winners[0]);
+      }
     }
 
     this.broadcast();
@@ -383,6 +390,13 @@ export class TetrisGame implements GameRoom {
       }
       if (this.tickTimer) clearInterval(this.tickTimer);
       this.tickTimer = null;
+      // Report the winner so the party's cross-game scoreboard records it.
+      // Seven of thirteen engines were missing this call, which meant more
+      // than half the catalogue silently contributed nothing to the night's
+      // standings — the room's main reason to keep playing.
+      if (this.winners.length > 0) {
+        this.callbacks.onGameEnd(this.roomId, this.winners[0]);
+      }
     }
   }
 
