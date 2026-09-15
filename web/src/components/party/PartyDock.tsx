@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Users,
@@ -55,6 +55,50 @@ export default function PartyDock() {
   const [expanded, setExpanded] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const shellRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * Publish the dock's height as `--party-dock-h` on the root element.
+   *
+   * The dock is fixed to the bottom of every page, which means it sits on top
+   * of anything else anchored there — and in a game that is always the action
+   * bar. It covered Liar's Bar's "Make Claim" button completely: the player
+   * could see their hand, select cards, and had no reachable way to play them.
+   *
+   * Reserving space rather than restacking is the fix that keeps working. Any
+   * bottom-anchored element offsets itself by this variable and is correct
+   * forever, including when the dock is expanded (which changes its height),
+   * and including for pages written later by someone who has never read this
+   * file. `.page` in index.css already accounts for it, so ordinary scrolling
+   * pages need no change at all.
+   */
+  useLayoutEffect(() => {
+    const el = shellRef.current;
+    const root = document.documentElement;
+    if (!el) {
+      root.style.setProperty("--party-dock-h", "0px");
+      return;
+    }
+
+    const publish = () => {
+      // Includes the bottom padding that clears the iOS home indicator.
+      const height = el.getBoundingClientRect().height;
+      root.style.setProperty("--party-dock-h", `${Math.ceil(height)}px`);
+    };
+
+    publish();
+    const observer = new ResizeObserver(publish);
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+      root.style.setProperty("--party-dock-h", "0px");
+    };
+    // `partyState` is in the deps, not just `expanded`: the dock returns null
+    // until a party exists, so on the render where one appears the ref goes
+    // from null to attached. Without a dep that changes on that render, the
+    // effect never re-runs and the variable stays at 0 — which is silently
+    // exactly the bug this whole mechanism exists to prevent.
+  }, [expanded, partyState?.roomId, partyState?.phase, partyState?.activeGameId]);
 
   // No party, nothing to dock. Standalone rooms and the landing page render
   // as they always did.
@@ -89,6 +133,7 @@ export default function PartyDock() {
   return (
     <>
       <div
+        ref={shellRef}
         className="fixed z-40 inset-x-0 bottom-0 pointer-events-none"
         style={{ paddingBottom: "var(--safe-b)" }}
       >

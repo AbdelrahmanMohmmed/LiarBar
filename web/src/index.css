@@ -104,6 +104,14 @@
     --safe-b: env(safe-area-inset-bottom, 0px);
     --safe-t: env(safe-area-inset-top, 0px);
 
+    /**
+     * Height of the party dock, published by PartyDock at runtime and 0 when
+     * there is no party. Anything anchored to the bottom of the screen must
+     * offset by it, or the dock covers it — which is exactly what happened to
+     * Liar's Bar's only action button.
+     */
+    --party-dock-h: 0px;
+
     /* Legacy alias kept so pre-existing components keep compiling. */
     --radius-legacy: 0.5rem;
   }
@@ -137,6 +145,26 @@
     );
     background-attachment: fixed;
     overflow-x: hidden;
+
+    /**
+     * Reserve the party dock's height for ALL in-flow content.
+     *
+     * The dock is fixed to the bottom of every page, so without this it sits
+     * on top of whatever the page put there — and in a game that is always the
+     * action bar. It made Liar's Bar unplayable (the "Make Claim" button was
+     * completely covered) and hid Rento's bankrupt and chat controls.
+     *
+     * On `body` rather than on a page class on purpose: every game page rolls
+     * its own layout and several set their own min-height, so a rule scoped to
+     * `.page` covered only the handful of screens that opted in. Here it
+     * applies to every page, including ones written by someone who has never
+     * heard of the dock.
+     *
+     * The variable is 0 when there is no party, so this costs nothing outside
+     * a room. Elements that are themselves `position: fixed` still need
+     * `bottom: var(--party-dock-h)` — padding cannot move them.
+     */
+    padding-bottom: var(--party-dock-h);
   }
 
   /* Display face for anything that should read as "score" or "headline". */

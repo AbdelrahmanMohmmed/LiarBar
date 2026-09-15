@@ -19,11 +19,24 @@ interface MobileHandSheetProps {
 }
 
 /**
- * Full-screen takeover for the player's hand on mobile, shown while it's the
- * player's turn. Unlike the compact in-flow hand bar, this shows every card
- * at full size in a scrollable grid so nothing needs to be squeezed to fit,
- * and lets the player select cards and make their claim without needing to
- * see the table.
+ * The player's hand on mobile, as a bottom sheet, while it's their turn.
+ *
+ * Two things were wrong with it and both were invisible until someone actually
+ * tried to take a turn on a phone:
+ *
+ * 1. **The party dock sat on top of the action button.** The dock is fixed to
+ *    the bottom of every page, so it covered "Make Claim" completely: you could
+ *    see your hand, select cards, and had no reachable way to play them. Fixed
+ *    by anchoring to `--party-dock-h` rather than to 0.
+ *
+ * 2. **At 82vh it hid the entire table.** With thirteen cards there is no
+ *    avoiding a tall sheet, but Liar's Bar is a game about the pile — how much
+ *    you lose by being caught is the whole decision — and a sheet that covers
+ *    the pile removes the information the decision is made on. It's now capped
+ *    so the top of the table stays visible, and the cards scroll instead.
+ *
+ * Restyled onto the design tokens along the way; it was the last thing still
+ * wearing the old amber-on-forest-green palette.
  */
 export const MobileHandSheet = memo(function MobileHandSheet({
   visible,
@@ -38,44 +51,55 @@ export const MobileHandSheet = memo(function MobileHandSheet({
 }: MobileHandSheetProps) {
   return (
     <div
-      className="fixed inset-x-0 bottom-0 z-40 flex flex-col rounded-t-3xl border-t-2 border-amber-900/40 bg-[#0d1a0d] shadow-[0_-8px_40px_rgba(0,0,0,0.6)] transition-transform duration-300 ease-out"
+      className={cn(
+        "fixed inset-x-0 z-40 flex flex-col rounded-t-xl border-t border-border",
+        "bg-surface/98 backdrop-blur transition-transform duration-300 ease-out",
+      )}
       style={{
-        height: collapsed ? 64 : "82vh",
+        // Sits directly on top of the party dock. Never 0: see the note above.
+        bottom: "var(--party-dock-h)",
+        height: collapsed ? 56 : "min(58dvh, 420px)",
+        boxShadow: "var(--shadow-3)",
         transform: visible ? "translateY(0)" : "translateY(110%)",
       }}
     >
-      {/* Grab handle / header — tap to collapse and peek at the table */}
+      {/* Grab handle — tap to collapse and see the whole table. */}
       <button
         type="button"
         onClick={onToggleCollapse}
-        className="flex shrink-0 flex-col items-center gap-1.5 px-4 pt-2 pb-2"
+        className="flex shrink-0 flex-col items-center gap-1 px-4 pt-2 pb-1.5"
+        aria-expanded={!collapsed}
       >
-        <span className="h-1 w-10 rounded-full bg-amber-700/50" />
+        <span className="h-1 w-10 rounded-pill bg-sand/30" />
         <span className="flex w-full items-center justify-between">
-          <span className="text-sm font-bold text-amber-300">
-            Your Turn &mdash; {cards.length} card{cards.length !== 1 ? "s" : ""}
+          <span className="text-sm font-bold text-coral">
+            Your turn &mdash; {cards.length} card{cards.length !== 1 ? "s" : ""}
           </span>
-          {collapsed ? <ChevronUp className="w-4 h-4 text-amber-200/60" /> : <ChevronDown className="w-4 h-4 text-amber-200/60" />}
+          {collapsed ? (
+            <ChevronUp className="w-4 h-4 text-sand" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-sand" />
+          )}
         </span>
       </button>
 
       {!collapsed && (
         <>
           {claimLabel && (
-            <p className="mx-4 mb-2 shrink-0 rounded-full bg-amber-900/30 px-3 py-1.5 text-center font-mono text-xs text-amber-300">
+            <p className="mx-4 mb-2 shrink-0 rounded-pill bg-coral/15 px-3 py-1.5 text-center font-numeric text-xs text-coral">
               {claimLabel}
             </p>
           )}
 
-          {/* Scrollable full-size hand */}
-          <div className="flex-1 overflow-y-auto px-4 pb-2">
-            <div className="flex flex-wrap justify-center gap-2 pt-2">
+          <div className="flex-1 overflow-y-auto px-4 pb-2" style={{ scrollbarWidth: "none" }}>
+            <div className="flex flex-wrap justify-center gap-2 pt-1">
               {cards.map((card, index) => (
                 <button
                   key={index}
                   onClick={() => onCardSelect(index)}
+                  aria-pressed={selectedCards.includes(index)}
                   className={cn(
-                    "transition-all duration-200",
+                    "transition-transform duration-200",
                     selectedCards.includes(index) && "-translate-y-3 scale-105",
                   )}
                 >
@@ -85,23 +109,20 @@ export const MobileHandSheet = memo(function MobileHandSheet({
             </div>
           </div>
 
-          {/* Footer action — skip while nothing is selected, claim once it is */}
-          <div className="shrink-0 border-t border-amber-900/20 p-3">
+          {/* Skip while nothing is selected; claim once something is. */}
+          <div
+            className="shrink-0 border-t border-border/60 p-3"
+            style={{ paddingBottom: "calc(0.75rem + var(--safe-b))" }}
+          >
             {selectedCards.length > 0 ? (
-              <button
-                onClick={onPlayClick}
-                className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white font-semibold shadow-lg shadow-amber-900/30 transition-all active:scale-95"
-              >
+              <button onClick={onPlayClick} className="btn btn-primary w-full">
                 <Send className="w-4 h-4" />
-                Make Claim ({selectedCards.length})
+                Make claim ({selectedCards.length})
               </button>
             ) : (
-              <button
-                onClick={onSkip}
-                className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-amber-900/40 text-amber-200/80 hover:bg-[#2a1515] transition-all"
-              >
+              <button onClick={onSkip} className="btn btn-ghost w-full">
                 <SkipForward className="w-4 h-4" />
-                Skip Turn
+                Skip turn
               </button>
             )}
           </div>

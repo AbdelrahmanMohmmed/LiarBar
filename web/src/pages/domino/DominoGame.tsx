@@ -305,8 +305,10 @@ export default function DominoGamePage() {
 
       {/* ---- Your hand ---- */}
       <section
-        className="fixed inset-x-0 bottom-0 z-30 border-t border-border/70 bg-surface/95 backdrop-blur"
-        style={{ paddingBottom: "calc(4.5rem + var(--safe-b))" }}
+        className="fixed inset-x-0 z-30 border-t border-border/70 bg-surface/95 backdrop-blur"
+        // Sits directly on top of the dock rather than guessing at its height,
+        // which was a hardcoded 4.5rem and wrong whenever the dock expanded.
+        style={{ bottom: "var(--party-dock-h)", paddingBottom: "0.5rem" }}
       >
         <div className="max-w-3xl mx-auto px-3 pt-2">
           <div className="flex items-center justify-between mb-1.5">

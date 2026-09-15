@@ -1506,7 +1506,10 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
         className="fixed flex items-center justify-center rounded-full z-40 transition-all duration-200 hover:scale-110 active:scale-95"
         style={{
           [isAr ? "left" : "right"]: 20,
-          bottom: "max(20px, env(safe-area-inset-bottom))",
+          // Offsets by the party dock's height. A fixed element can't be
+          // pushed by the body padding that handles normal flow, so without
+          // this the dock sits on top of it and the chat button is dead.
+          bottom: "calc(max(20px, env(safe-area-inset-bottom)) + var(--party-dock-h))",
           width: 54,
           height: 54,
           background: chatOpen ? "#FED23F" : "linear-gradient(135deg, #a78bfa, #7c3aed)",

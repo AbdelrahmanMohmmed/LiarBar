@@ -108,6 +108,22 @@ export class GameManager implements GameRoom {
   challengeStartedAt: number | null;
 
   private broadcast: (state: GameState) => void;
+  /**
+   * Who actually won, recorded when the game ends.
+   *
+   * This used to be re-derived at broadcast time as
+   * `players.find(p => p.hasWon)` — the first player holding no cards. That is
+   * wrong twice over: in Liar's Bar several players empty their hands over the
+   * course of a game (emptying your hand is how you get out of danger, not how
+   * you win), so `find` returns whoever happens to sit earliest in the array;
+   * and when the game ends for any other reason — everyone else left, the room
+   * emptied — nobody matches at all and the winner comes back null. The
+   * game-over screen then reads "Someone Wins!", which is what I actually saw.
+   *
+   * endGame() is always called with the winner's id. Keeping it is the fix.
+   */
+  private winnerId: string | null = null;
+
   private onGameEnd: (roomId: string, winnerId: string) => void;
   private onChallengeResolved: (roomId: string) => void;
 
@@ -253,6 +269,9 @@ export class GameManager implements GameRoom {
 
     this.centralPile = [];
     this.phase = "playing";
+    // A rematch reuses this instance; a stale winner would otherwise make the
+    // game-over overlay flash the previous match's result on the first frame.
+    this.winnerId = null;
     this.currentTurn = 0;
     this.lastDeclaration = null;
     this.lastPlayerId = null;
@@ -726,6 +745,8 @@ export class GameManager implements GameRoom {
     this.clearChallengeTimer();
 
     this.phase = "game_over";
+    // "system" is the sentinel for "the room emptied", which has no winner.
+    this.winnerId = winnerId === "system" ? null : winnerId;
     const winner = this.getPlayer(winnerId);
     if (winner) {
       winner.recordGame(true);
@@ -908,10 +929,7 @@ export class GameManager implements GameRoom {
       lastDeclaration: this.lastDeclaration,
       lastPlayerId: this.lastPlayerId,
       currentRequiredClaim: this.currentRequiredClaim,
-      winner:
-        this.phase === "game_over"
-          ? this.players.find((p) => p.hasWon)?.id ?? null
-          : null,
+      winner: this.phase === "game_over" ? this.winnerId : null,
       actionLog: this.actionLog,
       variant: this.variant,
       deckCount: this.deckCount,
