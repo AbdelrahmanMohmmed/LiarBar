@@ -697,11 +697,40 @@ select {
   color: #fdf6ec !important;
 }
 .dc-play-btn {
-  transition: background 0.15s ease, transform 0.1s ease;
+  transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
 }
 .dc-play-btn:hover {
-  background: #d1483c !important;
+  filter: brightness(0.92);
+  transform: translateY(-1px);
 }
 .dc-play-btn:active {
   transform: scale(0.96);
 }
+
+.dc-game-card {
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
+}
+.dc-game-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 8px 8px 0 #2B2420 !important;
+}
+
+/* Language transition overlay animations */
+@keyframes dc-overlay-in {
+  from { opacity: 0; backdrop-filter: blur(0px); }
+  to { opacity: 1; backdrop-filter: blur(6px); }
+}
+@keyframes dc-overlay-out {
+  from { opacity: 1; backdrop-filter: blur(6px); }
+  to { opacity: 0; backdrop-filter: blur(0px); }
+}
+@keyframes dc-domino-spin {
+  0% { transform: rotate(0deg) scale(1); }
+  50% { transform: rotate(180deg) scale(1.1); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+@keyframes dc-badge-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+

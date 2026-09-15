@@ -39,7 +39,7 @@ export const BRAND = {
   /** Display name, Latin script. */
   name: "Safariyat Games",
   /** Display name, Arabic script. */
-  nameAr: "سفريات جيمز",
+  nameAr: "ألعاب سفريات",
 
   /**
    * Apex domain, no protocol, no trailing slash.

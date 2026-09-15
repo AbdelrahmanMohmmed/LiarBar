@@ -656,7 +656,7 @@ const translations: Record<Language, Record<string, string>> = {
     "guide.close": "إغلاق",
 
     // ── Landing / game hub ──
-    "party.title": "اللمة",
+    "party.title": "الأوضة",
     "party.whats_next": "نلعب إيه دلوقتي؟",
     "party.whats_next_sub": "نفس الأوضة، نفس الناس. اختار اللي تحبه.",
     "party.pick_game": "اختار لعبة",
@@ -700,7 +700,7 @@ const translations: Record<Language, Record<string, string>> = {
     "party.bot_failed": "مقدرناش نضيف بوت",
 
     // ── Join via invite link ──
-    "join.title": "ادخل اللمة",
+    "join.title": "ادخل الأوضة",
     "join.playing_now": "بيلعبوا {game}",
     "join.party_waiting": "أصحابك مستنيينك",
     "join.n_here": "{n} موجودين",
