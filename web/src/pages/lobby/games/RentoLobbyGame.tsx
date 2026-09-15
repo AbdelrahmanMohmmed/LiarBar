@@ -150,11 +150,11 @@ function getTilePos(i: number): { x: number; y: number; w: number; h: number } {
 }
 
 export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: string }) {
-  const { lobbyState, myPlayerId: ctxMyId, chatMessages, sendChat } = useGame();
+  const { activeSubState, myPlayerId: ctxMyId, chatMessages, sendChat } = useGame();
   const { lang } = useLanguage();
   const isAr = lang === "ar";
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const state = (props?.state ?? lobbyState?.subGameState ?? null) as any;
+  const state = (props?.state ?? activeSubState) as any;
   const stateRef = useRef(state);
   stateRef.current = state;
   const myPlayerId = props?.myPlayerId ?? ctxMyId;
@@ -403,7 +403,7 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
       flashT += dt;
 
       const st = stateRef.current;
-      ctx.fillStyle = "#0e0b16";
+      ctx.fillStyle = "#1C1714";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       if (!st) { raf = requestAnimationFrame(loop); return; }
@@ -420,11 +420,11 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
 
       roundRect(ctx, interiorX, interiorY, interiorW, interiorH, 18);
       const bgGrad = ctx.createRadialGradient(centerX, centerY, 20, centerX, centerY, interiorW / 1.3);
-      bgGrad.addColorStop(0, "#271a47");
-      bgGrad.addColorStop(1, "#140c24");
+      bgGrad.addColorStop(0, "#332A24");
+      bgGrad.addColorStop(1, "#14100E");
       ctx.fillStyle = bgGrad;
       ctx.fill();
-      ctx.strokeStyle = "rgba(196,145,255,0.2)";
+      ctx.strokeStyle = "rgba(185,168,149,0.22)";
       ctx.lineWidth = 2;
       roundRect(ctx, interiorX, interiorY, interiorW, interiorH, 18);
       ctx.stroke();
@@ -483,7 +483,7 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
           roundRect(ctx, 0, 0, DICE_SIZE, DICE_SIZE, 19);
           ctx.stroke();
 
-          ctx.fillStyle = "#241640";
+          ctx.fillStyle = "#251E1A";
           ctx.font = "bold 40px 'Baloo 2', sans-serif";
           ctx.textAlign = "center";
           ctx.fillText(String(faceValue), DICE_HALF, DICE_HALF + 14);
@@ -492,8 +492,8 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
       } else {
         // Idle wordmark before the first roll
         const wordGrad = ctx.createLinearGradient(centerX - 90, centerY, centerX + 90, centerY);
-        wordGrad.addColorStop(0, "rgba(45,212,191,0.35)");
-        wordGrad.addColorStop(1, "rgba(196,145,255,0.35)");
+        wordGrad.addColorStop(0, "rgba(232,86,63,0.35)");
+        wordGrad.addColorStop(1, "rgba(242,180,65,0.35)");
         ctx.fillStyle = wordGrad;
         ctx.font = "bold 40px 'Baloo 2', sans-serif";
         ctx.textAlign = "center";
@@ -570,7 +570,7 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
         } else {
           const tileGrad = ctx.createLinearGradient(px, py, px, py + pos.h);
           tileGrad.addColorStop(0, withAlpha(ownerColor ?? cell.color ?? "#333333", ownerColor ? 0.5 : 0.4));
-          tileGrad.addColorStop(1, "rgba(16,11,24,0.92)");
+          tileGrad.addColorStop(1, "rgba(20,16,14,0.92)");
           ctx.fillStyle = tileGrad;
           ctx.fillRect(px, py, pos.w, pos.h);
         }
@@ -582,7 +582,7 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
           ctx.save();
           roundRect(ctx, px + 1, py + 1, pos.w - 2, pos.h - 2, TR);
           ctx.clip();
-          ctx.fillStyle = "rgba(10,8,16,0.4)";
+          ctx.fillStyle = "rgba(20,16,14,0.4)";
           ctx.fillRect(px, py, pos.w, pos.h);
           ctx.restore();
         }
@@ -759,7 +759,7 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
         // Active-player glow ring
         if (isCurrent) {
           const pulse = 0.35 + 0.25 * Math.sin(flashT * 0.006);
-          ctx.strokeStyle = `rgba(45,212,191,${pulse})`;
+          ctx.strokeStyle = `rgba(59,217,164,${pulse})`;
           ctx.lineWidth = 2.5;
           ctx.beginPath();
           ctx.arc(tx, ty, 17, 0, Math.PI * 2);
@@ -854,22 +854,22 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
         backgroundSize: "cover",
         backgroundPosition: "center",
         backgroundAttachment: "fixed",
-        backgroundColor: "#0b0710",
+        backgroundColor: "#14100E",
       }}
     >
       {/* Ambient color blobs — a "lovely" generated background instead of flat black */}
       <div className="pointer-events-none absolute inset-0" style={{ zIndex: 0 }} aria-hidden="true">
         <div
           className="absolute rounded-full animate-blob-float"
-          style={{ width: 560, height: 560, top: "-15%", left: "-10%", background: "radial-gradient(circle, rgba(45,212,191,0.30), transparent 70%)", filter: "blur(60px)" }}
+          style={{ width: 560, height: 560, top: "-15%", left: "-10%", background: "radial-gradient(circle, rgba(232,86,63,0.26), transparent 70%)", filter: "blur(60px)" }}
         />
         <div
           className="absolute rounded-full animate-blob-float"
-          style={{ width: 620, height: 620, top: "10%", right: "-15%", background: "radial-gradient(circle, rgba(192,132,252,0.28), transparent 70%)", filter: "blur(60px)", animationDelay: "-7s" }}
+          style={{ width: 620, height: 620, top: "10%", right: "-15%", background: "radial-gradient(circle, rgba(242,180,65,0.20), transparent 70%)", filter: "blur(60px)", animationDelay: "-7s" }}
         />
         <div
           className="absolute rounded-full animate-blob-float"
-          style={{ width: 480, height: 480, bottom: "-10%", left: "15%", background: "radial-gradient(circle, rgba(245,165,36,0.22), transparent 70%)", filter: "blur(60px)", animationDelay: "-13s" }}
+          style={{ width: 480, height: 480, bottom: "-10%", left: "15%", background: "radial-gradient(circle, rgba(226,61,87,0.18), transparent 70%)", filter: "blur(60px)", animationDelay: "-13s" }}
         />
         <div
           className="absolute rounded-full animate-blob-float"
@@ -882,7 +882,7 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
         <div
           className="font-extrabold text-2xl tracking-wide"
           style={{
-            backgroundImage: "linear-gradient(135deg, #2dd4bf, #c084fc)",
+            backgroundImage: "linear-gradient(135deg, #F2B441, #E8563F)",
             WebkitBackgroundClip: "text",
             backgroundClip: "text",
             color: "transparent",
@@ -915,7 +915,7 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
                 width: "100%",
                 maxWidth: CANVAS_W,
                 imageRendering: "auto",
-                background: "#0e0b16",
+                background: "#1C1714",
                 display: "block",
                 boxShadow: "0 20px 60px -20px rgba(124,58,237,0.35), 0 0 0 1px rgba(255,255,255,0.04)",
               }}
@@ -931,7 +931,7 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
                   key={state.lastAction}
                   className="relative rounded-2xl px-4 py-3 text-white font-bold animate-bubble-in"
                   style={{
-                    background: "linear-gradient(135deg, #7c3aed, #4f46e5)",
+                    background: "linear-gradient(135deg, #E8563F, #E23D57)",
                     fontSize: "clamp(12px, 1.6vw, 15px)",
                     lineHeight: 1.3,
                     boxShadow: "0 10px 30px -8px rgba(124,58,237,0.6)",
@@ -941,7 +941,7 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
                   <div
                     style={{
                       position: "absolute", bottom: -8, left: "50%", transform: "translateX(-50%) rotate(45deg)",
-                      width: 14, height: 14, background: "#4f46e5",
+                      width: 14, height: 14, background: "#E23D57",
                     }}
                   />
                 </div>
@@ -973,7 +973,7 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
                 {state?.canRoll && (
                   <button
                     onClick={rollDice}
-                    className="rounded-full font-bold text-[#0e0b16] transition-transform duration-150 hover:scale-105 active:scale-95 animate-pulse-glow"
+                    className="rounded-full font-bold text-[#14100E] transition-transform duration-150 hover:scale-105 active:scale-95 animate-pulse-glow"
                     style={{
                       padding: "clamp(6px, 1.4vw, 14px) clamp(12px, 2.6vw, 28px)",
                       fontSize: "clamp(10px, 1.5vw, 16px)",
@@ -987,7 +987,7 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
                 {!!state?.hasRolled && currentCell && (currentCell.type === "property" || currentCell.type === "utility") && !state.players.some((p: any) => p.properties?.includes(currentCell.id)) && me && me.money >= currentCell.price && (
                   <button
                     onClick={buyProperty}
-                    className="rounded-full font-bold text-[#0e0b16] transition-transform duration-150 hover:scale-105 active:scale-95 animate-pop-in"
+                    className="rounded-full font-bold text-[#14100E] transition-transform duration-150 hover:scale-105 active:scale-95 animate-pop-in"
                     style={{
                       padding: "clamp(6px, 1.4vw, 14px) clamp(12px, 2.6vw, 28px)",
                       fontSize: "clamp(10px, 1.5vw, 16px)",
@@ -1005,7 +1005,7 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
                     style={{
                       padding: "clamp(6px, 1.4vw, 14px) clamp(12px, 2.6vw, 28px)",
                       fontSize: "clamp(10px, 1.5vw, 16px)",
-                      background: "linear-gradient(135deg, #a78bfa, #8b5cf6)",
+                      background: "linear-gradient(135deg, #E8563F, #E23D57)",
                       boxShadow: "0 8px 24px -4px rgba(139,92,246,0.55)",
                     }}
                   >
@@ -1033,7 +1033,7 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
 
           {/* Finished-game banner (turn actions now live centered on the board above) */}
           {state?.phase === "finished" && (
-            <div className="text-fuchsia-300 font-bold text-lg animate-pop-in">
+            <div className="text-gold font-bold text-lg animate-pop-in">
               🎉 {state.players?.find((p: any) => p.id === state.winnerId)?.name} wins!
             </div>
           )}
@@ -1078,7 +1078,7 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
                     className="flex items-center justify-center rounded-full flex-shrink-0"
                     style={{
                       width: 34, height: 34, background: color, fontSize: 16,
-                      boxShadow: isCurrent ? `0 0 0 2px #0b0710, 0 0 0 4px ${color}` : "0 2px 6px rgba(0,0,0,0.35)",
+                      boxShadow: isCurrent ? `0 0 0 2px #14100E, 0 0 0 4px ${color}` : "0 2px 6px rgba(0,0,0,0.35)",
                       transition: "box-shadow 0.3s",
                     }}
                   >
@@ -1139,7 +1139,7 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
               <button
                 onClick={() => { resetTradeForm(); setShowTradeModal(true); }}
                 disabled={state?.phase !== "playing" || otherAlivePlayers.length === 0}
-                className="px-3.5 py-1.5 rounded-full bg-gradient-to-br from-purple-500 to-purple-700 hover:from-purple-400 hover:to-purple-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold transition-all duration-150 hover:scale-105 active:scale-95"
+                className="px-3.5 py-1.5 rounded-full bg-coral hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold transition-all duration-150 hover:scale-105 active:scale-95"
               >
                 {i18n.create}
               </button>
@@ -1149,7 +1149,7 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
                 <p className="text-white/50 text-[11px] leading-snug mb-1.5">{i18n.tradesDesc}</p>
                 <button
                   onClick={dismissTip}
-                  className="text-[11px] font-bold text-purple-300 hover:text-purple-200"
+                  className="text-[11px] font-bold text-sand hover:text-sand"
                 >
                   ✓ {i18n.gotIt}
                 </button>
@@ -1207,7 +1207,7 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
                         <span className="text-gray-400"> {isAr ? "ينتظر..." : "pending..."}</span>
                       </div>
                       <div className="flex gap-1 flex-shrink-0">
-                        <button onClick={(e) => { e.stopPropagation(); openEditTrade(trade); }} className="px-2 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold transition-colors">{i18n.edit}</button>
+                        <button onClick={(e) => { e.stopPropagation(); openEditTrade(trade); }} className="px-2 py-1 rounded-lg bg-coral hover:bg-coral text-white text-[10px] font-bold transition-colors">{i18n.edit}</button>
                         <button onClick={(e) => { e.stopPropagation(); cancelTrade(trade.id); }} className="px-2 py-1 rounded-lg bg-gray-600 hover:bg-gray-500 text-white text-[10px] font-bold transition-colors">{i18n.cancel}</button>
                       </div>
                     </div>
@@ -1285,7 +1285,7 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
       {/* Bankrupt confirm modal */}
       {showBankruptConfirm && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-pop-in" onClick={() => setShowBankruptConfirm(false)}>
-          <div className="bg-[#1d0d29] border border-rose-500/30 rounded-2xl p-6 w-full max-w-sm space-y-4 shadow-2xl shadow-rose-900/30 animate-bubble-in" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-surface-raised border border-rose-500/30 rounded-2xl p-6 w-full max-w-sm space-y-4 shadow-2xl shadow-rose-900/30 animate-bubble-in" onClick={(e) => e.stopPropagation()}>
             <div className="text-white font-bold text-lg">{i18n.bankruptConfirmTitle}</div>
             <p className="text-white/60 text-sm">{i18n.bankruptConfirmBody}</p>
             <div className="flex gap-3 justify-end">
@@ -1299,17 +1299,17 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
       {/* Trade Modal */}
       {showTradeModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-[#1d0d29] border border-purple-500/30 rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl shadow-purple-900/30 animate-bubble-in max-h-[90vh] overflow-y-auto">
+          <div className="bg-surface-raised border border-coral/30 rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl shadow-black/40 animate-bubble-in max-h-[90vh] overflow-y-auto">
             <div className="text-white font-bold text-lg">{editingTradeId ? i18n.editTradeTitle : i18n.tradeTitle}</div>
 
             {/* Select player */}
             <div>
-              <label className="text-purple-300 text-sm font-bold">{i18n.selectPlayer}</label>
+              <label className="text-sand text-sm font-bold">{i18n.selectPlayer}</label>
               <select
                 value={tradeTarget}
                 onChange={(e) => setTradeTarget(e.target.value)}
                 disabled={!!editingTradeId}
-                className="w-full mt-1 p-2 rounded-lg bg-white/10 border border-white/20 text-white transition-colors focus:border-purple-400 focus:outline-none disabled:opacity-60"
+                className="w-full mt-1 p-2 rounded-lg bg-white/10 border border-white/20 text-white transition-colors focus:border-coral focus:outline-none disabled:opacity-60"
               >
                 <option value="">{isAr ? "اختر لاعب..." : "Select player..."}</option>
                 {otherAlivePlayers.map((p: any) => (
@@ -1473,7 +1473,7 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
 
         return (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setViewingTradeId(null)}>
-            <div className="bg-[#1d0d29] border border-purple-500/30 rounded-2xl p-6 w-full max-w-lg space-y-4 shadow-2xl shadow-purple-900/30 animate-bubble-in max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-surface-raised border border-coral/30 rounded-2xl p-6 w-full max-w-lg space-y-4 shadow-2xl shadow-black/40 animate-bubble-in max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
               <div className="text-white font-bold text-lg">{i18n.tradeDetails}</div>
               <div className="text-white/50 text-xs -mt-2">{fromPlayer?.name} {i18n.with} {toPlayer?.name}</div>
               <div className="flex gap-3">
@@ -1484,7 +1484,7 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
                 {isSender && (
                   <>
                     <button onClick={() => cancelTrade(trade.id)} className="px-4 py-2 rounded-full bg-gray-600 hover:bg-gray-500 font-bold text-sm text-white transition-all hover:scale-105 active:scale-95">{i18n.cancel}</button>
-                    <button onClick={() => openEditTrade(trade)} className="px-4 py-2 rounded-full bg-indigo-600 hover:bg-indigo-500 font-bold text-sm text-white transition-all hover:scale-105 active:scale-95">{i18n.edit}</button>
+                    <button onClick={() => openEditTrade(trade)} className="px-4 py-2 rounded-full bg-coral hover:bg-coral font-bold text-sm text-white transition-all hover:scale-105 active:scale-95">{i18n.edit}</button>
                   </>
                 )}
                 {isReceiver && (
@@ -1512,7 +1512,7 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
           bottom: "calc(max(20px, env(safe-area-inset-bottom)) + var(--party-dock-h))",
           width: 54,
           height: 54,
-          background: chatOpen ? "#FED23F" : "linear-gradient(135deg, #a78bfa, #7c3aed)",
+          background: chatOpen ? "#F2B441" : "linear-gradient(135deg, #E8563F, #E23D57)",
           color: chatOpen ? "#2B2420" : "#fff",
           boxShadow: chatOpen ? "0 8px 24px -6px rgba(254,210,63,0.6)" : "0 8px 24px -6px rgba(124,58,237,0.6)",
         } as React.CSSProperties}

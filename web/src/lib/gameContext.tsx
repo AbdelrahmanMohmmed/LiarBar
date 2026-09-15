@@ -155,6 +155,17 @@ interface GameContextValue extends GameActions {
   partyState: PartyState | null;
   gameCatalog: GameSpecPublic[];
   lobbyState: LobbyState | null;
+  /**
+   * The active sub-game's public state, from whichever container holds it.
+   *
+   * Games with a typed slot above (Liar's Bar, domino, Codenames…) should keep
+   * using that slot — it carries the private fields too. This is for the arcade
+   * games, which have no slot: they read the container's `subGameState`
+   * directly, and every one of them read `lobbyState` only. Reached through a
+   * party the state lives on `partyState` instead, so seven of the twelve games
+   * in the picker rendered a blank screen.
+   */
+  activeSubState: unknown;
   gameState: GameState | null;
   codenamesState: CodenamesState | null;
   higherLowerState: HigherLowerState | null;
@@ -993,10 +1004,16 @@ export const [GameProvider, useGame] = createContextHook(() => {
     }
   }, [gameState?.actionLog]);
 
+  const activeSubState =
+    (partyState as { subGameState?: unknown } | null)?.subGameState ??
+    (lobbyState as { subGameState?: unknown } | null)?.subGameState ??
+    null;
+
   return {
     partyState,
     gameCatalog,
     lobbyState,
+    activeSubState,
     gameState,
     codenamesState,
     higherLowerState,

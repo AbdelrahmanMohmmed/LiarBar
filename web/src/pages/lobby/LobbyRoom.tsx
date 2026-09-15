@@ -259,8 +259,8 @@ export default function LobbyRoom() {
 
   if (!reconnected) {
     return (
-      <div className="min-h-screen bg-[#0e0606] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-purple-500 animate-spin" />
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-sand animate-spin" />
       </div>
     );
   }
@@ -268,17 +268,17 @@ export default function LobbyRoom() {
   // Join prompt screen
   if (!shell || !isInRoom) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-[#120717] via-[#1a0a20] to-[#120717] flex flex-col items-center justify-center p-4">
-        <div className="w-full max-w-md bg-[#190c1f]/90 border border-purple-900/30 shadow-2xl rounded-2xl p-6 space-y-4">
+      <div className="min-h-screen bg-gradient-to-b from-background via-surface to-background flex flex-col items-center justify-center p-4">
+        <div className="w-full max-w-md bg-surface/90 border border-border shadow-2xl rounded-2xl p-6 space-y-4">
           <div className="text-center">
             <h2 className="text-white text-2xl font-bold">Join Party Lobby</h2>
-            <p className="text-purple-300/50 text-sm mt-1">
-              Room Code: <span className="text-purple-400 font-mono font-bold">{paramRoomId}</span>
+            <p className="text-sand/50 text-sm mt-1">
+              Room Code: <span className="text-sand font-mono font-bold">{paramRoomId}</span>
             </p>
           </div>
           <div className="space-y-3">
             <div>
-              <label htmlFor="joinName" className="text-purple-200/80 text-xs block mb-1">
+              <label htmlFor="joinName" className="text-cream/80 text-xs block mb-1">
                 Your Display Name
               </label>
               <input
@@ -290,19 +290,19 @@ export default function LobbyRoom() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter") handleJoinRoom();
                 }}
-                className="w-full px-3 py-2.5 rounded-lg bg-[#27152f] border border-purple-900/40 text-white placeholder:text-purple-200/30 focus:border-purple-500 focus:outline-none text-sm"
+                className="w-full px-3 py-2.5 rounded-lg bg-surface-raised border border-border text-white placeholder:text-cream/30 focus:border-coral focus:outline-none text-sm"
               />
             </div>
             <button
               onClick={handleJoinRoom}
               disabled={isJoining}
-              className="w-full inline-flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold py-3 rounded-xl shadow-lg transition-all active:scale-95 disabled:opacity-50"
+              className="w-full inline-flex items-center justify-center gap-2 bg-coral hover:brightness-110 text-white font-semibold py-3 rounded-xl shadow-lg transition-all active:scale-95 disabled:opacity-50"
             >
               Join Lobby
             </button>
             <button
               onClick={() => navigate("/")}
-              className="w-full text-purple-300/40 hover:text-purple-300/60 text-xs py-1 transition-all"
+              className="w-full text-sand/40 hover:text-sand/60 text-xs py-1 transition-all"
             >
               Back to Games
             </button>
@@ -315,22 +315,26 @@ export default function LobbyRoom() {
   // Inline render game screen if a sub-game is active!
   if (shell.activeGameId) {
     return (
-      <div className="relative min-h-screen bg-[#0d070f]">
+      <div className="relative min-h-screen bg-background">
         {/* Floating Return to Lobby button for host */}
         {isHost && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50">
+          /* Top-LEFT, not centred: the voice pill is pinned top-right, and on
+             a 375px phone a centred "Return to Lobby Menu" ran underneath it.
+             Bilingual too — it was the one string on this screen still hard-
+             coded in English. */
+          <div className="absolute top-4 left-4 z-50">
             <button
               onClick={lobbyReturnToLobby}
-              className="inline-flex items-center gap-2 bg-purple-700 hover:bg-purple-600 text-white text-xs px-4 py-2 rounded-full shadow-lg shadow-black/40 ring-2 ring-purple-500/30 font-bold transition-all active:scale-95"
+              className="inline-flex items-center gap-2 bg-coral hover:brightness-110 text-white text-xs px-3.5 py-2 rounded-pill shadow-2 font-bold transition-all active:scale-95"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              Return to Lobby Menu
+              {t("party.back_to_hub")}
             </button>
           </div>
         )}
 
         {/* Persistent Voice Controls display in the top right floating corner */}
-        <div className="absolute top-4 right-4 z-50 bg-[#170e1c]/80 backdrop-blur-md px-3 py-1.5 rounded-full border border-purple-900/40 shadow-md">
+        <div className="absolute top-4 right-4 z-50 bg-surface/80 backdrop-blur-md px-3 py-1.5 rounded-full border border-border shadow-md">
           <VoiceControls />
         </div>
 
@@ -352,31 +356,31 @@ export default function LobbyRoom() {
 
   // Lobby Menu Page
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#100615] via-[#1a0c24] to-[#100615] flex flex-col p-4 font-sans text-purple-100">
+    <div className="min-h-screen bg-gradient-to-b from-background via-surface to-background flex flex-col p-4 font-sans text-cream">
       <div className="max-w-6xl mx-auto w-full flex-1 flex flex-col gap-6 py-4">
         {/* Top Navbar */}
-        <div className="flex items-center justify-between border-b border-purple-950/30 pb-4">
+        <div className="flex items-center justify-between border-b border-border pb-4">
           <button
             onClick={() => {
               leaveRoom();
               navigate("/");
             }}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-purple-300/60 hover:text-white hover:bg-purple-950/40 transition-all text-xs"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sand/60 hover:text-white hover:bg-surface-raised transition-all text-xs"
           >
             <ArrowLeft className="w-4 h-4" />
             Leave Party
           </button>
           
           <div className="text-center">
-            <h1 className="text-xl font-black bg-gradient-to-r from-purple-400 to-indigo-300 bg-clip-text text-transparent tracking-wide">
+            <h1 className="text-xl font-black bg-gradient-to-r from-coral to-gold bg-clip-text text-transparent tracking-wide">
               LOBBY GAME HUB
             </h1>
-            <p className="text-[10px] text-purple-400 font-mono tracking-widest mt-0.5">
+            <p className="text-[10px] text-sand font-mono tracking-widest mt-0.5">
               CODE: {paramRoomId}
             </p>
           </div>
 
-          <div className="bg-[#1f0e2a] px-3 py-1.5 rounded-full border border-purple-900/40 shadow-sm flex items-center gap-2">
+          <div className="bg-surface px-3 py-1.5 rounded-full border border-border shadow-sm flex items-center gap-2">
             <VoiceControls />
           </div>
         </div>
@@ -384,10 +388,10 @@ export default function LobbyRoom() {
         {/* Main Columns */}
         <div className="flex-1 grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch">
           {/* Left Column: Player List */}
-          <div className="md:col-span-4 bg-[#180b20]/70 border border-purple-950/40 rounded-2xl p-5 flex flex-col gap-4 shadow-xl">
-            <div className="flex items-center gap-2 border-b border-purple-950/30 pb-3">
-              <Users className="w-5 h-5 text-purple-400" />
-              <h2 className="font-bold text-sm uppercase tracking-wider text-purple-300">
+          <div className="md:col-span-4 bg-surface/70 border border-border rounded-2xl p-5 flex flex-col gap-4 shadow-xl">
+            <div className="flex items-center gap-2 border-b border-border pb-3">
+              <Users className="w-5 h-5 text-sand" />
+              <h2 className="font-bold text-sm uppercase tracking-wider text-sand">
                 Party Members ({shell.players.length})
               </h2>
             </div>
@@ -398,13 +402,13 @@ export default function LobbyRoom() {
                   key={player.id}
                   className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
                     player.id === myPlayerId
-                      ? "bg-[#251032]/85 border-purple-500/50"
-                      : "bg-[#1d0d27]/40 border-purple-950/20"
+                      ? "bg-surface-raised/85 border-coral/50"
+                      : "bg-surface/40 border-border"
                   }`}
                 >
                   <div className="flex items-center gap-3">
                     <div className="relative">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white text-xs font-black">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-coral to-ruby flex items-center justify-center text-white text-xs font-black">
                         {player.icon ? (
                           <span className="text-base leading-none">{player.icon}</span>
                         ) : (
@@ -412,7 +416,7 @@ export default function LobbyRoom() {
                         )}
                       </div>
                       {!player.isConnected && (
-                        <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-red-600 rounded-full border-2 border-[#180b20]" title="Offline" />
+                        <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-red-600 rounded-full border-2 border-border" title="Offline" />
                       )}
                     </div>
                     <div>
@@ -432,9 +436,9 @@ export default function LobbyRoom() {
             </div>
 
             {!shell.activeGameId && (
-              <div className="border-t border-purple-950/30 pt-3 space-y-3">
+              <div className="border-t border-border pt-3 space-y-3">
                 <div>
-                  <p className="text-[10px] uppercase tracking-wider text-purple-300/60 font-bold mb-2">
+                  <p className="text-[10px] uppercase tracking-wider text-sand/60 font-bold mb-2">
                     Choose Your Piece
                   </p>
                   <div className="grid grid-cols-6 gap-1.5">
@@ -447,8 +451,8 @@ export default function LobbyRoom() {
                           onClick={() => setPlayerIcon(icon)}
                           className={`text-base py-1.5 rounded-lg border transition-all ${
                             active
-                              ? "bg-purple-600 border-purple-400"
-                              : "bg-[#21112b]/50 border-purple-950/20 hover:bg-[#251330]"
+                              ? "bg-coral border-coral"
+                              : "bg-surface-raised/50 border-border hover:bg-surface-raised"
                           }`}
                         >
                           {icon}
@@ -459,7 +463,7 @@ export default function LobbyRoom() {
                 </div>
 
                 <div>
-                  <p className="text-[10px] uppercase tracking-wider text-purple-300/60 font-bold mb-2">
+                  <p className="text-[10px] uppercase tracking-wider text-sand/60 font-bold mb-2">
                     Your Fighter Character
                   </p>
                   <div className="grid grid-cols-4 gap-1.5">
@@ -472,8 +476,8 @@ export default function LobbyRoom() {
                           onClick={() => setPlayerCharacter(ch.id)}
                           className={`py-1.5 px-1 rounded-lg border text-[10px] font-bold transition-all ${
                             active
-                              ? "bg-purple-600 text-white border-purple-400"
-                              : "bg-[#21112b]/50 border-purple-950/20 text-purple-300 hover:bg-[#251330] hover:text-white"
+                              ? "bg-coral text-white border-coral"
+                              : "bg-surface-raised/50 border-border text-sand hover:bg-surface-raised hover:text-white"
                           }`}
                         >
                           {ch.label}
@@ -488,17 +492,17 @@ export default function LobbyRoom() {
             {isHost && (
               <button
                 onClick={() => addBot()}
-                className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-dashed border-purple-500/40 text-purple-300/70 hover:text-white hover:bg-purple-950/40 hover:border-purple-400/60 transition-all text-xs font-bold"
+                className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-dashed border-coral/40 text-sand/70 hover:text-white hover:bg-surface-raised hover:border-coral/60 transition-all text-xs font-bold"
               >
                 <Bot className="w-4 h-4" />
                 Add Bot
               </button>
             )}
           </div>
-          <div className="md:col-span-5 bg-[#180b20]/70 border border-purple-950/40 rounded-2xl p-5 flex flex-col gap-4 shadow-xl">
-            <div className="flex items-center gap-2 border-b border-purple-950/30 pb-3">
-              <Gamepad2 className="w-5 h-5 text-purple-400" />
-              <h2 className="font-bold text-sm uppercase tracking-wider text-purple-300">
+          <div className="md:col-span-5 bg-surface/70 border border-border rounded-2xl p-5 flex flex-col gap-4 shadow-xl">
+            <div className="flex items-center gap-2 border-b border-border pb-3">
+              <Gamepad2 className="w-5 h-5 text-sand" />
+              <h2 className="font-bold text-sm uppercase tracking-wider text-sand">
                 {isHost ? "Choose Next Game" : "Active Game Selection"}
               </h2>
             </div>
@@ -513,8 +517,8 @@ export default function LobbyRoom() {
                       onClick={() => setSelectedGame(game)}
                       className={`py-2 px-1 text-center rounded-xl border text-xs font-bold transition-all uppercase ${
                         selectedGame === game
-                          ? "bg-purple-600 text-white border-purple-400 shadow-md shadow-purple-900/30"
-                          : "bg-[#21112b]/50 border-purple-950/20 text-purple-300 hover:bg-[#251330] hover:text-white"
+                          ? "bg-coral text-white border-coral shadow-md shadow-black/40"
+                          : "bg-surface-raised/50 border-border text-sand hover:bg-surface-raised hover:text-white"
                       }`}
                     >
                       {game.replace("-", " ")}
@@ -523,17 +527,17 @@ export default function LobbyRoom() {
                 </div>
 
                 {/* Configuration Options */}
-                <div className="flex-1 bg-[#1e0e29] border border-purple-950/45 p-4 rounded-xl space-y-4 text-xs overflow-y-auto max-h-[300px]">
+                <div className="flex-1 bg-surface border border-border p-4 rounded-xl space-y-4 text-xs overflow-y-auto max-h-[300px]">
                   {selectedGame === "liars-bar" && (
                     <div className="space-y-3">
-                      <h3 className="font-black text-purple-400 border-b border-purple-950/20 pb-1.5">Liar's Bar Settings</h3>
+                      <h3 className="font-black text-sand border-b border-border pb-1.5">Liar's Bar Settings</h3>
                       <div className="grid grid-cols-2 gap-3">
                         <label className="space-y-1 block">
-                          <span className="text-purple-300/70 block">Variant</span>
+                          <span className="text-sand/70 block">Variant</span>
                           <select
                             value={lbVariant}
                             onChange={(e) => setLbVariant(e.target.value as any)}
-                            className="w-full bg-[#271533] border border-purple-900/40 rounded px-2 py-1.5 text-white focus:outline-none"
+                            className="w-full bg-surface-raised border border-border rounded px-2 py-1.5 text-white focus:outline-none"
                           >
                             <option value="cards">Cards</option>
                             <option value="dominoes">Dominoes</option>
@@ -541,11 +545,11 @@ export default function LobbyRoom() {
                         </label>
 
                         <label className="space-y-1 block">
-                          <span className="text-purple-300/70 block">Max Players</span>
+                          <span className="text-sand/70 block">Max Players</span>
                           <select
                             value={lbMaxPlayers}
                             onChange={(e) => setLbMaxPlayers(e.target.value)}
-                            className="w-full bg-[#271533] border border-purple-900/40 rounded px-2 py-1.5 text-white focus:outline-none"
+                            className="w-full bg-surface-raised border border-border rounded px-2 py-1.5 text-white focus:outline-none"
                           >
                             <option value="2">2</option>
                             <option value="3">3</option>
@@ -557,11 +561,11 @@ export default function LobbyRoom() {
 
                         {lbVariant === "cards" && (
                           <label className="space-y-1 block">
-                            <span className="text-purple-300/70 block">Claim Style</span>
+                            <span className="text-sand/70 block">Claim Style</span>
                             <select
                               value={lbClaimType}
                               onChange={(e) => setLbClaimType(e.target.value as any)}
-                              className="w-full bg-[#271533] border border-purple-900/40 rounded px-2 py-1.5 text-white focus:outline-none"
+                              className="w-full bg-surface-raised border border-border rounded px-2 py-1.5 text-white focus:outline-none"
                             >
                               <option value="suit">Suit (Standard)</option>
                               <option value="rank">Rank (All claims match)</option>
@@ -570,11 +574,11 @@ export default function LobbyRoom() {
                         )}
 
                         <label className="space-y-1 block">
-                          <span className="text-purple-300/70 block">Deck Count</span>
+                          <span className="text-sand/70 block">Deck Count</span>
                           <select
                             value={lbDeckCount}
                             onChange={(e) => setLbDeckCount(e.target.value)}
-                            className="w-full bg-[#271533] border border-purple-900/40 rounded px-2 py-1.5 text-white focus:outline-none"
+                            className="w-full bg-surface-raised border border-border rounded px-2 py-1.5 text-white focus:outline-none"
                           >
                             <option value="1">1 Deck</option>
                             <option value="2">2 Decks</option>
@@ -584,11 +588,11 @@ export default function LobbyRoom() {
                         </label>
 
                         <label className="space-y-1 block">
-                          <span className="text-purple-300/70 block">Reveal Time</span>
+                          <span className="text-sand/70 block">Reveal Time</span>
                           <select
                             value={lbRevealTime}
                             onChange={(e) => setLbRevealTime(e.target.value)}
-                            className="w-full bg-[#271533] border border-purple-900/40 rounded px-2 py-1.5 text-white focus:outline-none"
+                            className="w-full bg-surface-raised border border-border rounded px-2 py-1.5 text-white focus:outline-none"
                           >
                             <option value="3">3s</option>
                             <option value="5">5s</option>
@@ -598,11 +602,11 @@ export default function LobbyRoom() {
                         </label>
 
                         <label className="space-y-1 block">
-                          <span className="text-purple-300/70 block">Challenge Mode</span>
+                          <span className="text-sand/70 block">Challenge Mode</span>
                           <select
                             value={lbChallengeMode}
                             onChange={(e) => setLbChallengeMode(e.target.value as any)}
-                            className="w-full bg-[#271533] border border-purple-900/40 rounded px-2 py-1.5 text-white focus:outline-none"
+                            className="w-full bg-surface-raised border border-border rounded px-2 py-1.5 text-white focus:outline-none"
                           >
                             <option value="timer">Timer</option>
                             <option value="vote">Vote to Skip</option>
@@ -614,14 +618,14 @@ export default function LobbyRoom() {
 
                   {selectedGame === "codenames" && (
                     <div className="space-y-3">
-                      <h3 className="font-black text-purple-400 border-b border-purple-950/20 pb-1.5">Codenames Settings</h3>
+                      <h3 className="font-black text-sand border-b border-border pb-1.5">Codenames Settings</h3>
                       <div className="grid grid-cols-2 gap-3">
                         <label className="space-y-1 block">
-                          <span className="text-purple-300/70 block">Max Players</span>
+                          <span className="text-sand/70 block">Max Players</span>
                           <select
                             value={cnMaxPlayers}
                             onChange={(e) => setCnMaxPlayers(e.target.value)}
-                            className="w-full bg-[#271533] border border-purple-900/40 rounded px-2 py-1.5 text-white focus:outline-none"
+                            className="w-full bg-surface-raised border border-border rounded px-2 py-1.5 text-white focus:outline-none"
                           >
                             <option value="4">4</option>
                             <option value="6">6</option>
@@ -631,11 +635,11 @@ export default function LobbyRoom() {
                         </label>
 
                         <label className="space-y-1 block">
-                          <span className="text-purple-300/70 block">Language</span>
+                          <span className="text-sand/70 block">Language</span>
                           <select
                             value={cnLanguage}
                             onChange={(e) => setCnLanguage(e.target.value as any)}
-                            className="w-full bg-[#271533] border border-purple-900/40 rounded px-2 py-1.5 text-white focus:outline-none"
+                            className="w-full bg-surface-raised border border-border rounded px-2 py-1.5 text-white focus:outline-none"
                           >
                             <option value="ar">العربية (Arabic)</option>
                             <option value="en">English</option>
@@ -647,14 +651,14 @@ export default function LobbyRoom() {
 
                   {selectedGame === "higher-lower" && (
                     <div className="space-y-3">
-                      <h3 className="font-black text-purple-400 border-b border-purple-950/20 pb-1.5">Higher or Lower Settings</h3>
+                      <h3 className="font-black text-sand border-b border-border pb-1.5">Higher or Lower Settings</h3>
                       <div className="grid grid-cols-2 gap-3">
                         <label className="space-y-1 block">
-                          <span className="text-purple-300/70 block">Max Players</span>
+                          <span className="text-sand/70 block">Max Players</span>
                           <select
                             value={hlMaxPlayers}
                             onChange={(e) => setHlMaxPlayers(e.target.value)}
-                            className="w-full bg-[#271533] border border-purple-900/40 rounded px-2 py-1.5 text-white focus:outline-none"
+                            className="w-full bg-surface-raised border border-border rounded px-2 py-1.5 text-white focus:outline-none"
                           >
                             <option value="2">2</option>
                             <option value="3">3</option>
@@ -669,14 +673,14 @@ export default function LobbyRoom() {
 
                   {selectedGame === "snake" && (
                     <div className="space-y-3">
-                      <h3 className="font-black text-purple-400 border-b border-purple-950/20 pb-1.5">Snake Battle Settings</h3>
+                      <h3 className="font-black text-sand border-b border-border pb-1.5">Snake Battle Settings</h3>
                       <div className="grid grid-cols-2 gap-3">
                         <label className="space-y-1 block">
-                          <span className="text-purple-300/70 block">Match Duration</span>
+                          <span className="text-sand/70 block">Match Duration</span>
                           <select
                             value={snakeDuration}
                             onChange={(e) => setSnakeDuration(e.target.value)}
-                            className="w-full bg-[#271533] border border-purple-900/40 rounded px-2 py-1.5 text-white focus:outline-none"
+                            className="w-full bg-surface-raised border border-border rounded px-2 py-1.5 text-white focus:outline-none"
                           >
                             <option value="15">15s</option>
                             <option value="30">30s</option>
@@ -686,7 +690,7 @@ export default function LobbyRoom() {
                             <option value="300">300s</option>
                           </select>
                         </label>
-                        <p className="text-purple-300/50 text-[10px] leading-snug col-span-2">
+                        <p className="text-sand/50 text-[10px] leading-snug col-span-2">
                           Up to 4 players. Highest score when time runs out wins. Make a friend
                           crash into your body to eliminate them!
                         </p>
@@ -696,13 +700,13 @@ export default function LobbyRoom() {
 
                   {selectedGame === "tictactoe" && (
                     <div className="space-y-3">
-                      <h3 className="font-black text-purple-400 border-b border-purple-950/20 pb-1.5">Tic-Tac-Toe Settings</h3>
+                      <h3 className="font-black text-sand border-b border-border pb-1.5">Tic-Tac-Toe Settings</h3>
                       <label className="space-y-1 block">
-                        <span className="text-purple-300/70 block">Wins to Win Match</span>
+                        <span className="text-sand/70 block">Wins to Win Match</span>
                         <select
                           value={tttWinTarget}
                           onChange={(e) => setTttWinTarget(e.target.value)}
-                          className="w-full bg-[#271533] border border-purple-900/40 rounded px-2 py-1.5 text-white focus:outline-none"
+                          className="w-full bg-surface-raised border border-border rounded px-2 py-1.5 text-white focus:outline-none"
                         >
                           <option value="1">1</option>
                           <option value="3">3</option>
@@ -710,7 +714,7 @@ export default function LobbyRoom() {
                           <option value="10">10</option>
                         </select>
                       </label>
-                      <p className="text-purple-300/50 text-[10px] leading-snug">
+                      <p className="text-sand/50 text-[10px] leading-snug">
                         Two players take turns placing X and O. First to reach the target number
                         of round wins takes the match!
                       </p>
@@ -719,8 +723,8 @@ export default function LobbyRoom() {
 
                   {selectedGame === "space-invaders" && (
                     <div className="space-y-3">
-                      <h3 className="font-black text-purple-400 border-b border-purple-950/20 pb-1.5">Space Invaders Settings</h3>
-                      <p className="text-purple-300/50 text-[10px] leading-snug">
+                      <h3 className="font-black text-sand border-b border-border pb-1.5">Space Invaders Settings</h3>
+                      <p className="text-sand/50 text-[10px] leading-snug">
                         Co-op survival. Everyone gets a ship — work together to clear waves of
                         aliens. Don't let them reach the bottom! Catch power-ups to boost speed
                         and firepower.
@@ -730,14 +734,14 @@ export default function LobbyRoom() {
 
                   {selectedGame === "fighter" && (
                     <div className="space-y-3">
-                      <h3 className="font-black text-purple-400 border-b border-purple-950/20 pb-1.5">Fighter Settings</h3>
+                      <h3 className="font-black text-sand border-b border-border pb-1.5">Fighter Settings</h3>
                       <div className="grid grid-cols-2 gap-3">
                         <label className="space-y-1 block">
-                          <span className="text-purple-300/70 block">Rounds to Win</span>
+                          <span className="text-sand/70 block">Rounds to Win</span>
                           <select
                             value={fighterWins}
                             onChange={(e) => setFighterWins(e.target.value)}
-                            className="w-full bg-[#271533] border border-purple-900/40 rounded px-2 py-1.5 text-white focus:outline-none"
+                            className="w-full bg-surface-raised border border-border rounded px-2 py-1.5 text-white focus:outline-none"
                           >
                             <option value="1">1</option>
                             <option value="3">3</option>
@@ -745,11 +749,11 @@ export default function LobbyRoom() {
                           </select>
                         </label>
                         <label className="space-y-1 block">
-                          <span className="text-purple-300/70 block">Theme</span>
+                          <span className="text-sand/70 block">Theme</span>
                           <select
                             value={fighterTheme}
                             onChange={(e) => setFighterTheme(e.target.value as typeof fighterTheme)}
-                            className="w-full bg-[#271533] border border-purple-900/40 rounded px-2 py-1.5 text-white focus:outline-none"
+                            className="w-full bg-surface-raised border border-border rounded px-2 py-1.5 text-white focus:outline-none"
                           >
                             <option value="default">Default</option>
                             <option value="night">Night</option>
@@ -758,7 +762,7 @@ export default function LobbyRoom() {
                           </select>
                         </label>
                       </div>
-                      <p className="text-purple-300/50 text-[10px] leading-snug">
+                      <p className="text-sand/50 text-[10px] leading-snug">
                         Real-time online brawl — each player controls their own fighter from their
                         own device. Move, jump, punch, kick, block, and unleash your special when
                         your meter is full. First to the target round wins takes the match! Pick
@@ -769,20 +773,20 @@ export default function LobbyRoom() {
 
                   {selectedGame === "memory-puzzle" && (
                     <div className="space-y-3">
-                      <h3 className="font-black text-purple-400 border-b border-purple-950/20 pb-1.5">Memory Puzzle Settings</h3>
+                      <h3 className="font-black text-sand border-b border-border pb-1.5">Memory Puzzle Settings</h3>
                       <label className="space-y-1 block">
-                        <span className="text-purple-300/70 block">Bot Difficulty</span>
+                        <span className="text-sand/70 block">Bot Difficulty</span>
                         <select
                           value={mpDifficulty}
                           onChange={(e) => setMpDifficulty(e.target.value as typeof mpDifficulty)}
-                          className="w-full bg-[#271533] border border-purple-900/40 rounded px-2 py-1.5 text-white focus:outline-none"
+                          className="w-full bg-surface-raised border border-border rounded px-2 py-1.5 text-white focus:outline-none"
                         >
                           <option value="easy">Easy</option>
                           <option value="medium">Medium</option>
                           <option value="hard">Hard</option>
                         </select>
                       </label>
-                      <p className="text-purple-300/50 text-[10px] leading-snug">
+                      <p className="text-sand/50 text-[10px] leading-snug">
                         Players take turns flipping cards to find matching pairs. The player
                         with the most matches when all pairs are found wins!
                       </p>
@@ -791,8 +795,8 @@ export default function LobbyRoom() {
 
                   {selectedGame === "tetris" && (
                     <div className="space-y-3">
-                      <h3 className="font-black text-purple-400 border-b border-purple-950/20 pb-1.5">Tetris Settings</h3>
-                      <p className="text-purple-300/50 text-[10px] leading-snug">
+                      <h3 className="font-black text-sand border-b border-border pb-1.5">Tetris Settings</h3>
+                      <p className="text-sand/50 text-[10px] leading-snug">
                         Everyone plays their own Tetris board simultaneously. Score points by
                         clearing lines. The last player standing wins!
                       </p>
@@ -801,14 +805,14 @@ export default function LobbyRoom() {
 
                   {selectedGame === "rento" && (
                     <div className="space-y-3">
-                      <h3 className="font-black text-purple-400 border-b border-purple-950/20 pb-1.5">Rento Settings</h3>
+                      <h3 className="font-black text-sand border-b border-border pb-1.5">Rento Settings</h3>
                       <div className="grid grid-cols-2 gap-3">
                         <label className="space-y-1 block">
-                          <span className="text-purple-300/70 block">Max Players</span>
+                          <span className="text-sand/70 block">Max Players</span>
                           <select
                             value={rentoMaxPlayers}
                             onChange={(e) => setRentoMaxPlayers(e.target.value)}
-                            className="w-full bg-[#271533] border border-purple-900/40 rounded px-2 py-1.5 text-white focus:outline-none"
+                            className="w-full bg-surface-raised border border-border rounded px-2 py-1.5 text-white focus:outline-none"
                           >
                             <option value="2">2</option>
                             <option value="3">3</option>
@@ -818,11 +822,11 @@ export default function LobbyRoom() {
                           </select>
                         </label>
                         <label className="space-y-1 block">
-                          <span className="text-purple-300/70 block">Map</span>
+                          <span className="text-sand/70 block">Map</span>
                           <select
                             value={rentoMapId}
                             onChange={(e) => setRentoMapId(e.target.value as typeof rentoMapId)}
-                            className="w-full bg-[#271533] border border-purple-900/40 rounded px-2 py-1.5 text-white focus:outline-none"
+                            className="w-full bg-surface-raised border border-border rounded px-2 py-1.5 text-white focus:outline-none"
                           >
                             <option value="middle_east">Middle East</option>
                             <option value="europe">Europe</option>
@@ -830,11 +834,11 @@ export default function LobbyRoom() {
                           </select>
                         </label>
                         <label className="space-y-1 block">
-                          <span className="text-purple-300/70 block">Background</span>
+                          <span className="text-sand/70 block">Background</span>
                           <select
                             value={rentoBackgroundId}
                             onChange={(e) => setRentoBackgroundId(e.target.value as typeof rentoBackgroundId)}
-                            className="w-full bg-[#271533] border border-purple-900/40 rounded px-2 py-1.5 text-white focus:outline-none"
+                            className="w-full bg-surface-raised border border-border rounded px-2 py-1.5 text-white focus:outline-none"
                           >
                             <option value="nebula">Nebula</option>
                             <option value="ocean">Ocean</option>
@@ -843,7 +847,7 @@ export default function LobbyRoom() {
                           </select>
                         </label>
                         <label className="space-y-1 block">
-                          <span className="text-purple-300/70 block">Flag Style</span>
+                          <span className="text-sand/70 block">Flag Style</span>
                           <select
                             value={rentoFlagMode}
                             onChange={(e) => {
@@ -851,18 +855,18 @@ export default function LobbyRoom() {
                               setRentoFlagMode(mode);
                               try { localStorage.setItem("rento_flag_mode", mode); } catch { /* ignore */ }
                             }}
-                            className="w-full bg-[#271533] border border-purple-900/40 rounded px-2 py-1.5 text-white focus:outline-none"
+                            className="w-full bg-surface-raised border border-border rounded px-2 py-1.5 text-white focus:outline-none"
                           >
                             <option value="css">Drawn</option>
                             <option value="image">Real</option>
                           </select>
                         </label>
                         <label className="space-y-1 block">
-                          <span className="text-purple-300/70 block">Starting Balance</span>
+                          <span className="text-sand/70 block">Starting Balance</span>
                           <select
                             value={rentoStartingBalance}
                             onChange={(e) => setRentoStartingBalance(e.target.value)}
-                            className="w-full bg-[#271533] border border-purple-900/40 rounded px-2 py-1.5 text-white focus:outline-none"
+                            className="w-full bg-surface-raised border border-border rounded px-2 py-1.5 text-white focus:outline-none"
                           >
                             <option value="1500">$1500</option>
                             <option value="3000">$3000</option>
@@ -870,22 +874,22 @@ export default function LobbyRoom() {
                           </select>
                         </label>
                         <label className="space-y-1 block">
-                          <span className="text-purple-300/70 block">Jail</span>
+                          <span className="text-sand/70 block">Jail</span>
                           <select
                             value={rentoJailEnabled ? "on" : "off"}
                             onChange={(e) => setRentoJailEnabled(e.target.value === "on")}
-                            className="w-full bg-[#271533] border border-purple-900/40 rounded px-2 py-1.5 text-white focus:outline-none"
+                            className="w-full bg-surface-raised border border-border rounded px-2 py-1.5 text-white focus:outline-none"
                           >
                             <option value="on">Enabled</option>
                             <option value="off">Disabled</option>
                           </select>
                         </label>
                         <label className="space-y-1 block">
-                          <span className="text-purple-300/70 block">Free Parking Bonus</span>
+                          <span className="text-sand/70 block">Free Parking Bonus</span>
                           <select
                             value={rentoFreeParking}
                             onChange={(e) => setRentoFreeParking(e.target.value)}
-                            className="w-full bg-[#271533] border border-purple-900/40 rounded px-2 py-1.5 text-white focus:outline-none"
+                            className="w-full bg-surface-raised border border-border rounded px-2 py-1.5 text-white focus:outline-none"
                           >
                             <option value="0">None</option>
                             <option value="200">$200</option>
@@ -893,11 +897,11 @@ export default function LobbyRoom() {
                           </select>
                         </label>
                         <label className="space-y-1 block">
-                          <span className="text-purple-300/70 block">Turn Timer</span>
+                          <span className="text-sand/70 block">Turn Timer</span>
                           <select
                             value={rentoTurnTimer}
                             onChange={(e) => setRentoTurnTimer(e.target.value)}
-                            className="w-full bg-[#271533] border border-purple-900/40 rounded px-2 py-1.5 text-white focus:outline-none"
+                            className="w-full bg-surface-raised border border-border rounded px-2 py-1.5 text-white focus:outline-none"
                           >
                             <option value="30">30s</option>
                             <option value="45">45s</option>
@@ -906,11 +910,11 @@ export default function LobbyRoom() {
                           </select>
                         </label>
                         <label className="space-y-1 block">
-                          <span className="text-purple-300/70 block">Bot Difficulty</span>
+                          <span className="text-sand/70 block">Bot Difficulty</span>
                           <select
                             value={rentoAiDifficulty}
                             onChange={(e) => setRentoAiDifficulty(e.target.value as typeof rentoAiDifficulty)}
-                            className="w-full bg-[#271533] border border-purple-900/40 rounded px-2 py-1.5 text-white focus:outline-none"
+                            className="w-full bg-surface-raised border border-border rounded px-2 py-1.5 text-white focus:outline-none"
                           >
                             <option value="easy">Easy</option>
                             <option value="medium">Medium</option>
@@ -918,7 +922,7 @@ export default function LobbyRoom() {
                           </select>
                         </label>
                       </div>
-                      <p className="text-purple-300/50 text-[10px] leading-snug">
+                      <p className="text-sand/50 text-[10px] leading-snug">
                         Monopoly-style property trading. Roll dice, buy
                         properties, collect rent. Bots play automatically! Last player with money wins.
                       </p>
@@ -927,8 +931,8 @@ export default function LobbyRoom() {
 
                   {selectedGame === "snake-ladder" && (
                     <div className="space-y-3">
-                      <h3 className="font-black text-purple-400 border-b border-purple-950/20 pb-1.5">Snake & Ladder Settings</h3>
-                      <p className="text-purple-300/50 text-[10px] leading-snug">
+                      <h3 className="font-black text-sand border-b border-border pb-1.5">Snake & Ladder Settings</h3>
+                      <p className="text-sand/50 text-[10px] leading-snug">
                         Classic board game. Roll dice, climb ladders, dodge snakes! First to reach
                         square 100 wins.
                       </p>
@@ -938,19 +942,19 @@ export default function LobbyRoom() {
 
                 <button
                   onClick={handleStartGame}
-                  className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-purple-900/20 active:scale-95 transition-all"
+                  className="w-full flex items-center justify-center gap-2 bg-coral hover:brightness-110 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-black/40 active:scale-95 transition-all"
                 >
                   <Play className="w-4 h-4" />
                   Launch Sub-Game
                 </button>
               </div>
             ) : (
-              <div className="flex-1 flex flex-col items-center justify-center text-center p-6 bg-[#1b0d24]/60 rounded-xl border border-purple-950/30">
-                <Sparkles className="w-8 h-8 text-purple-400 mb-3 animate-pulse" />
-                <p className="text-purple-200/90 text-sm font-semibold mb-1">
+              <div className="flex-1 flex flex-col items-center justify-center text-center p-6 bg-surface/60 rounded-xl border border-border">
+                <Sparkles className="w-8 h-8 text-sand mb-3 animate-pulse" />
+                <p className="text-cream/90 text-sm font-semibold mb-1">
                   Waiting for Host to Start
                 </p>
-                <p className="text-purple-300/40 text-xs">
+                <p className="text-sand/40 text-xs">
                   Your host is selecting a game. Hang tight, and make sure your mic is set!
                 </p>
               </div>
@@ -958,18 +962,18 @@ export default function LobbyRoom() {
           </div>
 
           {/* Right Column: Chat Box */}
-          <div className="md:col-span-3 bg-[#180b20]/70 border border-purple-950/40 rounded-2xl p-5 flex flex-col gap-4 shadow-xl">
-            <div className="flex items-center gap-2 border-b border-purple-950/30 pb-3">
-              <MessageSquare className="w-5 h-5 text-purple-400" />
-              <h2 className="font-bold text-sm uppercase tracking-wider text-purple-300">
+          <div className="md:col-span-3 bg-surface/70 border border-border rounded-2xl p-5 flex flex-col gap-4 shadow-xl">
+            <div className="flex items-center gap-2 border-b border-border pb-3">
+              <MessageSquare className="w-5 h-5 text-sand" />
+              <h2 className="font-bold text-sm uppercase tracking-wider text-sand">
                 Lobby Chat
               </h2>
             </div>
 
             <div className="flex-1 flex flex-col gap-3 min-h-[250px] md:min-h-0">
-              <div className="flex-1 bg-[#150a1c]/90 border border-purple-950/35 rounded-xl p-3 overflow-y-auto space-y-3 h-[250px] md:h-[300px]">
+              <div className="flex-1 bg-surface/90 border border-border rounded-xl p-3 overflow-y-auto space-y-3 h-[250px] md:h-[300px]">
                 {chatMessages.length === 0 ? (
-                  <p className="text-purple-300/20 text-xs text-center italic mt-4">
+                  <p className="text-sand/20 text-xs text-center italic mt-4">
                     Send a message to start chatting!
                   </p>
                 ) : (
@@ -978,14 +982,14 @@ export default function LobbyRoom() {
                     return (
                       <div key={i} className="text-xs">
                         <div className="flex items-baseline gap-1.5">
-                          <span className={`font-black ${msg.playerId === myPlayerId ? "text-purple-400" : "text-purple-200"}`}>
+                          <span className={`font-black ${msg.playerId === myPlayerId ? "text-sand" : "text-cream"}`}>
                             {msg.playerName}
                           </span>
-                          <span className="text-[8px] text-purple-300/30">
+                          <span className="text-[8px] text-sand/30">
                             {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </span>
                         </div>
-                        <p className="text-purple-100/90 leading-normal mt-0.5 bg-[#21112b]/40 rounded-lg p-2 border border-purple-950/10">
+                        <p className="text-cream/90 leading-normal mt-0.5 bg-surface-raised/40 rounded-lg p-2 border border-border">
                           {msg.message}
                         </p>
                       </div>
@@ -1001,11 +1005,11 @@ export default function LobbyRoom() {
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
                   maxLength={100}
-                  className="flex-1 bg-[#251032] border border-purple-900/40 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
+                  className="flex-1 bg-surface-raised border border-border rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-coral"
                 />
                 <button
                   type="submit"
-                  className="bg-purple-600 hover:bg-purple-500 text-white rounded-xl p-2.5 transition-all"
+                  className="bg-coral hover:bg-coral text-white rounded-xl p-2.5 transition-all"
                 >
                   <Send className="w-3.5 h-3.5" />
                 </button>

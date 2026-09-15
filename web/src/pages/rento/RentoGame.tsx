@@ -49,7 +49,7 @@ export default function RentoGame() {
     return (
       <div style={{
         minHeight: "100vh",
-        background: "#0b0710",
+        background: "#14100E",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -77,7 +77,7 @@ export default function RentoGame() {
   }
 
   return (
-    <div style={{ position: "relative", minHeight: "100vh", background: "#0b0710" }}>
+    <div style={{ position: "relative", minHeight: "100vh", background: "#14100E" }}>
       {/* Top navbar */}
       <div
         style={{

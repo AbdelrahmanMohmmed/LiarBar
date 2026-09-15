@@ -3,10 +3,10 @@ import { getSocket } from "@/lib/socket";
 import { useLanguage } from "@/lib/languageContext";
 
 export default function TicTacToeLobbyGame() {
-  const { lobbyState, myPlayerId } = useGame();
+  const { activeSubState, myPlayerId } = useGame();
   const { lang } = useLanguage();
   const isAr = lang === "ar";
-  const state = (lobbyState?.subGameState ?? null) as any;
+  const state = activeSubState as any;
   const socket = getSocket();
 
   const mySymbol = state?.players?.find((p: any) => p.id === myPlayerId)?.symbol;

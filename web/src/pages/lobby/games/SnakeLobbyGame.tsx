@@ -4,11 +4,11 @@ import { getSocket } from "@/lib/socket";
 import { useLanguage } from "@/lib/languageContext";
 
 export default function SnakeLobbyGame() {
-  const { lobbyState, myPlayerId } = useGame();
+  const { activeSubState, myPlayerId } = useGame();
   const { lang } = useLanguage();
   const isAr = lang === "ar";
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const state = (lobbyState?.subGameState ?? null) as any;
+  const state = activeSubState as any;
   const stateRef = useRef(state);
   stateRef.current = state;
 
