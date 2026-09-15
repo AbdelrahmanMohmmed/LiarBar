@@ -18,6 +18,7 @@ import { MemoryPuzzleGame } from "./memory-puzzle/MemoryPuzzleGame.js";
 import { TetrisGame } from "./tetris/TetrisGame.js";
 import { RentoGame } from "./rento/RentoGame.js";
 import { SnakeLadderGame } from "./snake-ladder/SnakeLadderGame.js";
+import { SpyfallGame } from "./spyfall/SpyfallGame.js";
 import type { Lang } from "./codenames/board.js";
 
 /**
@@ -50,6 +51,8 @@ export interface CreateRoomOptions {
   backgroundId?: string;
   /** Domino house rule: finishing on a double doubles the round's score. */
   karakBonus?: boolean;
+  // Spyfall options
+  roundSeconds?: number;
   // Memory Puzzle options
   difficulty?: "easy" | "medium" | "hard";
 }
@@ -209,4 +212,14 @@ registerGame("rento", (roomId, options, callbacks) => {
 
 registerGame("snake-ladder", (roomId, options, callbacks) => {
   return new SnakeLadderGame(roomId, options.maxPlayers, callbacks);
+});
+
+registerGame("spyfall", (roomId, options, callbacks) => {
+  return new SpyfallGame(
+    roomId,
+    options.maxPlayers,
+    callbacks,
+    Number(options.roundSeconds) || 480,
+    Number(options.targetScore) || 6,
+  );
 });

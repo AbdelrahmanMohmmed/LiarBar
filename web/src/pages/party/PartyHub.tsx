@@ -283,6 +283,8 @@ export function gameRoute(gameId: string, roomId: string): string | null {
       return `/higher-lower/game/${roomId}`;
     case "domino":
       return `/domino/game/${roomId}`;
+    case "spyfall":
+      return `/spyfall/game/${roomId}`;
     case "rento":
       return `/rento/game/${roomId}`;
     default:

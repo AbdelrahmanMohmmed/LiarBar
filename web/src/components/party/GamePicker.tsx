@@ -36,6 +36,7 @@ const FALLBACK_META: Record<string, { emoji: string; en: string; ar: string }> =
   "space-invaders": { emoji: "👾", en: "Space Invaders", ar: "غزاة الفضاء" },
   fighter: { emoji: "🥊", en: "Fighter", ar: "قتال" },
   "snake-ladder": { emoji: "🪜", en: "Snakes & Ladders", ar: "سلم وثعبان" },
+  spyfall: { emoji: "🕶️", en: "Spyfall", ar: "برا اللعبة" },
 };
 
 export default function GamePicker({

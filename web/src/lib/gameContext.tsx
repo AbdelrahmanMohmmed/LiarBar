@@ -26,6 +26,7 @@ import type {
   Dominoe,
   RentoState,
 } from "./types";
+import type { SpyfallState } from "./spyfallTypes";
 
 /**
  * Everything the client can ask the server to do about a room.
@@ -75,6 +76,9 @@ export interface CreateRoomInput {
 
   // Memory puzzle
   difficulty?: "easy" | "medium" | "hard";
+
+  // Spyfall
+  roundSeconds?: number;
 }
 
 interface GameActions {
@@ -133,6 +137,10 @@ interface GameActions {
   partyLeave: () => Promise<void>;
   /** Which games exist and how many players each needs. */
   loadGameCatalog: () => Promise<GameSpecPublic[]>;
+  spyfallAccuse: (targetId: string) => Promise<void>;
+  spyfallVote: (agree: boolean) => Promise<void>;
+  spyfallGuess: (locationId: string) => Promise<void>;
+  spyfallPass: (toPlayerId: string) => Promise<void>;
 }
 
 interface GameContextValue extends GameActions {
@@ -145,6 +153,7 @@ interface GameContextValue extends GameActions {
   higherLowerState: HigherLowerState | null;
   dominoState: DominoState | null;
   rentoState: RentoState | null;
+  spyfallState: SpyfallState | null;
   myHand: Card[];
   isConnected: boolean;
   myPlayerId: string | null;
@@ -162,7 +171,8 @@ export type AnyRoomState =
   | CodenamesState
   | HigherLowerState
   | DominoState
-  | RentoState;
+  | RentoState
+  | SpyfallState;
 
 // Local storage keys. Prefixed by brand id so a rename doesn't silently
 // resurrect a stale room from a previous build.
@@ -189,6 +199,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
   const [higherLowerState, setHigherLowerState] = useState<HigherLowerState | null>(null);
   const [dominoState, setDominoState] = useState<DominoState | null>(null);
   const [rentoState, setRentoState] = useState<RentoState | null>(null);
+  const [spyfallState, setSpyfallState] = useState<SpyfallState | null>(null);
   const [myHand, setMyHand] = useState<Card[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [myPlayerId, setMyPlayerId] = useState<string | null>(null);
@@ -229,6 +240,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
     setHigherLowerState(null);
     setDominoState(null);
     setRentoState(null);
+    setSpyfallState(null);
     setMyHand([]);
     setChatMessages([]);
     setToasts([]);
@@ -286,6 +298,10 @@ export const [GameProvider, useGame] = createContextHook(() => {
       setDominoState(state);
     };
 
+    const onSpyfallPrivate = (state: SpyfallState) => {
+      setSpyfallState(state);
+    };
+
     const onChatMessage = (msg: ChatMessage) => {
       setChatMessages((prev) => [...prev.slice(-99), msg]);
     };
@@ -314,6 +330,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
     socket.on("codenames_private", onCodenamesPrivate);
     socket.on("higher_lower_private", onHigherLowerPrivate);
     socket.on("domino_private", onDominoPrivate);
+    socket.on("spyfall_private", onSpyfallPrivate);
     socket.on("chat_message", onChatMessage);
     socket.on("webrtc_signal", onWebRTCSignal);
     socket.on("error", onError);
@@ -335,6 +352,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
       socket.off("codenames_private", onCodenamesPrivate);
       socket.off("higher_lower_private", onHigherLowerPrivate);
       socket.off("domino_private", onDominoPrivate);
+      socket.off("spyfall_private", onSpyfallPrivate);
       socket.off("chat_message", onChatMessage);
       socket.off("webrtc_signal", onWebRTCSignal);
       socket.off("error", onError);
@@ -374,6 +392,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
         if (keep !== "higher-lower") setHigherLowerState(null);
         if (keep !== "domino") setDominoState(null);
         if (keep !== "rento") setRentoState(null);
+        if (keep !== "spyfall") setSpyfallState(null);
       };
 
       if (!gameId || !sub) {
@@ -419,6 +438,20 @@ export const [GameProvider, useGame] = createContextHook(() => {
         case "rento":
           setRentoState(sub as RentoState);
           break;
+        case "spyfall": {
+          // isSpy / locationName / role arrive only on spyfall_private. A
+          // naive replace from the public broadcast would blank the player's
+          // own secret every time anyone did anything.
+          const next = sub as SpyfallState;
+          setSpyfallState((prev) => ({
+            ...next,
+            isSpy: next.isSpy ?? prev?.isSpy,
+            locationId: next.locationId ?? prev?.locationId,
+            locationName: next.locationName ?? prev?.locationName,
+            role: next.role ?? prev?.role,
+          }));
+          break;
+        }
         default:
           // Arcade-style games (tetris, snake, fighter, ...) render straight
           // from the party envelope and keep no dedicated slot.
@@ -743,6 +776,41 @@ export const [GameProvider, useGame] = createContextHook(() => {
     return res.games ?? [];
   }, [emitWithAck]);
 
+  // ===== Spyfall =====
+  // The game itself is spoken; these are only the moves the server arbitrates.
+
+  const spyfallAccuse = useCallback(
+    async (targetId: string) => {
+      if (!myRoomId) throw new Error("Not in a room");
+      await emitWithAck("spyfall_accuse", { targetId });
+    },
+    [myRoomId, emitWithAck],
+  );
+
+  const spyfallVote = useCallback(
+    async (agree: boolean) => {
+      if (!myRoomId) throw new Error("Not in a room");
+      await emitWithAck("spyfall_vote", { agree });
+    },
+    [myRoomId, emitWithAck],
+  );
+
+  const spyfallGuess = useCallback(
+    async (locationId: string) => {
+      if (!myRoomId) throw new Error("Not in a room");
+      await emitWithAck("spyfall_guess", { locationId });
+    },
+    [myRoomId, emitWithAck],
+  );
+
+  const spyfallPass = useCallback(
+    async (toPlayerId: string) => {
+      if (!myRoomId) throw new Error("Not in a room");
+      await emitWithAck("spyfall_pass", { toPlayerId });
+    },
+    [myRoomId, emitWithAck],
+  );
+
   const sendWebRTCSignal = useCallback(
     (targetId: string, signal: unknown) => {
       if (!myRoomId) return;
@@ -804,6 +872,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
     higherLowerState,
     dominoState,
     rentoState,
+    spyfallState,
     myHand,
     isConnected,
     myPlayerId,
@@ -848,5 +917,9 @@ export const [GameProvider, useGame] = createContextHook(() => {
     partyReturnHub,
     partyLeave,
     loadGameCatalog,
+    spyfallAccuse,
+    spyfallVote,
+    spyfallGuess,
+    spyfallPass,
   } satisfies GameContextValue;
 });

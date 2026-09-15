@@ -15,7 +15,8 @@
     "test:party": "node test/party.e2e.mjs",
     "test:domino": "node test/domino.test.mjs",
     "test": "npm run build && npm run test:domino && npm run test:domino-sim",
-    "test:domino-sim": "node test/domino.sim.mjs"
+    "test:domino-sim": "node test/domino.sim.mjs",
+    "test:spyfall": "node test/spyfall.e2e.mjs"
   },
   "dependencies": {
     "cors": "^2.8.5",

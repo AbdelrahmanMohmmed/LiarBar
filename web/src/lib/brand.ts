@@ -199,6 +199,29 @@ export const GAMES: GameMeta[] = [
     art: "/art/games/domino.webp",
   },
   {
+    id: "spyfall",
+    name: { en: "Spyfall", ar: "برا اللعبة" },
+    blurb: {
+      en: "Everyone knows where they are. One of you is guessing.",
+      ar: "الكل عارف هما فين. واحد فيكم بيخمّن.",
+    },
+    description: {
+      en: "Everyone gets the same place and a role in it — except the spy, who gets nothing. Ask each other questions until someone gives themselves away. The whole game is the conversation, so it lives or dies on voice chat.",
+      ar: "الكل بياخد نفس المكان ودور فيه — ما عدا الجاسوس، اللي مبياخدش حاجة. اسألوا بعض لحد ما حد يفضح نفسه. اللعبة كلها كلام، فهي عايزة المايك مفتوح.",
+    },
+    category: "party",
+    status: "live",
+    minPlayers: 3,
+    maxPlayers: 10,
+    minutes: [8, 20],
+    path: "/spyfall",
+    emoji: "🕶️",
+    accent: "ruby",
+    voiceMatters: true,
+    supportsBots: false,
+    art: "/art/games/spyfall.webp",
+  },
+  {
     id: "liars-bar",
     name: { en: "Liar's Bar", ar: "أشك" },
     blurb: {
@@ -295,6 +318,7 @@ export const GAMES: GameMeta[] = [
 /** Games available inside a party room, in the order they should be offered. */
 export const PARTY_GAME_IDS = [
   "domino",
+  "spyfall",
   "liars-bar",
   "codenames",
   "higher-lower",

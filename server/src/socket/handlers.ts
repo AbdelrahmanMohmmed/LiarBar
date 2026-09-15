@@ -27,6 +27,7 @@ import { MemoryPuzzleGame } from "../games/memory-puzzle/MemoryPuzzleGame.js";
 import { TetrisGame } from "../games/tetris/TetrisGame.js";
 import { RentoGame } from "../games/rento/RentoGame.js";
 import { SnakeLadderGame } from "../games/snake-ladder/SnakeLadderGame.js";
+import { SpyfallGame } from "../games/spyfall/SpyfallGame.js";
 
 type Ack = ((response: unknown) => void) | undefined;
 
@@ -134,6 +135,7 @@ export function registerSocketHandlers(
     const tetrisMembership = makeMembership(TetrisGame);
     const rentoMembership = makeMembership(RentoGame);
     const snakeLadderMembership = makeMembership(SnakeLadderGame);
+    const spyfallMembership = makeMembership(SpyfallGame, { resolvePlayer: true });
 
     // ===== ROOM LIFECYCLE =====
 
@@ -968,6 +970,60 @@ export function registerSocketHandlers(
         return;
       }
       reply(callback, { success: true, dice: result.dice });
+    });
+
+    // ===== GAMEPLAY (Spyfall) =====
+    //
+    // The whole game happens in the voice channel; these events only move the
+    // few pieces of state the server has to arbitrate — who's being accused,
+    // who agreed, and what the spy thinks the location is.
+
+    socket.on("spyfall_pass", (data: { toPlayerId?: string }, callback: Ack) => {
+      const m = spyfallMembership(callback);
+      if (!m) return;
+      const result = m.room.passQuestion(m.player.id, String(data?.toPlayerId ?? ""));
+      if (!result.success) {
+        fail(callback, result.error ?? "Cannot pass the question");
+        return;
+      }
+      reply(callback, { success: true });
+    });
+
+    socket.on("spyfall_accuse", (data: { targetId?: string }, callback: Ack) => {
+      const m = spyfallMembership(callback);
+      if (!m) return;
+      const result = m.room.accuse(m.player.id, String(data?.targetId ?? ""));
+      if (!result.success) {
+        fail(callback, result.error ?? "Cannot accuse");
+        return;
+      }
+      reply(callback, { success: true });
+    });
+
+    socket.on("spyfall_vote", (data: { agree?: boolean }, callback: Ack) => {
+      const m = spyfallMembership(callback);
+      if (!m) return;
+      const result = m.room.castVote(m.player.id, data?.agree === true);
+      if (!result.success) {
+        fail(callback, result.error ?? "Cannot vote");
+        return;
+      }
+      reply(callback, { success: true });
+    });
+
+    socket.on("spyfall_guess", (data: { locationId?: string }, callback: Ack) => {
+      const m = spyfallMembership(callback);
+      if (!m) return;
+      const result = m.room.guessLocation(m.player.id, String(data?.locationId ?? ""));
+      if (!result.success) {
+        fail(callback, result.error ?? "Cannot guess");
+        return;
+      }
+      // The reveal contains everyone's secret, so private state must go out
+      // again immediately — otherwise the spy's own screen still says "you are
+      // the spy" while everyone else is looking at the result.
+      sendPrivateHands(io, m.room);
+      reply(callback, { success: true });
     });
 
     // ===== PARTY =====

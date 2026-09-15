@@ -111,6 +111,23 @@ export const GAME_SPECS: Record<string, GameSpec> = {
     validate: (o) => oneOf(o.language, ["ar", "en"], "Language"),
   },
 
+  spyfall: {
+    id: "spyfall",
+    minPlayers: 3,
+    maxPlayers: 10,
+    seating: "party",
+    // No bots, and not for lack of effort: the whole game is unstructured
+    // conversation. A bot would have to ask a plausible question, evaluate a
+    // spoken answer, and lie under questioning. A silent bot is worse than an
+    // empty seat — it looks like a player who stopped responding and the table
+    // wastes the round suspecting it.
+    bots: false,
+    voiceMatters: true,
+    validate: (o) =>
+      intInRange(o.roundSeconds, 120, 900, "Round length") ??
+      intInRange(o.targetScore, 3, 20, "Target score"),
+  },
+
   "higher-lower": {
     id: "higher-lower",
     minPlayers: 2,
@@ -208,6 +225,7 @@ export const GAME_SPECS: Record<string, GameSpec> = {
 /** Ids a party can switch into, in the order the picker should show them. */
 export const PARTY_GAME_ORDER = [
   "domino",
+  "spyfall",
   "liars-bar",
   "codenames",
   "higher-lower",
