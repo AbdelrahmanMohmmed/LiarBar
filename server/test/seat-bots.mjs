@@ -30,9 +30,18 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const clients = [];
 
 function act(socket, self) {
+  // Bluff decides what a seat may do from private fields (what you wrote, and
+  // which option is your own), and those never ride on the public broadcast.
+  // Merging the last private payload in is enough for a scripted seat.
+  socket.on("bluff_private", (st) => {
+    self.private = st;
+  });
+
   socket.on("game_state", async (envelope) => {
-    const state = envelope?.gameId === "party" ? envelope.subGameState : envelope;
-    if (!state) return;
+    const base = envelope?.gameId === "party" ? envelope.subGameState : envelope;
+    if (!base) return;
+    const state =
+      base.gameId === "bluff" && self.private ? { ...self.private, ...base } : base;
 
     // Small human-ish delay, and a guard so overlapping broadcasts don't make
     // the same seat act twice for one phase.
@@ -71,6 +80,22 @@ function act(socket, self) {
           const team = mine % 2 === 0 ? "red" : "teal";
           const role = mine < 2 ? "spymaster" : "operative";
           send("codenames_join_team", { team, role });
+        }
+        break;
+
+      case "bluff":
+        // Bluff has no bots and needs three players, so a solo tester can't
+        // reach the choosing screen at all without these. The "lies" are
+        // deliberately obvious nonsense — the point is to advance the phase,
+        // not to make the round fair.
+        if (state.phase === "writing" && !state.myAnswer) {
+          send("bluff_answer", {
+            answer: pick(["a brass bell", "Malta", "seventeen goats", "a wooden spoon"]) +
+              " " + Math.floor(Math.random() * 99),
+          });
+        } else if (state.phase === "choosing" && !state.myChoiceId) {
+          const notMine = (state.options || []).filter((o) => o.id !== state.myOptionId);
+          if (notMine.length) send("bluff_choose", { optionId: pick(notMine).id });
         }
         break;
 

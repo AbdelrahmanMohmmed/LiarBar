@@ -245,6 +245,31 @@ export const GAMES: GameMeta[] = [
     art: "/art/games/chameleon.webp",
   },
   {
+    id: "bluff",
+    name: { en: "Bluff", ar: "بلوف" },
+    blurb: {
+      en: "Invent the truth. Then spot the real one.",
+      ar: "اخترع الحقيقة. وبعدين القط الصح.",
+    },
+    description: {
+      en: "A sentence with one word missing. Everyone types an answer they made up, and then all of them are shuffled in with the real one. Score for finding the truth, and for every friend who falls for your lie. The funniest thing in the round is always something somebody at the table wrote.",
+      ar: "جملة ناقصها كلمة. كل واحد يكتب إجابة من مخّه، وبعدين كلها تتخلط مع الإجابة الحقيقية. تاخد نقط لما تلاقي الصح، وتاخد أكتر على كل صاحب يصدّق كذبتك. وأحلى حاجة في الجولة دايماً حد من اللي قاعدين كاتبها.",
+    },
+    category: "party",
+    status: "live",
+    minPlayers: 3,
+    maxPlayers: 10,
+    minutes: [10, 20],
+    path: "/bluff",
+    emoji: "🤥",
+    accent: "gold",
+    // The only party game here that works with the mics off: everything that
+    // matters is typed. Voice makes it funnier; it isn't load-bearing.
+    voiceMatters: false,
+    supportsBots: false,
+    art: "/art/games/bluff.webp",
+  },
+  {
     id: "wyr",
     name: { en: "Would You Rather", ar: "لو خيّروك" },
     blurb: {
@@ -366,6 +391,7 @@ export const PARTY_GAME_IDS = [
   "domino",
   "spyfall",
   "chameleon",
+  "bluff",
   "wyr",
   "liars-bar",
   "codenames",

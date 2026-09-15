@@ -32,6 +32,7 @@ const PRIVATE_STATE_EVENTS: Record<string, string> = {
   spyfall: "spyfall_private",
   chameleon: "chameleon_private",
   wyr: "wyr_private",
+  bluff: "bluff_private",
 };
 
 /**

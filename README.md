@@ -127,6 +127,7 @@ impossible to look at in a browser on your own.
 | **Spyfall** — برا اللعبة | 3–10 | Everyone knows the place except the spy. 30 locations, pure conversation |
 | **Chameleon** — الحرباية | 3–10 | One word each. 12 topic grids. Ninety-second rounds |
 | **Would You Rather** — لو خيّروك | 3–10 | Not what you'd pick — what your friends think you'd pick |
+| **Bluff** — بلوف | 3–10 | Invent the missing word, then spot the real one. 38 prompts, both languages |
 | **Liar's Bar** | 2–6 | Bluffing card game. Cards or dominoes variant |
 | **Codenames** | 4–10 | Fully bilingual — the whole board plays in Arabic or English |
 | **Higher or Lower** | 2–6 | Fast number-guessing race |

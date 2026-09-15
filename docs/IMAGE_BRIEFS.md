@@ -175,6 +175,45 @@ relatively quiet — the card overlays text there.
 >
 > [style block]
 
+### 2.6 Spyfall — `web/public/art/games/spyfall.webp`
+
+> A dark table seen from above with eight small cream cards face-down in a loose
+> ring, one card slightly out of line and turned a fraction toward the viewer.
+> Several hands rest on the table, relaxed, mid-conversation. One hand hovers
+> just above its card without touching it. The light is low and even — nobody is
+> singled out, which is the point.
+>
+> [style block]
+
+### 2.7 Chameleon — `web/public/art/games/chameleon.webp`
+
+> A four-by-four grid of small cream word-cards on a dark surface, viewed at a
+> slight angle. Deliberately leave the cards blank — no words. One card in the
+> grid catches a shaft of warmer light. Four hands at the edges of frame, one
+> pointing at a card, another pulled back. A single stylised chameleon eye motif
+> would be too literal — avoid it.
+>
+> [style block]
+
+### 2.8 Would You Rather — `web/public/art/games/wyr.webp`
+
+> Two large cream cards lying side by side on a warm near-black surface, both
+> blank, one tilted slightly and lit a fraction brighter than the other. A hand
+> hovers between them, fingers apart, not yet committed. Nothing else in frame.
+> The whole image should read as a decision being postponed.
+>
+> [style block]
+
+### 2.9 Bluff — `web/public/art/games/bluff.webp`
+
+> Five or six small cream cards laid in a vertical stack on a dark surface, each
+> with a single handwritten line of ink on it — the writing should be illegible
+> scribble, not readable words. One card in the middle is subtly cleaner and
+> straighter than the others, as though it were printed rather than written. Two
+> hands at the edges, one holding a pen. Warm lamp light from the upper left.
+>
+> [style block]
+
 ---
 
 ## Priority 3 — TikTok and social

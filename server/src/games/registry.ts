@@ -20,6 +20,7 @@ import { RentoGame } from "./rento/RentoGame.js";
 import { SnakeLadderGame } from "./snake-ladder/SnakeLadderGame.js";
 import { SpyfallGame } from "./spyfall/SpyfallGame.js";
 import { ChameleonGame } from "./chameleon/ChameleonGame.js";
+import { BluffGame } from "./bluff/BluffGame.js";
 import { WyrGame } from "./wyr/WyrGame.js";
 import type { Lang } from "./codenames/board.js";
 
@@ -57,6 +58,8 @@ export interface CreateRoomOptions {
   roundSeconds?: number;
   // Memory Puzzle options
   difficulty?: "easy" | "medium" | "hard";
+  // Bluff options
+  rounds?: number;
 }
 
 export type GameFactory = (
@@ -231,6 +234,16 @@ registerGame("chameleon", (roomId, options, callbacks) => {
     options.maxPlayers,
     callbacks,
     Number(options.targetScore) || 8,
+  );
+});
+
+registerGame("bluff", (roomId, options, callbacks) => {
+  return new BluffGame(
+    roomId,
+    options.maxPlayers,
+    callbacks,
+    Number(options.rounds) || 5,
+    options.language === "en" ? "en" : "ar",
   );
 });
 

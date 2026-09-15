@@ -106,6 +106,7 @@ const MIDGAME_OK = new Set([
   "guess",
   "guessing",
   "choosing",
+  "writing",
   "predicting",
   "paused",
 ]);

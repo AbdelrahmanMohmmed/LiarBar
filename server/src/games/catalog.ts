@@ -141,6 +141,24 @@ export const GAME_SPECS: Record<string, GameSpec> = {
     validate: (o) => intInRange(o.targetScore, 4, 30, "Target score"),
   },
 
+  bluff: {
+    id: "bluff",
+    minPlayers: 3,
+    maxPlayers: 10,
+    seating: "party",
+    // No bots. A bot would have to write a lie convincing enough to fool
+    // people who know each other, and then guess — which is both halves of
+    // the game rather than a supporting task.
+    bots: false,
+    // Playable in silence, unlike Spyfall or Chameleon: everything that
+    // matters is typed. Voice makes it much funnier, but it isn't load-bearing,
+    // which makes this the one party game that survives a bad connection.
+    voiceMatters: false,
+    validate: (o) =>
+      intInRange(o.rounds, 3, 12, "Rounds") ??
+      oneOf(o.language, ["ar", "en"], "Language"),
+  },
+
   wyr: {
     id: "wyr",
     minPlayers: 3,
@@ -252,6 +270,7 @@ export const PARTY_GAME_ORDER = [
   "domino",
   "spyfall",
   "chameleon",
+  "bluff",
   "wyr",
   "liars-bar",
   "codenames",

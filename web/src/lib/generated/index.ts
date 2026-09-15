@@ -10,6 +10,7 @@
  * be caught rather than silently diverging from what the server actually sends.
  */
 
+export * from "./bluff";
 export * from "./chameleon";
 export * from "./domino";
 export * from "./party";

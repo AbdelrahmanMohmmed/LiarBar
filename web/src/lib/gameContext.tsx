@@ -29,6 +29,7 @@ import type {
 import type { SpyfallState } from "./spyfallTypes";
 import type { ChameleonState } from "./chameleonTypes";
 import type { WyrState, WyrChoice } from "./wyrTypes";
+import type { BluffState } from "./bluffTypes";
 
 /**
  * Everything the client can ask the server to do about a room.
@@ -81,6 +82,9 @@ export interface CreateRoomInput {
 
   // Spyfall
   roundSeconds?: number;
+
+  // Bluff
+  rounds?: number;
 }
 
 interface GameActions {
@@ -148,6 +152,11 @@ interface GameActions {
   chameleonGuess: (index: number) => Promise<void>;
   wyrChoose: (choice: WyrChoice) => Promise<void>;
   wyrPredict: (choice: WyrChoice) => Promise<void>;
+  /** Bluff: submit the answer you invented. Replaces it if you write again. */
+  bluffAnswer: (answer: string) => Promise<void>;
+  /** Bluff: pick the answer you believe. Never your own. */
+  bluffChoose: (optionId: string) => Promise<void>;
+  bluffRematch: () => Promise<void>;
 }
 
 interface GameContextValue extends GameActions {
@@ -174,6 +183,7 @@ interface GameContextValue extends GameActions {
   spyfallState: SpyfallState | null;
   chameleonState: ChameleonState | null;
   wyrState: WyrState | null;
+  bluffState: BluffState | null;
   myHand: Card[];
   isConnected: boolean;
   myPlayerId: string | null;
@@ -196,7 +206,8 @@ export type AnyRoomState =
   | RentoState
   | SpyfallState
   | ChameleonState
-  | WyrState;
+  | WyrState
+  | BluffState;
 
 // Local storage keys. Prefixed by brand id so a rename doesn't silently
 // resurrect a stale room from a previous build.
@@ -244,6 +255,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
   const [spyfallState, setSpyfallState] = useState<SpyfallState | null>(null);
   const [chameleonState, setChameleonState] = useState<ChameleonState | null>(null);
   const [wyrState, setWyrState] = useState<WyrState | null>(null);
+  const [bluffState, setBluffState] = useState<BluffState | null>(null);
   const [myHand, setMyHand] = useState<Card[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [myPlayerId, setMyPlayerId] = useState<string | null>(null);
@@ -296,6 +308,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
     setSpyfallState(null);
     setChameleonState(null);
     setWyrState(null);
+    setBluffState(null);
     setMyHand([]);
     setChatMessages([]);
     setToasts([]);
@@ -366,6 +379,10 @@ export const [GameProvider, useGame] = createContextHook(() => {
       setWyrState(state);
     };
 
+    const onBluffPrivate = (state: BluffState) => {
+      setBluffState(state);
+    };
+
     const onChatMessage = (msg: ChatMessage) => {
       setChatMessages((prev) => [...prev.slice(-99), msg]);
     };
@@ -401,6 +418,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
     socket.on("spyfall_private", onSpyfallPrivate);
     socket.on("chameleon_private", onChameleonPrivate);
     socket.on("wyr_private", onWyrPrivate);
+    socket.on("bluff_private", onBluffPrivate);
     socket.on("chat_message", onChatMessage);
     socket.on("webrtc_signal", onWebRTCSignal);
     socket.on("session_superseded", onSuperseded);
@@ -426,6 +444,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
       socket.off("spyfall_private", onSpyfallPrivate);
       socket.off("chameleon_private", onChameleonPrivate);
       socket.off("wyr_private", onWyrPrivate);
+      socket.off("bluff_private", onBluffPrivate);
       socket.off("chat_message", onChatMessage);
       socket.off("webrtc_signal", onWebRTCSignal);
       socket.off("session_superseded", onSuperseded);
@@ -469,6 +488,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
         if (keep !== "spyfall") setSpyfallState(null);
         if (keep !== "chameleon") setChameleonState(null);
         if (keep !== "wyr") setWyrState(null);
+        if (keep !== "bluff") setBluffState(null);
       };
 
       if (!gameId || !sub) {
@@ -546,6 +566,20 @@ export const [GameProvider, useGame] = createContextHook(() => {
             isSubject: next.isSubject ?? prev?.isSubject,
             myAnswer: next.myAnswer ?? prev?.myAnswer ?? null,
             myPrediction: next.myPrediction ?? prev?.myPrediction ?? null,
+          }));
+          break;
+        }
+        case "bluff": {
+          // myAnswer / myOptionId / myChoiceId arrive only on bluff_private.
+          // myOptionId is the one option you may not pick, so losing it to a
+          // public update doesn't just look wrong — it lets you vote for your
+          // own lie, and the server rejects it with an error you can't explain.
+          const next = sub as BluffState;
+          setBluffState((prev) => ({
+            ...next,
+            myAnswer: next.myAnswer ?? prev?.myAnswer ?? null,
+            myOptionId: next.myOptionId ?? prev?.myOptionId ?? null,
+            myChoiceId: next.myChoiceId ?? prev?.myChoiceId ?? null,
           }));
           break;
         }
@@ -952,6 +986,27 @@ export const [GameProvider, useGame] = createContextHook(() => {
     [myRoomId, emitWithAck],
   );
 
+  const bluffAnswer = useCallback(
+    async (answer: string) => {
+      if (!myRoomId) throw new Error("Not in a room");
+      await emitWithAck("bluff_answer", { answer });
+    },
+    [myRoomId, emitWithAck],
+  );
+
+  const bluffChoose = useCallback(
+    async (optionId: string) => {
+      if (!myRoomId) throw new Error("Not in a room");
+      await emitWithAck("bluff_choose", { optionId });
+    },
+    [myRoomId, emitWithAck],
+  );
+
+  const bluffRematch = useCallback(async () => {
+    if (!myRoomId) throw new Error("Not in a room");
+    await emitWithAck("bluff_rematch", {});
+  }, [myRoomId, emitWithAck]);
+
   const sendWebRTCSignal = useCallback(
     (targetId: string, signal: unknown) => {
       if (!myRoomId) return;
@@ -1022,6 +1077,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
     spyfallState,
     chameleonState,
     wyrState,
+    bluffState,
     myHand,
     isConnected,
     myPlayerId,
@@ -1076,5 +1132,8 @@ export const [GameProvider, useGame] = createContextHook(() => {
     chameleonGuess,
     wyrChoose,
     wyrPredict,
+    bluffAnswer,
+    bluffChoose,
+    bluffRematch,
   } satisfies GameContextValue;
 });

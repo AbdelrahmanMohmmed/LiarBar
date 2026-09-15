@@ -35,6 +35,7 @@ import { RentoGame } from "../games/rento/RentoGame.js";
 import { SnakeLadderGame } from "../games/snake-ladder/SnakeLadderGame.js";
 import { SpyfallGame } from "../games/spyfall/SpyfallGame.js";
 import { ChameleonGame } from "../games/chameleon/ChameleonGame.js";
+import { BluffGame } from "../games/bluff/BluffGame.js";
 import { WyrGame } from "../games/wyr/WyrGame.js";
 
 type Ack = ((response: unknown) => void) | undefined;
@@ -147,6 +148,7 @@ export function registerSocketHandlers(
     const spyfallMembership = makeMembership(SpyfallGame, { resolvePlayer: true });
     const chameleonMembership = makeMembership(ChameleonGame, { resolvePlayer: true });
     const wyrMembership = makeMembership(WyrGame, { resolvePlayer: true });
+    const bluffMembership = makeMembership(BluffGame, { resolvePlayer: true });
 
     // ===== ROOM LIFECYCLE =====
 
@@ -1137,6 +1139,46 @@ export function registerSocketHandlers(
       }
       // The reveal makes every secret public, so private state must go back
       // out or the chameleon's own screen still says "you don't know the word".
+      sendPrivateHands(io, m.room);
+      reply(callback, { success: true });
+    });
+
+    // ===== GAMEPLAY (Bluff) =====
+
+    socket.on("bluff_answer", (data: { answer?: string }, callback: Ack) => {
+      const m = bluffMembership(callback);
+      if (!m) return;
+      const result = m.room.submitAnswer(m.player.id, String(data?.answer ?? ""));
+      if (!result.success) {
+        fail(callback, result.error ?? "Cannot submit that");
+        return;
+      }
+      // What you wrote is yours alone until the reveal, and the option id you
+      // may not pick is derived from it — both live on the private channel.
+      sendPrivateHands(io, m.room);
+      reply(callback, { success: true });
+    });
+
+    socket.on("bluff_choose", (data: { optionId?: string }, callback: Ack) => {
+      const m = bluffMembership(callback);
+      if (!m) return;
+      const result = m.room.choose(m.player.id, String(data?.optionId ?? ""));
+      if (!result.success) {
+        fail(callback, result.error ?? "Cannot choose that");
+        return;
+      }
+      sendPrivateHands(io, m.room);
+      reply(callback, { success: true });
+    });
+
+    socket.on("bluff_rematch", (_data: unknown, callback: Ack) => {
+      const m = bluffMembership(callback);
+      if (!m) return;
+      const result = m.room.rematch(m.player.id);
+      if (!result.success) {
+        fail(callback, result.error ?? "Cannot restart");
+        return;
+      }
       sendPrivateHands(io, m.room);
       reply(callback, { success: true });
     });
