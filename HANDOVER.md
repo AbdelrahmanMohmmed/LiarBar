@@ -65,13 +65,15 @@ Party 482915  ← the code, all night
 
 | Game | Players | Why it's here |
 |---|---|---|
-| **Domino** (rebuilt) | 2–4 | Egyptian street rules. Knock memory panel makes it readable |
+| **Domino** (rebuilt) | 2–4 | Egyptian street rules. The knock-memory panel is what makes it readable |
 | **Spyfall** — برا اللعبة | 3–10 | Pure conversation — the best possible fit for a voice product. 30 locations, culturally local |
-| **Chameleon** — الحرباية | 3–10 | 90-second rounds. 12 topic grids, Arabic written alongside English rather than from it |
+| **Chameleon** — الحرباية | 3–10 | One word each, 90-second rounds. 12 topic grids |
+| **Would You Rather** — لو خيّروك | 3–10 | Not what you'd pick — what your friends think you'd pick. The reveal is a screenshot every time |
 
-Both new games have no bots, deliberately — a bot that can't bluff under
+None of the three has bots, deliberately — a bot that can't bluff under
 questioning is worse than an empty seat, because it looks like a player who
-stopped responding and the table wastes the round suspecting it.
+stopped responding and the table wastes the round suspecting it. Use
+`node test/seat-bots.mjs <CODE>` if you want to look at them alone.
 
 ---
 
@@ -109,6 +111,36 @@ which looked exactly like "the game thinks I'm stuck".
 **`createRoom` had 23 positional parameters.** The new domino page's "karak"
 toggle was wired to nothing — no 24th slot, value silently dropped, no type
 error. Now an options object.
+
+---
+
+## Found by actually playing it in a browser
+
+The socket-level tests all passed. These only showed up by driving the real UI,
+which is worth knowing when you're deciding how much to trust a green test run.
+
+**Switching games from inside a game did nothing visible.** The switch button is
+on every page; the code that *navigated* to the new game was only on the hub. So
+the server moved on and everyone kept staring at the old board. That's the
+headline feature, half-broken, with no error.
+
+**Seven of twelve games showed a "join this lobby" form** to players who were
+already in the room — every arcade game, because the shared lobby shell predates
+parties and didn't recognise one.
+
+**The language reset on every page load.** An Arabic speaker had to toggle every
+single time, including on the invite link they just tapped. Now remembered, and
+defaulted from the browser's own languages.
+
+**The domino board labelled its ends "LEFT" and "RIGHT"** — which in Arabic sat
+on the opposite sides of the screen from the words. The labels are gone; you tap
+the end you can see.
+
+**Opening a room in a second tab left the first one a zombie** — still receiving
+updates, showing you as offline, no way to work out why. It now says so.
+
+There is now a `npm run test:live` suite covering the connection-level scenarios
+these came from: refresh mid-game, second tab, host leaves, latecomer joins.
 
 ---
 
