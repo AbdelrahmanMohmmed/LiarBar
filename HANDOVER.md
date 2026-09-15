@@ -69,11 +69,21 @@ Party 482915  ← the code, all night
 | **Spyfall** — برا اللعبة | 3–10 | Pure conversation — the best possible fit for a voice product. 30 locations, culturally local |
 | **Chameleon** — الحرباية | 3–10 | One word each, 90-second rounds. 12 topic grids |
 | **Would You Rather** — لو خيّروك | 3–10 | Not what you'd pick — what your friends think you'd pick. The reveal is a screenshot every time |
+| **Bluff** — بلوف | 3–10 | Everyone invents the missing word, then tries to spot the real one. The first game here where the players make the content |
+| **Taboo** — تابو | 4–12 | Describe the word without saying the four under it. **Start here if you only try one** |
 
-None of the three has bots, deliberately — a bot that can't bluff under
+**Taboo is the one to show people.** Every other game is *better* with voice;
+that one doesn't exist without it — the whole round is somebody talking fast
+while a room shouts over them — so it is the clearest possible argument for the
+thing this product has that a board-game site doesn't. It is also the game your
+friends have most likely already played in a living room, so nobody has to be
+taught it. Teams are drawn automatically, so it starts on one tap.
+
+None of the five has bots, deliberately — a bot that can't bluff under
 questioning is worse than an empty seat, because it looks like a player who
 stopped responding and the table wastes the round suspecting it. Use
-`node test/seat-bots.mjs <CODE>` if you want to look at them alone.
+`node test/seat-bots.mjs <CODE>` if you want to look at them alone; it can now
+drive Codenames, Bluff and Taboo too.
 
 ---
 
@@ -139,6 +149,18 @@ the end you can see.
 **Opening a room in a second tab left the first one a zombie** — still receiving
 updates, showing you as offline, no way to work out why. It now says so.
 
+**Domino was unplayable by a human.** On your turn every tile rendered dimmed,
+both ends were disabled, and the only control on screen was "Knock". Every turn,
+for every player, in every match — and the turn timer then played a legal move
+on your behalf, which is how a match still reached a conclusion and is why
+nothing caught it. The list of legal moves is defined as "your legal plays, *if
+it is your turn*", and it was pushed while the previous player's move was being
+finished. It was correctly empty, and nothing re-sent it once the turn arrived.
+
+Worth dwelling on: three test suites passed throughout. They all exercise the
+public state, which was right. The list only ever travels on the private channel
+and only a real client reads it. That's what `test/domino.e2e.mjs` is for now.
+
 **Seven of twelve games rendered a blank screen** once the lobby form was out
 of the way — every arcade game again, for a different reason. They read their
 state from the lobby container and only the lobby container, and in a party the
@@ -171,6 +193,24 @@ covered it and three of the four players.
 canonical URL and `index, follow` alike — because the head is shared and only
 fourteen pages set it. Rooms opened from the landing page claimed to *be* the
 landing page, which is a good way to rank for nothing.
+
+**The Liar's Bar table was never translated.** "Empty pile", "(you)", "Your
+hand — 13 cards", "Wait for your turn", "Make Claim" — the seven strings a
+player looks at most, sitting on an otherwise fully Arabic screen. The game-over
+overlay, which is the last thing every player sees at the end of every match,
+was entirely in English too. So was the mic control's "3 online", on four
+different game headers, which an RTL line reorders to read "online 3".
+
+**The Liar's Bar chat pill sat with 156 of its 343 pixels off the screen**, in
+both languages, for as long as its slide-away animation has existed. It centres
+itself with a `-translate-x-1/2` class, and an inline `transform: translateY(…)`
+silently replaced it — `transform` is one property, not two.
+
+**A deploy landing mid-session turned the next page white.** New build, new
+chunk filenames, old ones no longer served; a player already in a room who
+navigates to a page they haven't loaded yet gets a 404 on the import and React
+unmounts the tree. No message, nothing suggesting a refresh would fix it, on a
+game night.
 
 There is now a `npm run test:live` suite covering the connection-level scenarios
 these came from: refresh mid-game, second tab, host leaves, latecomer joins,
@@ -286,6 +326,10 @@ cost. I'd do this before posting a single TikTok.
   a moderation department. Read §5 and §9 of MATCHMAKING.md before starting it.
 - **Generate images.** I can't produce raster art; every one is specified
   instead, with a fallback already shipping.
+- **Translate the standalone lobby menu.** ~57 English strings live on
+  `/lobby/:code`'s settings screen. None of them are reachable from a party —
+  that flow routes to its own hub — so they only appear on the pre-party path,
+  which is on its way out. Worth doing only if you decide to keep that path.
 
 ---
 
@@ -297,8 +341,28 @@ cd web    && npm install && npm run dev     # :5173
 ```
 
 ```bash
-cd server && npm test          # types check, engine contracts, domino rules, 60-match sim
-cd server && npm run test:party      # needs the server running
-cd server && npm run test:spyfall    # needs the server running
-cd server && npm run test:chameleon  # needs the server running
+cd server && npm test        # offline: types, engine contracts, domino rules, 60-match sim
+cd server && npm run test:live   # everything below, in order — needs the server running
 ```
+
+The live suite is eight files and takes a few minutes, because two of them
+deliberately sit and watch a clock run out. Individually:
+
+```bash
+npm run test:party        # the party model: switch, rematch, hub, invite preview
+npm run test:lifecycle    # phones: refresh mid-game, second tab, host leaves, latecomer
+npm run test:spyfall
+npm run test:chameleon
+npm run test:wyr
+npm run test:bluff
+npm run test:taboo
+npm run test:domino:live  # the private slice — the one the other domino tests can't see
+```
+
+**Why there are two kinds of test.** The offline ones prove rules and finish in
+seconds. The live ones prove the *wire*: what each individual socket actually
+receives, which is where almost every real bug in this project has been. The
+single worst bug found this session — domino being unplayable by a human —
+passed all three offline domino suites, because the rules were right and the
+public state was right and the thing that was wrong only ever travels on the
+private channel.
