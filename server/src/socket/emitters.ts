@@ -30,6 +30,7 @@ const PRIVATE_STATE_EVENTS: Record<string, string> = {
   "higher-lower": "higher_lower_private",
   domino: "domino_private",
   spyfall: "spyfall_private",
+  chameleon: "chameleon_private",
 };
 
 /**

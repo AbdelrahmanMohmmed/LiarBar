@@ -29,6 +29,7 @@ import { TetrisGame } from "../games/tetris/TetrisGame.js";
 import { RentoGame } from "../games/rento/RentoGame.js";
 import { SnakeLadderGame } from "../games/snake-ladder/SnakeLadderGame.js";
 import { SpyfallGame } from "../games/spyfall/SpyfallGame.js";
+import { ChameleonGame } from "../games/chameleon/ChameleonGame.js";
 
 type Ack = ((response: unknown) => void) | undefined;
 
@@ -138,6 +139,7 @@ export function registerSocketHandlers(
     const rentoMembership = makeMembership(RentoGame);
     const snakeLadderMembership = makeMembership(SnakeLadderGame);
     const spyfallMembership = makeMembership(SpyfallGame, { resolvePlayer: true });
+    const chameleonMembership = makeMembership(ChameleonGame, { resolvePlayer: true });
 
     // ===== ROOM LIFECYCLE =====
 
@@ -1024,6 +1026,44 @@ export function registerSocketHandlers(
       // The reveal contains everyone's secret, so private state must go out
       // again immediately — otherwise the spy's own screen still says "you are
       // the spy" while everyone else is looking at the result.
+      sendPrivateHands(io, m.room);
+      reply(callback, { success: true });
+    });
+
+    // ===== GAMEPLAY (Chameleon) =====
+
+    socket.on("chameleon_clue", (data: { clue?: string }, callback: Ack) => {
+      const m = chameleonMembership(callback);
+      if (!m) return;
+      const result = m.room.submitClue(m.player.id, String(data?.clue ?? ""));
+      if (!result.success) {
+        fail(callback, result.error ?? "Cannot give that clue");
+        return;
+      }
+      reply(callback, { success: true });
+    });
+
+    socket.on("chameleon_vote", (data: { targetId?: string }, callback: Ack) => {
+      const m = chameleonMembership(callback);
+      if (!m) return;
+      const result = m.room.vote(m.player.id, String(data?.targetId ?? ""));
+      if (!result.success) {
+        fail(callback, result.error ?? "Cannot vote");
+        return;
+      }
+      reply(callback, { success: true });
+    });
+
+    socket.on("chameleon_guess", (data: { index?: number }, callback: Ack) => {
+      const m = chameleonMembership(callback);
+      if (!m) return;
+      const result = m.room.guessWord(m.player.id, Number(data?.index));
+      if (!result.success) {
+        fail(callback, result.error ?? "Cannot guess");
+        return;
+      }
+      // The reveal makes every secret public, so private state must go back
+      // out or the chameleon's own screen still says "you don't know the word".
       sendPrivateHands(io, m.room);
       reply(callback, { success: true });
     });

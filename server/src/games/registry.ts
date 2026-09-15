@@ -19,6 +19,7 @@ import { TetrisGame } from "./tetris/TetrisGame.js";
 import { RentoGame } from "./rento/RentoGame.js";
 import { SnakeLadderGame } from "./snake-ladder/SnakeLadderGame.js";
 import { SpyfallGame } from "./spyfall/SpyfallGame.js";
+import { ChameleonGame } from "./chameleon/ChameleonGame.js";
 import type { Lang } from "./codenames/board.js";
 
 /**
@@ -212,6 +213,15 @@ registerGame("rento", (roomId, options, callbacks) => {
 
 registerGame("snake-ladder", (roomId, options, callbacks) => {
   return new SnakeLadderGame(roomId, options.maxPlayers, callbacks);
+});
+
+registerGame("chameleon", (roomId, options, callbacks) => {
+  return new ChameleonGame(
+    roomId,
+    options.maxPlayers,
+    callbacks,
+    Number(options.targetScore) || 8,
+  );
 });
 
 registerGame("spyfall", (roomId, options, callbacks) => {

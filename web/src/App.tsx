@@ -35,6 +35,8 @@ import RentoHome from "./pages/rento/RentoHome";
 import RentoRoom from "./pages/rento/RentoRoom";
 import RentoGame from "./pages/rento/RentoGame";
 import SpyfallHome from "./pages/spyfall/SpyfallHome";
+import ChameleonGamePage from "./pages/chameleon/ChameleonGame";
+import ChameleonHome from "./pages/chameleon/ChameleonHome";
 import SpyfallGamePage from "./pages/spyfall/SpyfallGame";
 import PartyHub from "./pages/party/PartyHub";
 import JoinParty from "./pages/party/JoinParty";
@@ -101,6 +103,8 @@ const App = () => (
             <Route path="/higher-lower/game/:roomId" element={<HigherLowerGame />} />
             <Route path="/spyfall" element={<SpyfallHome />} />
             <Route path="/spyfall/game/:roomId" element={<SpyfallGamePage />} />
+            <Route path="/chameleon" element={<ChameleonHome />} />
+            <Route path="/chameleon/game/:roomId" element={<ChameleonGamePage />} />
             <Route path="/domino" element={<DominoHome />} />
             <Route path="/domino/room/:roomId" element={<DominoRoom />} />
             <Route path="/domino/game/:roomId" element={<DominoGame />} />

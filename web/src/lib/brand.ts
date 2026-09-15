@@ -222,6 +222,29 @@ export const GAMES: GameMeta[] = [
     art: "/art/games/spyfall.webp",
   },
   {
+    id: "chameleon",
+    name: { en: "Chameleon", ar: "الحرباية" },
+    blurb: {
+      en: "One word each. One of you is bluffing it.",
+      ar: "كلمة واحدة لكل واحد. وواحد فيكم بيمثّل.",
+    },
+    description: {
+      en: "Sixteen words on a grid and one of them is the secret. Everyone knows which — except the chameleon. Say one word about it each, then vote. Rounds take ninety seconds, so there's never a reason not to play one more.",
+      ar: "ستاشر كلمة في شبكة، وواحدة منهم هي السر. الكل عارف مين — ما عدا الحرباية. كل واحد يقول كلمة واحدة عنها، وبعدين تصوتوا. الجولة تسعين ثانية، فمفيش سبب متلعبش واحدة كمان.",
+    },
+    category: "party",
+    status: "live",
+    minPlayers: 3,
+    maxPlayers: 10,
+    minutes: [5, 15],
+    path: "/chameleon",
+    emoji: "🦎",
+    accent: "violet",
+    voiceMatters: true,
+    supportsBots: false,
+    art: "/art/games/chameleon.webp",
+  },
+  {
     id: "liars-bar",
     name: { en: "Liar's Bar", ar: "أشك" },
     blurb: {
@@ -319,6 +342,7 @@ export const GAMES: GameMeta[] = [
 export const PARTY_GAME_IDS = [
   "domino",
   "spyfall",
+  "chameleon",
   "liars-bar",
   "codenames",
   "higher-lower",

@@ -27,6 +27,7 @@ import type {
   RentoState,
 } from "./types";
 import type { SpyfallState } from "./spyfallTypes";
+import type { ChameleonState } from "./chameleonTypes";
 
 /**
  * Everything the client can ask the server to do about a room.
@@ -141,6 +142,9 @@ interface GameActions {
   spyfallVote: (agree: boolean) => Promise<void>;
   spyfallGuess: (locationId: string) => Promise<void>;
   spyfallPass: (toPlayerId: string) => Promise<void>;
+  chameleonClue: (clue: string) => Promise<void>;
+  chameleonVote: (targetId: string) => Promise<void>;
+  chameleonGuess: (index: number) => Promise<void>;
 }
 
 interface GameContextValue extends GameActions {
@@ -154,6 +158,7 @@ interface GameContextValue extends GameActions {
   dominoState: DominoState | null;
   rentoState: RentoState | null;
   spyfallState: SpyfallState | null;
+  chameleonState: ChameleonState | null;
   myHand: Card[];
   isConnected: boolean;
   myPlayerId: string | null;
@@ -172,7 +177,8 @@ export type AnyRoomState =
   | HigherLowerState
   | DominoState
   | RentoState
-  | SpyfallState;
+  | SpyfallState
+  | ChameleonState;
 
 // Local storage keys. Prefixed by brand id so a rename doesn't silently
 // resurrect a stale room from a previous build.
@@ -200,6 +206,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
   const [dominoState, setDominoState] = useState<DominoState | null>(null);
   const [rentoState, setRentoState] = useState<RentoState | null>(null);
   const [spyfallState, setSpyfallState] = useState<SpyfallState | null>(null);
+  const [chameleonState, setChameleonState] = useState<ChameleonState | null>(null);
   const [myHand, setMyHand] = useState<Card[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [myPlayerId, setMyPlayerId] = useState<string | null>(null);
@@ -241,6 +248,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
     setDominoState(null);
     setRentoState(null);
     setSpyfallState(null);
+    setChameleonState(null);
     setMyHand([]);
     setChatMessages([]);
     setToasts([]);
@@ -302,6 +310,10 @@ export const [GameProvider, useGame] = createContextHook(() => {
       setSpyfallState(state);
     };
 
+    const onChameleonPrivate = (state: ChameleonState) => {
+      setChameleonState(state);
+    };
+
     const onChatMessage = (msg: ChatMessage) => {
       setChatMessages((prev) => [...prev.slice(-99), msg]);
     };
@@ -331,6 +343,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
     socket.on("higher_lower_private", onHigherLowerPrivate);
     socket.on("domino_private", onDominoPrivate);
     socket.on("spyfall_private", onSpyfallPrivate);
+    socket.on("chameleon_private", onChameleonPrivate);
     socket.on("chat_message", onChatMessage);
     socket.on("webrtc_signal", onWebRTCSignal);
     socket.on("error", onError);
@@ -353,6 +366,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
       socket.off("higher_lower_private", onHigherLowerPrivate);
       socket.off("domino_private", onDominoPrivate);
       socket.off("spyfall_private", onSpyfallPrivate);
+      socket.off("chameleon_private", onChameleonPrivate);
       socket.off("chat_message", onChatMessage);
       socket.off("webrtc_signal", onWebRTCSignal);
       socket.off("error", onError);
@@ -393,6 +407,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
         if (keep !== "domino") setDominoState(null);
         if (keep !== "rento") setRentoState(null);
         if (keep !== "spyfall") setSpyfallState(null);
+        if (keep !== "chameleon") setChameleonState(null);
       };
 
       if (!gameId || !sub) {
@@ -449,6 +464,16 @@ export const [GameProvider, useGame] = createContextHook(() => {
             locationId: next.locationId ?? prev?.locationId,
             locationName: next.locationName ?? prev?.locationName,
             role: next.role ?? prev?.role,
+          }));
+          break;
+        }
+        case "chameleon": {
+          // isChameleon / secretIndex arrive only on chameleon_private.
+          const next = sub as ChameleonState;
+          setChameleonState((prev) => ({
+            ...next,
+            isChameleon: next.isChameleon ?? prev?.isChameleon,
+            secretIndex: next.secretIndex ?? prev?.secretIndex ?? null,
           }));
           break;
         }
@@ -811,6 +836,32 @@ export const [GameProvider, useGame] = createContextHook(() => {
     [myRoomId, emitWithAck],
   );
 
+  // ===== Chameleon =====
+
+  const chameleonClue = useCallback(
+    async (clue: string) => {
+      if (!myRoomId) throw new Error("Not in a room");
+      await emitWithAck("chameleon_clue", { clue });
+    },
+    [myRoomId, emitWithAck],
+  );
+
+  const chameleonVote = useCallback(
+    async (targetId: string) => {
+      if (!myRoomId) throw new Error("Not in a room");
+      await emitWithAck("chameleon_vote", { targetId });
+    },
+    [myRoomId, emitWithAck],
+  );
+
+  const chameleonGuess = useCallback(
+    async (index: number) => {
+      if (!myRoomId) throw new Error("Not in a room");
+      await emitWithAck("chameleon_guess", { index });
+    },
+    [myRoomId, emitWithAck],
+  );
+
   const sendWebRTCSignal = useCallback(
     (targetId: string, signal: unknown) => {
       if (!myRoomId) return;
@@ -873,6 +924,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
     dominoState,
     rentoState,
     spyfallState,
+    chameleonState,
     myHand,
     isConnected,
     myPlayerId,
@@ -921,5 +973,8 @@ export const [GameProvider, useGame] = createContextHook(() => {
     spyfallVote,
     spyfallGuess,
     spyfallPass,
+    chameleonClue,
+    chameleonVote,
+    chameleonGuess,
   } satisfies GameContextValue;
 });

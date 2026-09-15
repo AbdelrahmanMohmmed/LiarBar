@@ -102,14 +102,21 @@ const MIDGAME_OK = new Set([
   "round_recap",
   "waiting_for_challenge",
   "clue",
+  "clues",
   "guess",
+  "guessing",
   "paused",
 ]);
 
 for (const { game, path } of engines) {
   const src = readFileSync(path, "utf8");
   const assigned = new Set(
-    [...src.matchAll(/(?:this\.)?phase(?:\s*:[^=]+)?\s*=\s*"([a-z_]+)"/g)].map((m) => m[1]),
+    // The type annotation must not span lines: `[^=]` would be greedy across
+    // newlines and let a bare `phase:` in an interface run forward to an
+    // unrelated `= "..."` several lines below, reporting phantom phases.
+    [...src.matchAll(/(?:this\.)?phase(?:\s*:[^=\r\n]*)?\s*=\s*"([a-z_]+)"/g)].map(
+      (m) => m[1],
+    ),
   );
   const unknown = [...assigned].filter((p) => !known.has(p) && !MIDGAME_OK.has(p));
 

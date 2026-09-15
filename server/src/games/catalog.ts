@@ -128,6 +128,19 @@ export const GAME_SPECS: Record<string, GameSpec> = {
       intInRange(o.targetScore, 3, 20, "Target score"),
   },
 
+  chameleon: {
+    id: "chameleon",
+    minPlayers: 3,
+    maxPlayers: 10,
+    seating: "party",
+    // Same reason as Spyfall: a bot would have to invent a one-word clue about
+    // a word it can see, and judge whether everyone else's clue sounded
+    // informed. Both are the game itself, not a supporting task.
+    bots: false,
+    voiceMatters: true,
+    validate: (o) => intInRange(o.targetScore, 4, 30, "Target score"),
+  },
+
   "higher-lower": {
     id: "higher-lower",
     minPlayers: 2,
@@ -226,6 +239,7 @@ export const GAME_SPECS: Record<string, GameSpec> = {
 export const PARTY_GAME_ORDER = [
   "domino",
   "spyfall",
+  "chameleon",
   "liars-bar",
   "codenames",
   "higher-lower",
