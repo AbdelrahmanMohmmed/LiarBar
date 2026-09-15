@@ -78,10 +78,10 @@ biggest lever on this platform.
 
 ---
 
-## 4. The six formats
+## 4. The seven formats
 
 These are ordered by how reliably each one converts to a share. Don't start with
-format 6 because it's the most fun to make.
+format 7 because it's the most fun to make.
 
 ### Format 1 — "The group chat" ⭐ start here
 
@@ -126,6 +126,42 @@ is a much shorter distance to travel.
 This is also the format most likely to produce a **repeatable series** — and a
 series is what turns an account from a set of videos into something people
 follow.
+
+### Format 2b — "ممنوع تقول" (the Taboo near-miss) ⭐ added later, and it may beat format 2
+
+8–15 seconds. One clip. No editing beyond a cut.
+
+```
+[the card fills the screen: one word, four forbidden words under it]
+[audio: someone describing frantically, getting closer and closer]
+[the buzzer — hard cut on the sound]
+[freeze on the forbidden word they said, circled]
+```
+
+**Why this is the strongest format the product has, now that Taboo exists:**
+
+1. **The clip is self-contained.** You don't have to understand the app, the
+   room, or the party model. You understand it in two seconds because everyone
+   has played this in a living room.
+2. **The payoff is a sound, and the sound is a punchline.** Format 2's knock is
+   a beat; a buzz landing on someone mid-sentence is a joke with a victim, and
+   the victim is a friend.
+3. **It is infinitely repeatable without repeating itself**, because the
+   content is whatever a real person said. Eighty cards, and the video is never
+   about the card.
+4. **It shows voice without explaining voice.** The single hardest thing to
+   convey about this product is that the talking is inside it. This format
+   conveys it without a word of narration, because the entire clip *is* the
+   talking.
+
+Run it as a series with a fixed frame: same card treatment, same buzzer sound,
+same end card. A fixed frame is what makes a viewer recognise the third one as
+yours.
+
+**The near-miss variant is better than the buzz.** A describer who *almost*
+says the word, catches themselves, and has to find another route is funnier and
+more shareable than one who gets caught — the tension resolves instead of just
+stopping. Keep both; lead with the near-miss.
 
 ### Format 3 — "The switch" (the actual product differentiator)
 
@@ -333,6 +369,16 @@ Enough to not stall in week three, which is when accounts die.
 
 **"طقّ" (format 2) — 10 videos**
 One per satisfying knock, block, or last-tile finish. Pure clip, pure sound.
+
+**"ممنوع تقول" (format 2b) — 20 videos, and this is where I'd spend the effort**
+One per Taboo card that produces a good near-miss. Twenty is not ambitious: you
+will get several usable clips out of a single evening of real play, because the
+game generates them continuously and the good ones are obvious the moment they
+happen. Fixed frame, fixed buzzer, fixed end card.
+
+The shot list writes itself from the deck — رمضان, ميكروباص, حلاق, بطيخ,
+تيتة, زحمة are all cards where the obvious route is blocked and the second
+route is funny. Play the deck, keep the clips, post three a week.
 
 **"The group chat" (format 1) — 10 videos**
 Ten different ways the chat goes quiet. Night out cancelled. Everyone home sick.
