@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node scripts/check-env.mjs && tsc && vite build",
+    "build": "node scripts/check-env.mjs && node scripts/sync-brand.mjs --check && tsc && vite build",
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx",
     "brand:sync": "node scripts/sync-brand.mjs",
+    "brand:check": "node scripts/sync-brand.mjs --check",
     "check:env": "node scripts/check-env.mjs"
   },
   "dependencies": {

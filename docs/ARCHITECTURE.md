@@ -200,6 +200,19 @@ That is why `web/scripts/sync-brand.mjs` exists: `index.html`, `sitemap.xml`,
 A rename cannot leave the old name in the one place that is most publicly
 visible.
 
+Generating was only half of it, though, because nothing forced anyone to run
+the generator — and the files did go stale, the first time two games were added
+without it, leaving `sitemap.xml` missing the two newest pages on a site whose
+owner had asked why it doesn't appear in search results. `npm run build` now
+runs `sync-brand.mjs --check` first, so a stale static file fails a deploy
+instead of surviving one. (`<lastmod>` is normalised out of the comparison; it
+is today's date by construction and would otherwise fail the check daily.)
+
+The same argument produced `web/scripts/check-env.mjs`, which runs alongside it
+and warns when a build ships without a TURN relay — see VOICE.md §4. Both exist
+because the failure they catch is invisible to the person doing the deploying
+and expensive for somebody else a week later.
+
 For routes, `lib/seo.tsx` imperatively upserts `<title>`, meta, canonical and
 JSON-LD on mount. Google renders JS and picks these up. Non-rendering crawlers
 get the static defaults, which is the correct trade: the pages they'd miss are

@@ -28,11 +28,37 @@
  * script's own runtime, and the parse only has to handle the handful of
  * top-level string literals this script cares about. It fails loudly if it
  * can't find them, so a silently stale file isn't possible.
+ *
+ * ## `--check`
+ *
+ * Generating is only half of it: nothing forced anyone to *run* the generator,
+ * and the files went stale the moment two games were added without it — which
+ * is how `sitemap.xml` came to omit the two newest pages on a site whose owner
+ * had asked why it doesn't appear in search results.
+ *
+ * `node scripts/sync-brand.mjs --check` regenerates into memory and compares,
+ * and it runs as part of `npm run build`, so a stale static file now fails a
+ * deploy rather than surviving one. `<lastmod>` is normalised out of the
+ * comparison — it is today's date by construction and would otherwise make the
+ * check fail every day for no reason.
  */
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
+const CHECK_ONLY = process.argv.includes("--check");
+
+/** Everything this script produces, so it can be written or compared. */
+const outputs = [];
+function emit(relPath, content) {
+  outputs.push({ relPath, content });
+}
+
+/** `<lastmod>` is today's date by construction and must not fail the check. */
+function comparable(text) {
+  return text.replace(/<lastmod>[^<]*<\/lastmod>/g, "<lastmod/>");
+}
 
 const here = dirname(fileURLToPath(import.meta.url));
 const webRoot = resolve(here, "..");
@@ -207,7 +233,7 @@ ${JSON.stringify(
 </html>
 `;
 
-writeFileSync(resolve(webRoot, "index.html"), html, "utf8");
+emit("index.html", html);
 
 // ---------------------------------------------------------------------------
 // sitemap.xml
@@ -229,7 +255,7 @@ ${routes
   .join("\n")}
 </urlset>
 `;
-writeFileSync(resolve(webRoot, "public/sitemap.xml"), sitemap, "utf8");
+emit("public/sitemap.xml", sitemap);
 
 // ---------------------------------------------------------------------------
 // robots.txt
@@ -249,7 +275,7 @@ Disallow: /lobby/
 
 Sitemap: ${siteUrl}/sitemap.xml
 `;
-writeFileSync(resolve(webRoot, "public/robots.txt"), robots, "utf8");
+emit("public/robots.txt", robots);
 
 // ---------------------------------------------------------------------------
 // site.webmanifest
@@ -273,11 +299,46 @@ const manifest = {
   lang: "en",
   dir: "ltr",
 };
-writeFileSync(
-  resolve(webRoot, "public/site.webmanifest"),
-  JSON.stringify(manifest, null, 2) + "\n",
-  "utf8",
-);
+emit("public/site.webmanifest", JSON.stringify(manifest, null, 2) + "\n");
+
+// ---------------------------------------------------------------------------
+// Write, or compare and complain
+// ---------------------------------------------------------------------------
+
+if (CHECK_ONLY) {
+  const stale = [];
+  for (const { relPath, content } of outputs) {
+    let onDisk = "";
+    try {
+      onDisk = readFileSync(resolve(webRoot, relPath), "utf8");
+    } catch {
+      stale.push(`${relPath} (missing)`);
+      continue;
+    }
+    if (comparable(onDisk) !== comparable(content)) stale.push(relPath);
+  }
+
+  if (stale.length === 0) {
+    console.log(`sync-brand: ${outputs.length} generated file(s) in sync.`);
+    process.exit(0);
+  }
+
+  console.error("");
+  console.error("sync-brand: generated files are out of date:");
+  for (const f of stale) console.error(`  - ${f}`);
+  console.error("");
+  console.error("  These are the files crawlers and link previews read without");
+  console.error("  running JavaScript, so a stale one is invisible in the app and");
+  console.error("  wrong everywhere else. Fix with:");
+  console.error("");
+  console.error("      cd web && npm run brand:sync");
+  console.error("");
+  process.exit(1);
+}
+
+for (const { relPath, content } of outputs) {
+  writeFileSync(resolve(webRoot, relPath), content, "utf8");
+}
 
 console.log(`sync-brand: wrote index.html, sitemap.xml, robots.txt, site.webmanifest`);
 console.log(`  brand : ${name} (${nameAr})`);
