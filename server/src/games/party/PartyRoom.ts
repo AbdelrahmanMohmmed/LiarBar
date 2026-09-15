@@ -257,9 +257,14 @@ export class PartyRoom implements GameRoom {
    */
   startGame(): unknown | null {
     if (!this.activeSubRoom) return null;
-    const result = this.activeSubRoom.startGame();
+    // Phase flips BEFORE the engine starts, not after. Engines broadcast from
+    // inside startGame(), and that broadcast is re-wrapped by toState() — so
+    // setting the phase afterwards means the state clients actually receive
+    // still says "hub", and nobody's screen moves to the game.
     this.phase = "playing";
     this.lastActivityAt = Date.now();
+    const result = this.activeSubRoom.startGame();
+    this.broadcast();
     return result;
   }
 
@@ -338,6 +343,7 @@ export class PartyRoom implements GameRoom {
 
     if (autoStart) {
       this.phase = "playing";
+      // Same ordering rule as startGame(): phase first, engine second.
       subRoom.startGame();
     } else {
       // Staged but not dealt: the party sits in the hub while people arrive,

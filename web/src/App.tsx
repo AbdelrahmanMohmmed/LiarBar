@@ -34,6 +34,9 @@ import DominoGame from "./pages/domino/DominoGame";
 import RentoHome from "./pages/rento/RentoHome";
 import RentoRoom from "./pages/rento/RentoRoom";
 import RentoGame from "./pages/rento/RentoGame";
+import PartyHub from "./pages/party/PartyHub";
+import JoinParty from "./pages/party/JoinParty";
+import PartyDock from "./components/party/PartyDock";
 
 const queryClient = new QueryClient();
 
@@ -81,6 +84,10 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Landing />} />
+            {/* The party is the durable room; /j/:code is the short invite
+                link that every WhatsApp message carries. */}
+            <Route path="/r/:roomId" element={<PartyHub />} />
+            <Route path="/j/:roomId" element={<JoinParty />} />
             <Route path="/play" element={<Index />} />
             <Route path="/room/:roomId" element={<Room />} />
             <Route path="/game/:roomId" element={<Game />} />
@@ -110,6 +117,10 @@ const App = () => (
             <Route path="/arcade/tetris" element={<TetrisGame />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
+          {/* Mounted outside <Routes> on purpose: every game page inherits
+              invite / switch-game / rematch / mic without knowing the dock
+              exists, so no game can ship without a way back to the hub. */}
+          <PartyDock />
         </BrowserRouter>
         </VoiceProvider>
         <ToastRenderer />
