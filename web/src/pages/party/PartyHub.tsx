@@ -56,15 +56,6 @@ export default function PartyHub() {
     });
   }, [roomId, partyState?.roomId, myPlayerId, reconnectRoom, navigate]);
 
-  // When the host starts a game, everyone follows automatically. Without this
-  // the host would have to tell five people "go to the game" out loud, which
-  // is precisely the kind of coordination the product is supposed to remove.
-  useEffect(() => {
-    if (!partyState || partyState.phase !== "playing" || !partyState.activeGameId) return;
-    const route = gameRoute(partyState.activeGameId, partyState.roomId);
-    if (route) navigate(route);
-  }, [partyState?.phase, partyState?.activeGameId, partyState?.roomId, navigate]);
-
   const me = partyState?.players.find((p) => p.id === myPlayerId);
   const isHost = Boolean(me?.isHost);
   const activeMeta = partyState?.activeGameId ? getGame(partyState.activeGameId) : undefined;
@@ -266,33 +257,4 @@ export default function PartyHub() {
       />
     </div>
   );
-}
-
-/**
- * Where a given game renders. Kept here (rather than on each game's own page)
- * so that "which URL does this game live at" is answered in exactly one place;
- * games that render inside the generic lobby shell share one route.
- */
-export function gameRoute(gameId: string, roomId: string): string | null {
-  switch (gameId) {
-    case "liars-bar":
-      return `/game/${roomId}`;
-    case "codenames":
-      return `/codenames/game/${roomId}`;
-    case "higher-lower":
-      return `/higher-lower/game/${roomId}`;
-    case "domino":
-      return `/domino/game/${roomId}`;
-    case "spyfall":
-      return `/spyfall/game/${roomId}`;
-    case "chameleon":
-      return `/chameleon/game/${roomId}`;
-    case "wyr":
-      return `/wyr/game/${roomId}`;
-    case "rento":
-      return `/rento/game/${roomId}`;
-    default:
-      // Arcade-style games render inside the shared lobby shell.
-      return `/lobby/${roomId}`;
-  }
 }

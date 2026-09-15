@@ -13,6 +13,7 @@ import Landing from "./pages/Landing";
 import JoinParty from "./pages/party/JoinParty";
 import NotFound from "./pages/NotFound";
 import PartyDock from "./components/party/PartyDock";
+import PartyRouter from "./components/party/PartyRouter";
 
 /**
  * Routes are code-split, and the split is the point.
@@ -204,6 +205,10 @@ const App = () => (
                   invite / switch-game / rematch / mic without knowing the dock
                   exists, so no game can ship without a way back to the hub. */}
               <PartyDock />
+              {/* Follows the party into whatever game the host switches to.
+                  Mounted here, not in PartyHub: the dock can switch games from
+                  any page, so the follower has to live where the dock does. */}
+              <PartyRouter />
             </BrowserRouter>
           </VoiceProvider>
           <ToastRenderer />
