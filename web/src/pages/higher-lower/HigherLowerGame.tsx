@@ -93,7 +93,7 @@ export default function HigherLowerGame() {
     higherLowerGuess, higherLowerRematch, sendChat, chatMessages, addToast, leaveRoom
   } = useGame();
 
-  const { lang } = useLanguage();
+  const { lang, t } = useLanguage();
   const isAr = lang === "ar";
   const c = COPY[isAr ? "ar" : "en"];
   const dir = isAr ? "rtl" : "ltr";
@@ -248,7 +248,7 @@ export default function HigherLowerGame() {
   if (!reconnected || !higherLowerState) {
     return (
       <div style={{ minHeight: "100vh", background: COLORS.cream, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <p style={{ fontFamily: font, color: COLORS.ink }}>Loading...</p>
+        <p style={{ fontFamily: font, color: COLORS.ink }}>{t("common.loading")}</p>
       </div>
     );
   }

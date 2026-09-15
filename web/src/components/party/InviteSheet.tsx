@@ -132,7 +132,7 @@ export default function InviteSheet({ roomCode, gameName, open, onClose }: Props
 
         <div className="grid grid-cols-2 gap-2 mb-3">
           <a
-            className="btn btn-live"
+            className="btn btn-whatsapp"
             href={`https://wa.me/?text=${encodeURIComponent(message)}`}
             target="_blank"
             rel="noopener noreferrer"

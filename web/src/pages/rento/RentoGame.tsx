@@ -32,7 +32,7 @@ export default function RentoGame() {
   const {
     rentoState, myPlayerId, leaveRoom,
   } = useGame();
-  const { lang } = useLanguage();
+  const { lang, t } = useLanguage();
   const isAr = lang === "ar";
   const c = HOW_TO[isAr ? "ar" : "en"];
   const dir = isAr ? "rtl" : "ltr";
@@ -57,7 +57,7 @@ export default function RentoGame() {
         gap: 16,
         fontFamily: "system-ui, sans-serif",
       }}>
-        <p style={{ color: "#fff" }}>Reconnecting to game room...</p>
+        <p style={{ color: "#fff" }}>{t("common.reconnecting")}</p>
         <button
           onClick={() => navigate("/rento")}
           style={{

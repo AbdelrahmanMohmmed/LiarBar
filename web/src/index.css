@@ -299,6 +299,30 @@
     background: hsl(var(--mint) / 0.9);
   }
 
+  /**
+   * WhatsApp's own green, and the one colour in this file that isn't a token.
+   *
+   * It is here because the alternative was worse: the button used `btn-live`,
+   * which is mint — the one colour the system reserves for "happening right
+   * now" (DESIGN_SYSTEM.md §2) — for a share link that is not live anything.
+   * Recolouring it coral would have obeyed the rule and cost the button the
+   * thing that makes it work: in this market WhatsApp is not one share target
+   * among several, it is *the* way an invite travels, and people find that
+   * button by its colour without reading it.
+   *
+   * Third-party brand colours on third-party buttons are a recognised
+   * exception, the same one that lets a "Sign in with Google" button be
+   * Google's blue. It applies to this button and nothing else.
+   */
+  .btn-whatsapp {
+    background: #25d366;
+    color: #06231a;
+    box-shadow: 0 6px 18px -8px rgb(37 211 102 / 0.55);
+  }
+  .btn-whatsapp:hover:not(:disabled) {
+    background: #21bd5c;
+  }
+
   .btn-ghost {
     background: hsl(var(--surface-raised) / 0.6);
     color: hsl(var(--foreground));

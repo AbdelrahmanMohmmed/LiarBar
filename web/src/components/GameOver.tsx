@@ -1,6 +1,7 @@
 import { memo } from "react";
 import type { GameState } from "@/lib/types";
 import { Trophy, RotateCcw, Home } from "lucide-react";
+import { useLanguage } from "@/lib/languageContext";
 
 interface GameOverProps {
   gameState: GameState;
@@ -15,6 +16,7 @@ export const GameOver = memo(function GameOver({
   onBackToLobby,
   onHome,
 }: GameOverProps) {
+  const { t } = useLanguage();
   const winner = gameState.players.find(
     (p) => p.id === gameState.winner,
   );
@@ -54,18 +56,23 @@ export const GameOver = memo(function GameOver({
 
           <div>
             <h2 className="text-3xl font-bold text-white mb-2">
-              {isMeWinner ? "You Won!" : `${winner?.name || "Someone"} Wins!`}
+              {isMeWinner
+                ? t("over.you_won")
+                : t("over.someone_wins").replace(
+                    "{name}",
+                    winner?.name || t("over.someone"),
+                  )}
             </h2>
             <p className="text-amber-200/60 text-sm">
               {isMeWinner
-                ? "You emptied your hand first. Well played!"
-                : "Better luck next round."}
+                ? t("over.you_won_sub")
+                : t("over.better_luck")}
             </p>
           </div>
 
           <div className="space-y-2">
             <p className="text-amber-200/40 text-xs uppercase tracking-wider">
-              Final Standings
+              {t("over.final_standings")}
             </p>
             {sorted.map((player, idx) => (
               <div
@@ -96,13 +103,13 @@ export const GameOver = memo(function GameOver({
                     {player.name}
                     {player.id === myPlayerId && (
                       <span className="text-amber-400/60 text-xs ml-1">
-                        (you)
+                        ({t("table.you")})
                       </span>
                     )}
                   </span>
                 </div>
                 <span className="text-amber-200/40 font-mono text-sm">
-                  {player.cardCount} cards
+                  {t("over.n_cards").replace("{n}", String(player.cardCount))}
                 </span>
               </div>
             ))}
@@ -114,14 +121,14 @@ export const GameOver = memo(function GameOver({
               className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-amber-900/40 text-amber-200 hover:bg-amber-900/20 transition-all text-sm font-medium"
             >
               <RotateCcw className="w-4 h-4" />
-              Rematch
+              {t("over.rematch")}
             </button>
             <button
               onClick={onHome}
               className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white font-semibold shadow-lg transition-all active:scale-95"
             >
               <Home className="w-4 h-4" />
-              Home
+              {t("over.home")}
             </button>
           </div>
         </div>

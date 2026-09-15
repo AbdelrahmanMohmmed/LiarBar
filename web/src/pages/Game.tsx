@@ -266,7 +266,7 @@ export default function Game() {
       <div className="min-h-screen bg-[#1a0a0a] flex items-center justify-center">
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-amber-200/60">Loading game...</p>
+          <p className="text-amber-200/60">{t("common.loading")}</p>
         </div>
       </div>
     );

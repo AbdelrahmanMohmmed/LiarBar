@@ -74,6 +74,19 @@ generic "nice green", the glance-and-know property is gone, and that property is
 the single highest-value thing in the visual system for a product used while
 talking.
 
+The rule has caught real drift twice. Codenames' side panels were mapped onto
+mint by a palette shim and ended up putting it on a "Show game log" button; the
+WhatsApp share button used `.btn-live` for a link that is not live anything.
+
+### The one exception: other people's brands
+
+`.btn-whatsapp` is WhatsApp's own `#25D366`, and it is the only hard-coded
+colour in `index.css`. This is the same exception that lets a "Sign in with
+Google" button be Google's blue: people find those buttons by colour without
+reading them, and in this market WhatsApp is not one share target among several
+— it is how an invite travels. It applies to that button and to nothing else. A
+new third-party button may claim the exception; a new *game* may not.
+
 ### Contrast (WCAG 2.1)
 
 Checked against the surfaces the token is actually used on.

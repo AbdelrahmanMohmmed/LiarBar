@@ -94,7 +94,7 @@ export default function DominoRoom() {
     dominoState, myPlayerId, joinRoom, reconnectRoom,
     startGame, addBot, removeBot, addToast, leaveRoom,
   } = useGame();
-  const { lang } = useLanguage();
+  const { lang, t } = useLanguage();
   const isAr = lang === "ar";
   const c = COPY[isAr ? "ar" : "en"];
   const dir = isAr ? "rtl" : "ltr";
@@ -183,7 +183,7 @@ export default function DominoRoom() {
   if (!reconnected) {
     return (
       <div style={{ minHeight: "100vh", background: COLORS.cream, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <p style={{ fontFamily: font, color: COLORS.ink }}>Loading...</p>
+        <p style={{ fontFamily: font, color: COLORS.ink }}>{t("common.loading")}</p>
       </div>
     );
   }
@@ -192,7 +192,7 @@ export default function DominoRoom() {
   if (!dominoState) {
     return (
       <div style={{ minHeight: "100vh", background: COLORS.cream, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
-        <p style={{ fontFamily: font, color: COLORS.ink }}>Room not found or disconnected.</p>
+        <p style={{ fontFamily: font, color: COLORS.ink }}>{t("common.room_gone")}</p>
         <SecondaryButton onClick={() => navigate("/domino")}>{c.back}</SecondaryButton>
       </div>
     );
