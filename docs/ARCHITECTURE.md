@@ -135,14 +135,16 @@ peers from it would see an empty roster for that instant and tear the mesh down.
 | **Cost** | Upload scales linearly with room size. At ~10 people a weak phone on mobile data starts to struggle. |
 | **When to revisit** | If you add spectators, or a "watch a table" feature, or rooms above ~10. Mesh is quadratic and there is no clever way around that — the answer is an SFU, and the migration touches only `voiceContext.tsx`. |
 
-### TypeScript everywhere, but no shared types package
+### One shared contract, copied rather than imported
 
 | | |
 |---|---|
-| **Why** | The server's state types are mirrored by hand in `web/src/lib/types.ts` and `dominoTypes.ts`. |
-| **Honest assessment** | This is the weakest decision in the codebase. It has already caused real bugs — the client's copy of the domino matching rule drifted from the server's and disagreed about flipped tiles. |
-| **Why it's still like this** | A shared package means a build step between two packages that currently deploy independently to two different platforms. |
-| **What I'd do** | A `shared/` folder of pure `.ts` type files, imported by both via a path alias, with no build step of its own. That's a couple of hours and removes an entire class of bug. **This is the highest-value refactor left in the codebase.** |
+| **Why** | `server/src/shared/` holds the wire contract — every shape that crosses the network. `npm run types:sync` copies it into `web/src/lib/generated/`, and `npm run types:check` fails if a copy has drifted. |
+| **Chosen over** | A `shared/` workspace package; a monorepo tool; hand-mirrored types (what this was). |
+| **Why not a real package** | Both deployments build from a single directory and nothing else: the server's `Dockerfile` copies only `server/src`, and Vercel builds the web app with `web/` as its root. A cross-package import works perfectly on a developer's machine and fails in both deployments — the worst possible place to discover it. |
+| **What it fixes** | The types used to be mirrored by hand, and they had already drifted: the client's copy of the domino matching rule disagreed with the server's about flipped tiles, so the UI offered plays the server then rejected. |
+| **Cost** | A generated file in the repo, and a `types:sync` step when the contract changes. `types:check` runs as part of `npm test`, so forgetting it fails loudly rather than silently. |
+| **Still to do** | Codenames, Rento and Liar's Bar are not yet in `shared/` — their client types are still hand-mirrored. Moving them is mechanical; the pattern is established. |
 
 ---
 
@@ -245,19 +247,18 @@ behind a load balancer with polling fallback enabled, and ship metrics from
 
 ## 7. What I'd build next, in order
 
-1. **`shared/` type package.** (§3) Removes an entire class of client/server
-   drift bug. Highest value per hour of anything on this list.
-2. **Route-level code splitting.** The bundle is ~880KB / 247KB gzipped because
-   every game is in the main chunk. `React.lazy` per route would cut first load
-   by roughly two-thirds. On the target device — a mid-range Android on Egyptian
-   mobile data, tapping a WhatsApp link — that is the difference between joining
-   and giving up.
-3. **Persistent identity.** A cookie-backed player id is the prerequisite for
+1. **Finish the shared contract.** (§3) Domino, Spyfall, Chameleon and the
+   party envelope are done; Codenames, Rento and Liar's Bar still hand-mirror
+   their types. Mechanical work, and it closes an entire class of bug.
+2. **Persistent identity.** A cookie-backed player id is the prerequisite for
    friends lists, stats, and matchmaking (see [MATCHMAKING.md](MATCHMAKING.md)).
 4. **Server-side tests for the remaining engines.** Domino has 30 rule tests and
    a 60-match simulation; the others have none. Liar's Bar and Codenames are the
    next most rule-dense.
-5. **An SFU**, if and only if you want spectators or rooms above ten (§3).
+4. **An SFU**, if and only if you want spectators or rooms above ten (§3).
+
+*(Route-level code splitting was on this list and is now done — first paint
+went from ~261KB gzipped to 139KB. See `web/src/App.tsx` and `vite.config.ts`.)*
 
 ---
 

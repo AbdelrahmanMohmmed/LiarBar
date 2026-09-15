@@ -80,101 +80,32 @@ import { chooseDominoPlay, botThinkMs, type BotDifficulty } from "./DominoBot.js
  *   and fire the right line of chatter instead of diffing state and guessing.
  */
 
-export type DominoMode = "individual" | "teams";
+/**
+ * The wire shapes live in `src/shared/domino.ts` — the single source of truth
+ * for what the client receives, copied into the web package by
+ * `npm run types:sync`. Re-exported here so existing imports keep working and
+ * so it is obvious that this engine implements a published contract rather
+ * than a private shape.
+ */
+export type {
+  DominoMode,
+  DominoPhase,
+  DominoTeam,
+  DominoEvent,
+  DominoSeatState,
+  DominoRecap,
+  DominoState,
+  DominoPrivate,
+  DominoPlayerState,
+} from "../../shared/domino.js";
 
-export interface DominoEvent {
-  kind:
-    | "play"
-    | "knock"
-    | "draw"
-    | "round_start"
-    | "round_end"
-    | "timeout"
-    | "match_end";
-  seat: number;
-  playerId: string;
-  playerName: string;
-  at: number;
-  tile?: Tile;
-  /** For a knock: the pips that were open, i.e. what this player lacks. */
-  deadOn?: number[];
-  method?: RoundOutcome["method"];
-  points?: number;
-}
-
-export interface DominoSeatState {
-  seat: number;
-  playerId: string;
-  name: string;
-  team: Team;
-  isBot: boolean;
-  isConnected: boolean;
-  flag?: string;
-  handCount: number;
-  /** Numbers this seat has proved it doesn't hold, by knocking. */
-  knockedOn: number[];
-  score: number;
-  /** Revealed only in the recap. */
-  hand?: Tile[];
-  pips?: number;
-}
-
-export interface DominoRecap {
-  method: RoundOutcome["method"];
-  winnerSeat: number | null;
-  winnerName: string | null;
-  winnerTeam: Team | null;
-  points: number;
-  karak: boolean;
-  pipsBySeat: number[];
-  handsBySeat: Tile[][];
-  nextRoundAt: number | null;
-}
-
-export interface DominoState {
-  roomId: string;
-  gameId: "domino";
-  phase: "lobby" | "playing" | "round_recap" | "game_over";
-  mode: DominoMode;
-  targetScore: number;
-  turnSeconds: number;
-  karakBonus: boolean;
-  tableTheme: string;
-  tileTheme: string;
-
-  /** Legacy alias; the client's shared player list still reads `players`. */
-  players: Array<{
-    id: string;
-    name: string;
-    isBot: boolean;
-    isHost: boolean;
-    isConnected: boolean;
-    flag?: string;
-    cardCount: number;
-    hand: never[];
-  }>;
-
-  seats: DominoSeatState[];
-  maxPlayers: number;
-
-  board: PlacedTile[];
-  ends: BoardEnds;
-  boneyardCount: number;
-
-  activeSeat: number | null;
-  turnDeadline: number | null;
-  roundNumber: number;
-  /** How many of each pip value are visible on the table. Public read-aid. */
-  playedPipCount: number[];
-
-  scores: { A: number; B: number };
-  seatScores: number[];
-  winnerTeam: Team | null;
-  winnerId: string | null;
-
-  recap: DominoRecap | null;
-  events: DominoEvent[];
-}
+import type {
+  DominoMode,
+  DominoEvent,
+  DominoSeatState,
+  DominoRecap,
+  DominoState,
+} from "../../shared/domino.js";
 
 const RECAP_SECONDS = 8;
 /** How long a disconnected player's turn is held before the bot takes over. */

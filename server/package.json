@@ -14,11 +14,13 @@
     "check:codenames-words": "tsx src/games/codenames/words/check.ts",
     "test:party": "node test/party.e2e.mjs",
     "test:domino": "node test/domino.test.mjs",
-    "test": "npm run build && npm run test:engines && npm run test:domino && npm run test:domino-sim",
+    "test": "npm run build && npm run types:check && npm run test:engines && npm run test:domino && npm run test:domino-sim",
     "test:domino-sim": "node test/domino.sim.mjs",
     "test:spyfall": "node test/spyfall.e2e.mjs",
     "test:engines": "node test/engines.test.mjs",
-    "test:chameleon": "node test/chameleon.e2e.mjs"
+    "test:chameleon": "node test/chameleon.e2e.mjs",
+    "types:sync": "node scripts/sync-types.mjs",
+    "types:check": "node scripts/sync-types.mjs --check"
   },
   "dependencies": {
     "cors": "^2.8.5",
