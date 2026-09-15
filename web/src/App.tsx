@@ -14,6 +14,7 @@ import JoinParty from "./pages/party/JoinParty";
 import NotFound from "./pages/NotFound";
 import PartyDock from "./components/party/PartyDock";
 import PartyRouter from "./components/party/PartyRouter";
+import SupersededNotice from "./components/party/SupersededNotice";
 
 /**
  * Routes are code-split, and the split is the point.
@@ -209,6 +210,8 @@ const App = () => (
                   Mounted here, not in PartyHub: the dock can switch games from
                   any page, so the follower has to live where the dock does. */}
               <PartyRouter />
+              {/* Full-screen, because everything behind it is stale. */}
+              <SupersededNotice />
             </BrowserRouter>
           </VoiceProvider>
           <ToastRenderer />

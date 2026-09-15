@@ -170,6 +170,8 @@ interface GameContextValue extends GameActions {
   chatMessages: ChatMessage[];
   toasts: ToastNotification[];
   error: string | null;
+  /** Non-null when a newer window took over this player's session. */
+  supersededRoomId: string | null;
 }
 
 /** Anything the server can send on `game_state` or a command ack. */
@@ -220,6 +222,15 @@ export const [GameProvider, useGame] = createContextHook(() => {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * This window's session was taken over by a newer one — the same player
+   * opened the room again in another tab, or re-tapped the invite link.
+   *
+   * Surfaced rather than ignored because the alternative is a tab that keeps
+   * receiving broadcasts while showing its own player as offline, which looks
+   * like a bug in the game and is impossible for a player to diagnose.
+   */
+  const [supersededRoomId, setSupersededRoomId] = useState<string | null>(null);
 
   const myPlayerIdRef = useRef(myPlayerId);
   myPlayerIdRef.current = myPlayerId;
@@ -262,6 +273,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
     setError(null);
     setMyRoomId(null);
     setMyPlayerId(null);
+    setSupersededRoomId(null);
   }, []);
 
   // Single entry point for "leave the room and go home" — every leave button
@@ -341,6 +353,10 @@ export const [GameProvider, useGame] = createContextHook(() => {
       );
     };
 
+    const onSuperseded = (data: { roomId: string }) => {
+      setSupersededRoomId(data?.roomId ?? null);
+    };
+
     const onError = (data: { error: string }) => {
       setError(data.error);
       addToast(data.error, "error");
@@ -358,6 +374,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
     socket.on("wyr_private", onWyrPrivate);
     socket.on("chat_message", onChatMessage);
     socket.on("webrtc_signal", onWebRTCSignal);
+    socket.on("session_superseded", onSuperseded);
     socket.on("error", onError);
 
     // Check for stored room/player
@@ -382,6 +399,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
       socket.off("wyr_private", onWyrPrivate);
       socket.off("chat_message", onChatMessage);
       socket.off("webrtc_signal", onWebRTCSignal);
+      socket.off("session_superseded", onSuperseded);
       socket.off("error", onError);
     };
   }, [addToast]);
@@ -976,6 +994,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
     chatMessages,
     toasts,
     error,
+    supersededRoomId,
     createRoom,
     joinRoom,
     reconnectRoom,

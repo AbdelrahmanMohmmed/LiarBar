@@ -295,16 +295,50 @@ export function registerSocketHandlers(
             return;
           }
 
-          const player = room.handleReconnect(String(data?.playerId ?? ""), socket.id);
+          const requestedId = String(data?.playerId ?? "");
+
+          /**
+           * A reconnect takes over the seat. If that seat already has a LIVE
+           * socket, this is the same person opening the room a second time —
+           * a second tab, or a link tapped again from WhatsApp.
+           *
+           * The takeover itself is correct: the newest window is the one the
+           * player is looking at. But the old socket was silently orphaned —
+           * still joined to the room, still receiving broadcasts, and rendering
+           * a session that no longer belongs to it. The visible symptom is a
+           * tab showing its own player as "offline" while everything else
+           * updates, which is confusing in a way nobody could diagnose.
+           *
+           * Tell the old window instead, so it can say so plainly.
+           */
+          const existing = room.getPlayer(requestedId);
+          const previousSocketId =
+            existing?.socketId && existing.socketId !== socket.id
+              ? existing.socketId
+              : null;
+
+          const player = room.handleReconnect(requestedId, socket.id);
           if (!player) {
             fail(callback, "Player not found in room");
             return;
           }
 
+          if (previousSocketId) {
+            io.to(previousSocketId).emit("session_superseded", {
+              roomId: room.roomId,
+            });
+            const stale = io.sockets.sockets.get(previousSocketId);
+            stale?.leave(room.roomId);
+            registry.unbindSocket(previousSocketId);
+          }
+
           socket.join(room.roomId);
           registry.bindSocket(socket.id, { roomId: room.roomId, playerId: player.id });
 
-          console.log(`Player ${player.name} reconnected to room ${room.roomId}`);
+          console.log(
+            `Player ${player.name} reconnected to room ${room.roomId}` +
+              (previousSocketId ? " (superseded an earlier window)" : ""),
+          );
 
           reply(callback, {
             success: true,

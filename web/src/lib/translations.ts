@@ -416,6 +416,11 @@ const translations: Record<Language, Record<string, string>> = {
     "wyr.how_3": "Guess right and you score 1. So it pays to actually know your friends.",
     "wyr.how_4": "The subject scores 1 for every person who got it WRONG — so it pays to be surprising, not likeable.",
 
+    "superseded.title": "You opened this room somewhere else",
+    "superseded.body": "This window is no longer connected — the newest one has the seat. Anything you see here is out of date.",
+    "superseded.resume": "Play here instead",
+    "superseded.leave": "Close this",
+
     "404.title": "404",
     "404.message": "Oops! Page not found",
     "404.back_home": "Return to Home",
@@ -830,6 +835,11 @@ const translations: Record<Language, Record<string, string>> = {
     "wyr.how_2": "والباقي بيخمّنوا هو اختار أنهي واحدة.",
     "wyr.how_3": "لو خمّنت صح تاخد نقطة. يعني بيفرق إنك تعرف أصحابك بجد.",
     "wyr.how_4": "وصاحب الدور بياخد نقطة عن كل واحد خمّن غلط — يعني بيفرق إنك تفاجئهم، مش إنك تعجبهم.",
+
+    "superseded.title": "فتحت الأوضة دي في مكان تاني",
+    "superseded.body": "النافذة دي مبقتش متصلة — الأحدث هي اللي ماسكة مكانك. أي حاجة شايفها هنا قديمة.",
+    "superseded.resume": "العب من هنا",
+    "superseded.leave": "اقفل دي",
 
     "404.title": "404",
     "404.message": "عذراً! الصفحة غير موجودة",
