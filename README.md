@@ -124,10 +124,15 @@ impossible to look at in a browser on your own.
 | Game | Players | Notes |
 |---|---|---|
 | **Domino** | 2–4 | Egyptian street rules: partners, all 28 tiles dealt, knock when stuck, race to 101 |
+| **Spyfall** — برا اللعبة | 3–10 | Everyone knows the place except the spy. 30 locations, pure conversation |
+| **Chameleon** — الحرباية | 3–10 | One word each. 12 topic grids. Ninety-second rounds |
+| **Would You Rather** — لو خيّروك | 3–10 | Not what you'd pick — what your friends think you'd pick |
 | **Liar's Bar** | 2–6 | Bluffing card game. Cards or dominoes variant |
 | **Codenames** | 4–10 | Fully bilingual — the whole board plays in Arabic or English |
 | **Higher or Lower** | 2–6 | Fast number-guessing race |
 | **Rento** | 2–6 | Property trading, on a turn timer |
 | Arcade | 1–10 | Tetris, Snake, Tic-Tac-Toe, Memory, Space Invaders, Fighter, Snakes & Ladders |
+
+Every one of them is reachable from inside a party without a new link.
 
 Adding one: [ARCHITECTURE.md §8](docs/ARCHITECTURE.md#8-adding-a-game).
