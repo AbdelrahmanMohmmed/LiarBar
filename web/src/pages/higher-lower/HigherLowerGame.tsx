@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useGame } from "@/lib/gameContext";
+import { useGame, storedSession } from "@/lib/gameContext";
 import { useLanguage } from "@/lib/languageContext";
 import { COLORS, uiFont } from "./theme";
 import { playTickSfx, playWinSfx, playTimeoutSfx } from "@/utils/sfx";
@@ -112,8 +112,7 @@ export default function HigherLowerGame() {
   // Sync state or reconnect
   useEffect(() => {
     if (reconnected) return;
-    const storedRoomId = localStorage.getItem("liarsbar_roomId");
-    const storedPlayerId = localStorage.getItem("liarsbar_playerId");
+    const { roomId: storedRoomId, playerId: storedPlayerId } = storedSession();
 
     if (paramRoomId) {
       if (storedRoomId === paramRoomId && storedPlayerId) {

@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useLayoutEffect, useRef } from "react";
 import type { Card as CardType } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Send, SkipForward, ChevronDown, ChevronUp } from "lucide-react";
@@ -35,6 +35,14 @@ interface MobileHandSheetProps {
  *    the pile removes the information the decision is made on. It's now capped
  *    so the top of the table stays visible, and the cards scroll instead.
  *
+ *    Capping it was not enough on its own: the table is a square sized by the
+ *    viewport width, so on a 375px phone it stayed 343px tall and centred, and
+ *    the sheet still covered the pile and three of the four seats. So the sheet
+ *    also publishes its height as `--hand-sheet-h`, the same trick the party
+ *    dock uses, and the table area reserves that space and shrinks into what is
+ *    left. The table becomes an oval rather than a circle, which is what a card
+ *    table looks like anyway.
+ *
  * Restyled onto the design tokens along the way; it was the last thing still
  * wearing the old amber-on-forest-green palette.
  */
@@ -49,8 +57,39 @@ export const MobileHandSheet = memo(function MobileHandSheet({
   onSkip,
   claimLabel,
 }: MobileHandSheetProps) {
+  const sheetRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * Publish the sheet's height as `--hand-sheet-h`, or 0 while it is off
+   * screen. Read by the table area in Game.tsx; see the note above.
+   */
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    const el = sheetRef.current;
+    if (!el || !visible) {
+      root.style.setProperty("--hand-sheet-h", "0px");
+      return;
+    }
+
+    const publish = () => {
+      root.style.setProperty(
+        "--hand-sheet-h",
+        `${Math.ceil(el.getBoundingClientRect().height)}px`,
+      );
+    };
+
+    publish();
+    const observer = new ResizeObserver(publish);
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+      root.style.setProperty("--hand-sheet-h", "0px");
+    };
+  }, [visible, collapsed]);
+
   return (
     <div
+      ref={sheetRef}
       className={cn(
         "fixed inset-x-0 z-40 flex flex-col rounded-t-xl border-t border-border",
         "bg-surface/98 backdrop-blur transition-transform duration-300 ease-out",

@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useGame } from "@/lib/gameContext";
+import { useGame, storedSession } from "@/lib/gameContext";
 import { GameTable } from "@/components/GameTable";
 import { PlayerHand } from "@/components/PlayerHand";
 import { MobileHandSheet } from "@/components/MobileHandSheet";
@@ -33,6 +33,8 @@ export default function Game() {
     addToast,
     reconnectRoom,
     leaveRoom,
+    partyState,
+    partyRematch,
   } = useGame();
 
   const { lang, toggleLang, t } = useLanguage();
@@ -53,8 +55,7 @@ export default function Game() {
 
   useEffect(() => {
     if (reconnected) return;
-    const storedRoomId = localStorage.getItem("liarsbar_roomId");
-    const storedPlayerId = localStorage.getItem("liarsbar_playerId");
+    const { roomId: storedRoomId, playerId: storedPlayerId } = storedSession();
 
     if (storedRoomId === paramRoomId && storedPlayerId && !gameState) {
       reconnectRoom(storedRoomId, storedPlayerId).then(() => {
@@ -65,11 +66,18 @@ export default function Game() {
     }
   }, [paramRoomId, gameState, reconnectRoom, reconnected]);
 
+  // A party never goes to /room/:id — that page is the classic standalone
+  // lobby and asks a party member, who is already seated, to type their name
+  // and join. PartyRouter owns where a party goes; this bounce is only for
+  // the classic flow.
+  const inParty = partyState?.roomId === paramRoomId;
+
   useEffect(() => {
+    if (inParty) return;
     if (gameState?.phase === "lobby" || !gameState) {
       navigate(`/room/${paramRoomId}`);
     }
-  }, [gameState, paramRoomId, navigate]);
+  }, [inParty, gameState, paramRoomId, navigate]);
 
   // Countdown timer for challenge window
   useEffect(() => {
@@ -265,7 +273,15 @@ export default function Game() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#0d1a0d] via-[#1a2e0d] to-[#0d1a0d] flex flex-col overflow-hidden relative">
+    /*
+      `h-[100dvh]`, not `min-h-screen`. The page already clips its overflow, so
+      a minimum height bought nothing — but it let the column grow past the
+      viewport the moment the table area reserved room for the hand sheet, and
+      a taller column just pushed the table back down underneath it. A fixed
+      viewport height is what makes that reservation mean anything. `dvh` so the
+      mobile browser chrome collapsing doesn't leave a gap.
+    */
+    <div className="h-[100dvh] bg-gradient-to-b from-[#0d1a0d] via-[#1a2e0d] to-[#0d1a0d] flex flex-col overflow-hidden relative">
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-amber-600/4 blur-3xl" />
         <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-emerald-800/5 rounded-full blur-3xl" />
@@ -320,8 +336,24 @@ export default function Game() {
       </div>
 
       {/* Main game area */}
-      <div className="flex-1 flex flex-col relative z-10">
-        <div className="flex-1 min-h-0 flex items-center justify-center p-4">
+      {/*
+        `min-h-0` on the column as well as on the table row. A flex item's
+        default minimum is its content height, so without it this wrapper grew
+        to fit the table plus the space reserved for the hand sheet, overflowed
+        the fixed-height page, and pushed the table straight back under the
+        sheet it was trying to avoid.
+      */}
+      <div className="flex-1 min-h-0 flex flex-col relative z-10">
+        {/*
+          Reserve the space the mobile hand sheet is occupying, so the table
+          recentres into what's left instead of being covered by it. The sheet
+          publishes its own height; it is 0px whenever the sheet is off screen,
+          which is every desktop layout and most of a mobile game.
+        */}
+        <div
+          className="flex-1 min-h-0 flex items-center justify-center p-4"
+          style={{ paddingBottom: "calc(1rem + var(--hand-sheet-h, 0px))" }}
+        >
           <GameTable
             gameState={gameState}
             myPlayerId={myPlayerId!}
@@ -330,8 +362,11 @@ export default function Game() {
           />
         </div>
 
-        {/* Action area (bottom padding reserves room for the floating chat pill) */}
-        <div className="relative z-20 pb-16">
+        {/* Action area. The bottom padding reserves room for the floating chat
+            pill; while the mobile hand sheet is up the pill is hidden and
+            everything else in here is too, so the padding is only stealing
+            height from the table. */}
+        <div className={`relative z-20 ${showMobileHandSheet ? "pb-0" : "pb-16"}`}>
           {/* Challenge notification for ANY player (except lastPlayer) */}
           {canChallenge && (
             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-4 w-full max-w-md animate-in slide-in-from-bottom-4 duration-300">
@@ -599,7 +634,17 @@ export default function Game() {
         <GameOver
           gameState={gameState}
           myPlayerId={myPlayerId!}
-          onBackToLobby={() => navigate(`/room/${paramRoomId}`)}
+          /*
+            "Rematch" used to navigate to /room/:id for everyone. In a party
+            that is the classic lobby, which greets a player who is already in
+            the room with "enter your name to join" — so the one button on the
+            game-over screen threw you out of the game you had just finished.
+            A party deals again in place; only a classic room goes to a lobby.
+          */
+          onBackToLobby={() => {
+            if (inParty) void partyRematch();
+            else navigate(`/room/${paramRoomId}`);
+          }}
           onHome={() => { leaveRoom(); navigate("/"); }}
         />
       )}

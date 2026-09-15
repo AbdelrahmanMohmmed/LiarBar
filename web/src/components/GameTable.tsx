@@ -215,7 +215,15 @@ export const GameTable = memo(function GameTable({
   }, [gameState.turnDeadline, gameState.phase]);
 
   return (
-    <div className="relative w-full max-w-[650px] aspect-square mx-auto perspective-1000">
+    /*
+      `max-h-full` lets the board give up height when its container is short —
+      a phone with the hand sheet open. The seats are placed as percentages of
+      the box, and every ring is `rounded-full` with a percentage inset, so a
+      shorter box is simply an oval table with every seat still on it. Without
+      it the square kept its width-derived height and the bottom seats sat
+      underneath the sheet.
+    */
+    <div className="relative w-full max-w-[650px] max-h-full aspect-square mx-auto perspective-1000">
       {/* 3D Table surface with perspective */}
       <div className="absolute inset-[12%] rounded-full preserve-3d" style={{ transform: "rotateX(15deg)" }}>
         {/* Table base */}

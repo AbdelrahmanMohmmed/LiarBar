@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useGame } from "@/lib/gameContext";
+import { useGame, storedSession } from "@/lib/gameContext";
 import { useLanguage } from "@/lib/languageContext";
 import type { CodenamesRole, CodenamesTeam } from "@/lib/types";
 import { COLORS, uiFont } from "./theme";
@@ -96,8 +96,7 @@ export default function CodenamesRoom() {
 
   useEffect(() => {
     if (reconnected) return;
-    const storedRoomId = localStorage.getItem("liarsbar_roomId");
-    const storedPlayerId = localStorage.getItem("liarsbar_playerId");
+    const { roomId: storedRoomId, playerId: storedPlayerId } = storedSession();
 
     if (storedRoomId === paramRoomId && storedPlayerId && !codenamesState) {
       reconnectRoom(storedRoomId, storedPlayerId)

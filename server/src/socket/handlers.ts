@@ -2,7 +2,12 @@ import type { Server, Socket } from "socket.io";
 import { config } from "../config.js";
 import { RoomRegistry } from "../core/RoomRegistry.js";
 import { RateLimiter } from "./rateLimit.js";
-import { sendPrivateHands, broadcastState, activeGameRoom } from "./emitters.js";
+import {
+  sendPrivateHands,
+  sendPrivateStateTo,
+  broadcastState,
+  activeGameRoom,
+} from "./emitters.js";
 import {
   createGameRoom,
   DEFAULT_GAME_ID,
@@ -344,6 +349,11 @@ export function registerSocketHandlers(
             success: true,
             state: room.toPlayerState(player.id),
           });
+
+          // The reply carries public state and whatever secrets live inside
+          // toPlayerState; this carries the ones that travel on their own
+          // channel. Without it a refresh mid-hand leaves you cardless.
+          sendPrivateStateTo(io, room, player.id, socket.id);
         } catch (err) {
           console.error("Error reconnecting:", err);
           fail(callback, "Failed to reconnect");

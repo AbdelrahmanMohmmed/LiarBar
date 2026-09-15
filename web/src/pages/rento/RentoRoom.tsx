@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useGame } from "@/lib/gameContext";
+import { useGame, storedSession } from "@/lib/gameContext";
 import { useLanguage } from "@/lib/languageContext";
 import { flagImageUrl } from "@/lib/utils";
 import { COLORS, uiFont } from "@/pages/domino/theme";
@@ -96,8 +96,7 @@ export default function RentoRoom() {
 
   useEffect(() => {
     if (reconnected) return;
-    const storedRoomId = localStorage.getItem("liarsbar_roomId");
-    const storedPlayerId = localStorage.getItem("liarsbar_playerId");
+    const { roomId: storedRoomId, playerId: storedPlayerId } = storedSession();
 
     if (paramRoomId) {
       if (storedRoomId === paramRoomId && storedPlayerId) {

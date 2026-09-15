@@ -57,6 +57,37 @@ export function sendPrivateHands(io: Server, room: GameRoom): void {
 }
 
 /**
+ * Send one player their private state, without touching anyone else's.
+ *
+ * Reconnecting needs this. The reply to `reconnect_room` carries the player's
+ * own `toPlayerState`, which is enough for every game that keeps its secrets
+ * inside that object — but Liar's Bar delivers the hand over `your_hand`, on
+ * its own channel, into its own piece of client state. So refreshing the page
+ * mid-hand gave you a table that said you were holding thirteen cards and a
+ * hand that was empty, with no way to play and no error to explain it.
+ *
+ * Re-sending on reconnect fixes that game and immunises the next one: any
+ * engine listed in PRIVATE_STATE_EVENTS is covered here by construction.
+ */
+export function sendPrivateStateTo(
+  io: Server,
+  room: GameRoom,
+  playerId: string,
+  socketId: string,
+): void {
+  const target = activeGameRoom(room);
+  if (!target.getPlayer(playerId)) return;
+
+  const state = target.toPlayerState(playerId) as { hand?: unknown };
+  io.to(socketId).emit("your_hand", { hand: state.hand ?? [] });
+
+  const privateEvent = PRIVATE_STATE_EVENTS[target.gameId];
+  if (privateEvent) {
+    io.to(socketId).emit(privateEvent, state);
+  }
+}
+
+/**
  * Broadcast public state to the room.
  *
  * Note this always sends the *container's* state, never the sub-room's: the

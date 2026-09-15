@@ -246,6 +246,53 @@ const party = (s) => s.states.at(-1);
     [host, late].forEach((c) => c.close());
   }
 
+  // -------------------------------------------------------------------
+  // 5. A refresh mid-hand gives your cards back — on the channel that
+  //    carries them.
+  // -------------------------------------------------------------------
+  {
+    // Case 1 covers domino, whose hand rides inside `toPlayerState` and so
+    // arrives in the reconnect reply for free. Liar's Bar does not: the hand
+    // travels on `your_hand`, its own event, into its own piece of client
+    // state. Reconnect never re-sent it, so a refresh mid-hand left the table
+    // saying you held thirteen cards while your hand was empty — nothing to
+    // play, nothing to explain it.
+    const host = track(await connect());
+    const created = await emit(host, "create_room", {
+      playerName: "Ahmed",
+      gameId: "liars-bar",
+      maxPlayers: 4,
+      variant: "cards",
+      deckCount: 1,
+    });
+    const code = created.roomId;
+
+    const sara = track(await connect());
+    const saraJoin = await emit(sara, "join_room", { roomId: code, playerName: "Sara" });
+    await emit(host, "add_bot", {});
+    await emit(host, "start_game", {});
+    await sleep(400);
+
+    sara.close();
+    await sleep(300);
+
+    const sara2 = await connect();
+    let hand = null;
+    sara2.on("your_hand", (d) => {
+      hand = d?.hand ?? null;
+    });
+    await emit(sara2, "reconnect_room", { roomId: code, playerId: saraJoin.playerId });
+    await sleep(400);
+
+    if (Array.isArray(hand) && hand.length > 0) {
+      ok(`a refresh mid-hand gets the cards back (${hand.length})`);
+    } else {
+      bad("hand restore", `your_hand after reconnect: ${JSON.stringify(hand)}`);
+    }
+
+    [host, sara2].forEach((c) => c.close());
+  }
+
   console.log(
     failures
       ? `\n=== LIFECYCLE: ${failures} CHECK(S) FAILED ===`

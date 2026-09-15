@@ -203,6 +203,24 @@ function readStored(key: string, legacyKey: string): string | null {
   }
 }
 
+/**
+ * The room and player id this browser last used, if any.
+ *
+ * Nine pages each read these keys inline, and every one of them still spelled
+ * the pre-rename `liarsbar_*` keys — which nothing has written since the
+ * rebrand. Their "reconnect me if I refreshed straight onto this page" effect
+ * had therefore been dead for as long as the new keys have existed, silently,
+ * because the party flow reconnects first in the common case and hid it.
+ *
+ * One exported reader means the next rename is one line, not nine files.
+ */
+export function storedSession(): { roomId: string | null; playerId: string | null } {
+  return {
+    roomId: readStored(LS_ROOM_ID, LEGACY_LS_ROOM_ID),
+    playerId: readStored(LS_PLAYER_ID, LEGACY_LS_PLAYER_ID),
+  };
+}
+
 export const [GameProvider, useGame] = createContextHook(() => {
   const [partyState, setPartyState] = useState<PartyState | null>(null);
   const [gameCatalog, setGameCatalog] = useState<GameSpecPublic[]>([]);
