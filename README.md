@@ -1,53 +1,115 @@
-# Liar's Bar 
-https://games.safariyat.live
+# Lamma — لمّة
 
-Online multiplayer games including Liar's Bar (cards & dominoes variants) and bilingual Codenames (Arabic/English) with voice chat, styling themes, and full Arabic RTL support.
+**Online party games you play with your friends in one browser tab.**
+One room, one link, a dozen games, and voice chat that doesn't drop when you
+switch between them.
 
-- **`server/`** — Node.js + Express + Socket.IO game server (TypeScript)
-- **`web/`** — React + Vite + Tailwind client
+> Live at https://games.safariyat.live
+> The brand name lives in one file — see [docs/BRANDING.md](docs/BRANDING.md).
 
-## Run locally
+---
 
-Requires Node.js 18+.
+## The idea in one paragraph
 
-**Terminal 1 — server:**
+A room is not a game. A room is a group of people, and the game is a slot inside
+it that anyone can swap at any time. Finish domino, switch to Codenames, and the
+room code, the roster, the chat, the voice call and the night's scoreboard all
+stay exactly where they were. Nobody re-sends a link. That is the entire product
+thesis, and everything else follows from it.
+
+---
+
+## Repository
+
+```
+server/   Node + Express + Socket.IO game server (TypeScript)
+web/      React + Vite + Tailwind client
+docs/     Architecture, branding, design system, voice, roadmaps
+deploy/   coturn (TURN relay) config for voice
+```
+
+## Run it locally
+
+Requires Node 20+.
+
+**Terminal 1 — server**
 
 ```bash
 cd server
 npm install
-npm run dev        # starts on http://localhost:3001
+cp .env.example .env
+npm run dev          # http://localhost:3001
 ```
 
-**Terminal 2 — web client:**
+**Terminal 2 — web**
 
 ```bash
 cd web
 npm install
-npm run dev        # starts on http://localhost:5173
+cp .env.example .env
+npm run dev          # http://localhost:5173
 ```
 
-Open http://localhost:5173, create a room, and share the room code (or open a second browser tab and join with it). You can also fill the room with bots.
+Open http://localhost:5173, start a party, and share the six-digit code — or
+open a second browser tab and join with it. You can fill empty seats with bots.
 
-To test from another device on your LAN, copy `web/.env.example` to `web/.env` and set `VITE_BACKEND_URL` to your machine's LAN IP (e.g. `http://192.168.1.22:3001`), and make sure the IP is listed in the server's `ALLOWED_ORIGINS`.
+To play from another device on your LAN, set `VITE_BACKEND_URL` in `web/.env` to
+your machine's LAN IP, and add that origin to `ALLOWED_ORIGINS` in `server/.env`.
+**Both**, or the socket handshake is rejected and every client sits on
+"connecting" forever.
 
-### Useful scripts
+## Scripts
 
 | Where | Command | What it does |
 |---|---|---|
-| `server/` | `npm run dev` | Dev server with auto-reload (tsx watch) |
-| `server/` | `npm run build && npm start` | Compile to `dist/` and run production build |
+| `server/` | `npm run dev` | Dev server, auto-reload |
+| `server/` | `npm test` | Build, then run the domino rule tests and the match simulation |
+| `server/` | `npm run test:domino` | 30 rule checks, no network |
+| `server/` | `npm run test:domino-sim` | 60 full matches + the disconnect regression |
+| `server/` | `npm run test:party` | End-to-end party flow against a running server |
 | `server/` | `npm run typecheck` | Type-check without emitting |
 | `web/` | `npm run dev` | Vite dev server with HMR |
-| `web/` | `npm run build` | Production build to `web/dist/` |
+| `web/` | `npm run build` | Production build |
+| `web/` | `npm run brand:sync` | Regenerate `index.html`, sitemap, robots, manifest from `brand.ts` |
 | `web/` | `npm run lint` | ESLint |
 
-### Environment
+## Environment
 
-Copy `.env.example` to `.env` in each package. Key variables:
+| File | Key | Notes |
+|---|---|---|
+| `server/.env` | `PORT` | Default 3001 |
+| | `ALLOWED_ORIGINS` | Comma-separated. Unset = allow any (fine locally, **not** in production) |
+| `web/.env` | `VITE_BACKEND_URL` | Where the socket connects |
+| | `VITE_TURN_URL` / `_USERNAME` / `_CREDENTIAL` | Voice relay. Without it, voice only works between players on the same network |
+| | `VITE_FIREBASE_*` | Optional, for Google sign-in |
 
-- `server/.env` — `PORT`, `ALLOWED_ORIGINS` (comma-separated CORS origins)
-- `web/.env` — `VITE_BACKEND_URL`, optional Firebase keys for Google sign-in
+---
 
-## Architecture
+## Documentation
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the module layout, how to add a new game or feature, and scaling notes.
+| Document | What's in it |
+|---|---|
+| [**ARCHITECTURE.md**](docs/ARCHITECTURE.md) | How it fits together, every technology choice and what it was chosen *instead of*, scaling, and what I'd build next |
+| [**BRANDING.md**](docs/BRANDING.md) | Why the current name doesn't work, the recommended one, a ranked domain shortlist, and how to switch |
+| [**DESIGN_SYSTEM.md**](docs/DESIGN_SYSTEM.md) | Tokens, the WCAG contrast table, and the reasoning behind each decision |
+| [**VOICE.md**](docs/VOICE.md) | How WebRTC voice works here, how to diagnose "voice is broken", and how to grow it |
+| [**MATCHMAKING.md**](docs/MATCHMAKING.md) | Persistent parties, presence, and matchmaking — designed, not built, in build order |
+| [**IMAGE_BRIEFS.md**](docs/IMAGE_BRIEFS.md) | Every raster asset with an exact prompt and output path |
+| [**CONTENT_STRATEGY.md**](docs/CONTENT_STRATEGY.md) | TikTok plan, six formats, 90 days of video ideas |
+| [DEPLOY.md](DEPLOY.md) | Deployment |
+| [VOICE_TURN_SETUP.md](VOICE_TURN_SETUP.md) | coturn setup on the VM |
+
+---
+
+## Games
+
+| Game | Players | Notes |
+|---|---|---|
+| **Domino** | 2–4 | Egyptian street rules: partners, all 28 tiles dealt, knock when stuck, race to 101 |
+| **Liar's Bar** | 2–6 | Bluffing card game. Cards or dominoes variant |
+| **Codenames** | 4–10 | Fully bilingual — the whole board plays in Arabic or English |
+| **Higher or Lower** | 2–6 | Fast number-guessing race |
+| **Rento** | 2–6 | Property trading, on a turn timer |
+| Arcade | 1–10 | Tetris, Snake, Tic-Tac-Toe, Memory, Space Invaders, Fighter, Snakes & Ladders |
+
+Adding one: [ARCHITECTURE.md §8](docs/ARCHITECTURE.md#8-adding-a-game).
