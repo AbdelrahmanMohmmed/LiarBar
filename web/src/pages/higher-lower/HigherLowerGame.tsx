@@ -469,14 +469,14 @@ export default function HigherLowerGame() {
               display: "inline-flex",
               alignItems: "center",
               gap: 6,
-              background: "#FFFBEB",
+              background: COLORS.white,
               padding: "4px 12px",
               borderRadius: 999,
-              border: "1px solid #FEF3C7",
+              border: `1px solid ${COLORS.peach}`,
             }}
           >
-            <Clock size={16} style={{ color: "#F59E0B" }} />
-            <span style={{ fontFamily: "monospace", fontWeight: 700, fontSize: 15, color: "#D97706" }}>
+            <Clock size={16} style={{ color: COLORS.peach }} />
+            <span style={{ fontFamily: "monospace", fontWeight: 700, fontSize: 15, color: COLORS.peach }}>
               {timeLeft} {c.seconds}
             </span>
           </div>
@@ -541,8 +541,8 @@ export default function HigherLowerGame() {
                   justifyContent: "space-between",
                   padding: "10px 14px",
                   borderRadius: 16,
-                  border: isCurrentAct ? `3px solid #8B5CF6` : `2px solid ${COLORS.ink}`,
-                  background: isMe ? "#FFFBEB" : COLORS.white,
+                  border: isCurrentAct ? `3px solid ${COLORS.red}` : `2px solid ${COLORS.ink}`,
+                  background: COLORS.white,
                   boxShadow: "2px 2px 0px rgba(43,36,32,0.1)",
                   transition: "all 0.2s ease-in-out",
                   transform: isCurrentAct ? "scale(1.01)" : "scale(1)",
@@ -769,19 +769,28 @@ export default function HigherLowerGame() {
       <div
         style={{
           position: "fixed",
-          bottom: 12,
+          // Clears the party dock. A fixed element isn't moved by the body
+          // padding that handles everything in normal flow, so without this
+          // offset the dock sits squarely on top of the chat pill — and on a
+          // phone the dock is the only way back to the hub.
+          bottom: "calc(12px + var(--party-dock-h))",
           left: "50%",
           transform: "translateX(-50%)",
           width: "calc(100% - 32px)",
           maxWidth: 480,
-          background: "#2E1065", // Deep purple pill color
+          // Was a hard-coded deep purple, the last of the old Higher or Lower
+          // palette on this page and the brightest thing on the screen.
+          background: COLORS.white,
           borderRadius: 24,
           boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
           color: COLORS.cream,
           zIndex: 90,
           transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
           overflow: "hidden",
-          border: `2px solid ${COLORS.cream}`,
+          // `COLORS.cream` is the page ground on this palette, so a border in
+          // it is an invisible border. A raised-surface edge is what the rest
+          // of the design system uses for a floating panel.
+          border: `1px solid ${COLORS.disabledBg}`,
           height: chatOpen ? 300 : 48,
           display: "flex",
           flexDirection: "column",

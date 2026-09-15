@@ -45,7 +45,14 @@ function act(socket, self) {
 
     // Small human-ish delay, and a guard so overlapping broadcasts don't make
     // the same seat act twice for one phase.
-    const key = `${state.gameId}:${state.phase}:${state.roundNumber ?? 0}`;
+    //
+    // The key includes whoever the phase is currently waiting on. Chameleon
+    // takes clues one seat at a time within a single phase, so a key of
+    // game:phase:round made every seat act at most once for the whole clue
+    // phase — the first bot spoke and the round then sat there until the
+    // timer killed it, which looks exactly like the game being broken.
+    const waitingOn = state.cluePlayerId ?? state.activeSeat ?? "";
+    const key = `${state.gameId}:${state.phase}:${state.roundNumber ?? 0}:${waitingOn}`;
     if (self.lastKey === key) return;
     self.lastKey = key;
     await sleep(700 + Math.random() * 900);

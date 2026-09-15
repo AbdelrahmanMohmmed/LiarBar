@@ -209,6 +209,15 @@ export default function ChameleonGamePage() {
           )}
 
           {myTurn ? (
+            <>
+              {/* Say so. The input appearing is a signal, but a player looking
+                  at a grid of sixteen words and a small text box has no way to
+                  tell whether the round is waiting on them or on somebody
+                  else — and in a game where the whole table is waiting, that
+                  is the one thing they need to know. */}
+              <p className="text-sm text-coral text-center mb-2">
+                {t("chameleon.your_turn")}
+              </p>
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -234,6 +243,7 @@ export default function ChameleonGamePage() {
                 <Send size={16} />
               </button>
             </form>
+            </>
           ) : (
             <p className="text-sm text-sand text-center">
               {t("chameleon.waiting_for").replace(

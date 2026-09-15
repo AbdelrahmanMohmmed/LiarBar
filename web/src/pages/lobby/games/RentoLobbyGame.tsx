@@ -1514,7 +1514,7 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
           height: 54,
           background: chatOpen ? "#F2B441" : "linear-gradient(135deg, #E8563F, #E23D57)",
           color: chatOpen ? "#2B2420" : "#fff",
-          boxShadow: chatOpen ? "0 8px 24px -6px rgba(254,210,63,0.6)" : "0 8px 24px -6px rgba(124,58,237,0.6)",
+          boxShadow: chatOpen ? "0 8px 24px -6px rgba(242,180,65,0.55)" : "0 8px 24px -6px rgba(232,86,63,0.55)",
         } as React.CSSProperties}
         aria-label="Chat"
       >

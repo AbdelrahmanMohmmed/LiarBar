@@ -1028,7 +1028,15 @@ export default function CodenamesGame() {
 
       {/* Button to show the game over overlay again if closed */}
       {codenamesState.phase === "finished" && !showGameOverOverlay && (
-        <div style={{ position: "fixed", bottom: 20, [isAr ? "left" : "right"]: 20, zIndex: 99 }}>
+        <div
+          style={{
+            position: "fixed",
+            // Above the party dock, not behind it.
+            bottom: "calc(20px + var(--party-dock-h))",
+            [isAr ? "left" : "right"]: 20,
+            zIndex: 99,
+          }}
+        >
           <PrimaryButton
             onClick={() => setShowGameOverOverlay(true)}
             color={winner === "red" ? COLORS.red : COLORS.teal}

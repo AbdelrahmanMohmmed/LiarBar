@@ -39,7 +39,55 @@ import SupersededNotice from "./components/party/SupersededNotice";
  * socket connection — the landing page, the invite link, and 404. Lazy-loading
  * those would put a network round-trip on the critical path for no benefit.
  */
-const lazyPage = (loader: () => Promise<{ default: ComponentType }>) => lazy(loader);
+/**
+ * A lazily-loaded page that survives a deploy landing mid-session.
+ *
+ * Every build gives its chunks new content-hashed filenames, and the old ones
+ * stop being served. A player who loaded the app before a deploy is holding an
+ * index that names chunks which no longer exist — so the moment they navigate
+ * to a page they haven't visited yet, the import 404s, the error bubbles out of
+ * Suspense, and React unmounts the tree. The result is a white screen, mid
+ * game-night, with nothing in the UI to suggest a reload would fix it.
+ *
+ * This is not theoretical: it reproduces every time the dev build is rebuilt
+ * with a tab open, which is exactly what a Vercel deploy looks like to someone
+ * already playing.
+ *
+ * So a failed chunk load reloads the page once, which fetches the new index and
+ * the new chunk names. The sessionStorage flag makes it once and not a loop: if
+ * the import fails again after a reload the failure is real (offline, a broken
+ * deploy) and the error is allowed through to the boundary, where it can be
+ * reported rather than hidden behind an endless refresh.
+ */
+const RELOADED_KEY = "lamma_chunk_reload";
+
+const lazyPage = (loader: () => Promise<{ default: ComponentType }>) =>
+  lazy(async () => {
+    try {
+      const mod = await loader();
+      try {
+        sessionStorage.removeItem(RELOADED_KEY);
+      } catch {
+        /* private mode: the flag is a nicety, not a requirement */
+      }
+      return mod;
+    } catch (err) {
+      let alreadyTried = false;
+      try {
+        alreadyTried = sessionStorage.getItem(RELOADED_KEY) === "1";
+        sessionStorage.setItem(RELOADED_KEY, "1");
+      } catch {
+        /* no storage: fall through and reload once per page load */
+      }
+      if (!alreadyTried) {
+        window.location.reload();
+        // Never resolves — the reload is already under way, and resolving with
+        // anything here would flash a wrong page first.
+        return new Promise<{ default: ComponentType }>(() => {});
+      }
+      throw err;
+    }
+  });
 
 const Index = lazyPage(() => import("./pages/index"));
 const Room = lazyPage(() => import("./pages/Room"));
