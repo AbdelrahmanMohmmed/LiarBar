@@ -2,7 +2,7 @@ import type { Server, Socket } from "socket.io";
 import { config } from "../config.js";
 import { RoomRegistry } from "../core/RoomRegistry.js";
 import { RateLimiter } from "./rateLimit.js";
-import { sendPrivateHands, broadcastState } from "./emitters.js";
+import { sendPrivateHands, broadcastState, activeGameRoom } from "./emitters.js";
 import {
   createGameRoom,
   DEFAULT_GAME_ID,
@@ -20,6 +20,8 @@ import { SnakeGame } from "../games/snake/SnakeGame.js";
 import { SpaceInvadersGame } from "../games/space-invaders/SpaceInvadersGame.js";
 import { FighterGame } from "../games/fighter/FighterGame.js";
 import { LobbyRoom } from "../games/lobby/LobbyRoom.js";
+import { PartyRoom } from "../games/party/PartyRoom.js";
+import { validateGameOptions, publicCatalog } from "../games/catalog.js";
 import { DominoGame } from "../games/domino/DominoGame.js";
 import { MemoryPuzzleGame } from "../games/memory-puzzle/MemoryPuzzleGame.js";
 import { TetrisGame } from "../games/tetris/TetrisGame.js";
@@ -34,6 +36,21 @@ function reply(callback: Ack, response: unknown): void {
 
 function fail(callback: Ack, error: string): void {
   reply(callback, { error });
+}
+
+/**
+ * Is this room still in a pre-game state where the roster can change?
+ *
+ * A standalone engine calls that phase "lobby"; a party calls it "hub" and
+ * additionally allows roster changes while a game is staged but not yet dealt.
+ * Callers care about the question, not about which vocabulary the room uses.
+ */
+function isAcceptingRosterChanges(room: GameRoom): boolean {
+  if (room instanceof PartyRoom) {
+    if (room.phase === "hub") return true;
+    return room.activeSubRoom?.phase === "lobby";
+  }
+  return room.phase === "lobby";
 }
 
 /** Validate and normalize a player-provided display name. */
@@ -95,10 +112,7 @@ export function registerSocketHandlers(
           fail(callback, "Not in a room");
           return null;
         }
-        let targetRoom = m.room;
-        if (targetRoom instanceof LobbyRoom && targetRoom.activeSubRoom) {
-          targetRoom = targetRoom.activeSubRoom;
-        }
+        const targetRoom = activeGameRoom(m.room);
         if (!(targetRoom instanceof GameClass)) {
           fail(callback, "Action not supported by this game");
           return null;
@@ -143,96 +157,31 @@ export function registerSocketHandlers(
           }
 
           const gameId = data.gameId || DEFAULT_GAME_ID;
-          const maxPlayers = Number(data.maxPlayers);
 
-          if (gameId === DEFAULT_GAME_ID) {
-            const deckCount = Number(data.deckCount);
-            if (!Number.isInteger(maxPlayers) || maxPlayers < 2 || maxPlayers > 6) {
-              fail(callback, "Players must be between 2 and 6");
+          // "party" / the legacy "lobby" id mean "open a room with no game
+          // chosen yet"; anything else means "open a room and stage that
+          // game in it". Either way the room itself is a PartyRoom, so the
+          // group can switch games later without a new invite link.
+          const wantsHubOnly = gameId === "party" || gameId === "lobby";
+
+          if (!wantsHubOnly) {
+            const optionError = validateGameOptions(gameId, data);
+            if (optionError) {
+              fail(callback, optionError);
               return;
             }
-            if (!Number.isInteger(deckCount) || deckCount < 1 || deckCount > 4) {
-              fail(callback, "Deck count must be between 1 and 4");
-              return;
-            }
-            if (data.variant !== "cards" && data.variant !== "dominoes") {
-              fail(callback, "Unknown game variant");
-              return;
-            }
-          } else if (gameId === "codenames") {
-            if (!Number.isInteger(maxPlayers) || maxPlayers < 4 || maxPlayers > 10) {
-              fail(callback, "Players must be between 4 and 10");
-              return;
-            }
-            if (data.language !== "ar" && data.language !== "en") {
-              fail(callback, "Language must be 'ar' or 'en'");
-              return;
-            }
-          } else if (gameId === "higher-lower") {
-            if (!Number.isInteger(maxPlayers) || maxPlayers < 2 || maxPlayers > 6) {
-              fail(callback, "Players must be between 2 and 6");
-              return;
-            }
-          } else if (gameId === "lobby") {
-            if (!Number.isInteger(maxPlayers) || maxPlayers < 2 || maxPlayers > 10) {
-              fail(callback, "Players must be between 2 and 10");
-              return;
-            }
-          } else if (gameId === "domino") {
-            if (!Number.isInteger(maxPlayers) || maxPlayers < 2 || maxPlayers > 4) {
-              fail(callback, "Players must be between 2 and 4");
-              return;
-            }
-            if (data.gameMode === "teams" && maxPlayers !== 4) {
-              fail(callback, "Team mode requires exactly 4 players");
-              return;
-            }
-          } else if (gameId === "rento") {
-            if (!Number.isInteger(maxPlayers) || maxPlayers < 2 || maxPlayers > 6) {
-              fail(callback, "Players must be between 2 and 6");
-              return;
-            }
-            if (data.startingBalance !== undefined) {
-              const bal = Number(data.startingBalance);
-              if (!Number.isFinite(bal) || bal < 200 || bal > 10000) {
-                fail(callback, "Starting balance must be between 200 and 10000");
-                return;
-              }
-            }
-            if (data.turnTimer !== undefined) {
-              const t = Number(data.turnTimer);
-              if (!Number.isFinite(t) || t < 30000 || t > 120000) {
-                fail(callback, "Turn timer must be between 30 and 120 seconds");
-                return;
-              }
-            }
-            if (data.freeParkingBonus !== undefined) {
-              const f = Number(data.freeParkingBonus);
-              if (!Number.isFinite(f) || f < 0 || f > 2000) {
-                fail(callback, "Free parking bonus must be between 0 and 2000");
-                return;
-              }
-            }
-            if (data.aiDifficulty !== undefined && !["easy", "medium", "hard"].includes(data.aiDifficulty)) {
-              fail(callback, "Invalid AI difficulty");
-              return;
-            }
-            if (data.mapId !== undefined && !["middle_east", "europe", "americas"].includes(data.mapId)) {
-              fail(callback, "Invalid map");
-              return;
-            }
-            if (data.backgroundId !== undefined && !["nebula", "ocean", "sunset", "emerald"].includes(data.backgroundId)) {
-              fail(callback, "Invalid background");
-              return;
-            }
-          } else {
-            fail(callback, `Unknown game: ${gameId}`);
+          } else if (
+            !Number.isInteger(Number(data.maxPlayers)) ||
+            Number(data.maxPlayers) < 2 ||
+            Number(data.maxPlayers) > 10
+          ) {
+            fail(callback, "Players must be between 2 and 10");
             return;
           }
 
           const roomId = registry.generateRoomCode();
 
-          const room = createGameRoom(gameId, roomId, data, {
+          const room = new PartyRoom(roomId, Number(data.maxPlayers), {
             broadcast: (state) => io.to(roomId).emit("game_state", state),
             onGameEnd: (rid, winnerId) => {
               console.log(`Game over in room ${rid}, winner: ${winnerId}`);
@@ -243,12 +192,19 @@ export function registerSocketHandlers(
             },
           });
 
-          if (!room) {
-            fail(callback, `Unknown game: ${gameId}`);
-            return;
-          }
-
           const player = room.addPlayer(playerName, socket.id, true, undefined, (data as any).flag);
+
+          // Stage the requested game without dealing: the host is alone at
+          // this point, and the classic flow is create -> share link -> wait
+          // -> press Start. Auto-starting here would deal to one person.
+          if (!wantsHubOnly) {
+            const staged = room.pickGame(gameId, data, { autoStart: false });
+            if (!staged.success) {
+              room.destroy();
+              fail(callback, staged.error ?? "Failed to set up that game");
+              return;
+            }
+          }
           registry.add(room);
           socket.join(roomId);
           registry.bindSocket(socket.id, { roomId, playerId: player.id });
@@ -283,7 +239,13 @@ export function registerSocketHandlers(
             fail(callback, "Room not found");
             return;
           }
-          if (room.phase !== "lobby") {
+
+          // A party always accepts arrivals. If a game is mid-hand the
+          // newcomer waits in the hub and is dealt into the next one — which
+          // is the entire reason parties exist. Only standalone game rooms
+          // (created before this change, or by a direct engine route) still
+          // reject a mid-game join, because their engines cannot seat one.
+          if (!(room instanceof PartyRoom) && room.phase !== "lobby") {
             fail(callback, "Game already in progress");
             return;
           }
@@ -356,7 +318,7 @@ export function registerSocketHandlers(
         if (!m) return;
         const { room } = m;
 
-        if (room.phase !== "lobby") {
+        if (!isAcceptingRosterChanges(room)) {
           fail(callback, "Game already started");
           return;
         }
@@ -379,7 +341,7 @@ export function registerSocketHandlers(
       if (!m) return;
       const { room } = m;
 
-      if (room.phase !== "lobby") {
+      if (!isAcceptingRosterChanges(room)) {
         fail(callback, "Game already started");
         return;
       }
@@ -985,6 +947,109 @@ export function registerSocketHandlers(
       reply(callback, { success: true, dice: result.dice });
     });
 
+    // ===== PARTY =====
+    //
+    // These four events are the whole answer to "we finished a game, now we
+    // have to send a new link on WhatsApp". The room code, the roster, the
+    // chat and the voice mesh survive every one of them.
+
+    /** Public game catalogue, so the picker can grey out games that don't fit. */
+    socket.on("party_catalog", (_data: unknown, callback: Ack) => {
+      reply(callback, { success: true, games: publicCatalog() });
+    });
+
+    /** Host switches the party into a different game. Works from any phase. */
+    socket.on(
+      "party_pick_game",
+      (data: { gameId?: string; options?: Partial<CreateRoomOptions> }, callback: Ack) => {
+        const m = hostMembership(callback);
+        if (!m) return;
+        if (!(m.room instanceof PartyRoom)) {
+          fail(callback, "This room can't switch games");
+          return;
+        }
+        // Switching rebuilds a game engine and reseats everyone, so it is
+        // cheap but not free; rate-limit it against a stuck client looping.
+        if (!limiter.allow(`${socket.id}:party_pick`, 12, 30_000)) {
+          fail(callback, "Slow down a moment");
+          return;
+        }
+
+        const result = m.room.pickGame(
+          String(data?.gameId ?? ""),
+          data?.options ?? {},
+        );
+        if (!result.success) {
+          fail(callback, result.error ?? "Could not start that game");
+          return;
+        }
+
+        sendPrivateHands(io, m.room);
+        reply(callback, { success: true });
+      },
+    );
+
+    /** Same game, same settings, same people, fresh deal. */
+    socket.on("party_rematch", (_data: unknown, callback: Ack) => {
+      const m = hostMembership(callback);
+      if (!m) return;
+      if (!(m.room instanceof PartyRoom)) {
+        fail(callback, "This room can't rematch");
+        return;
+      }
+      if (!limiter.allow(`${socket.id}:party_pick`, 12, 30_000)) {
+        fail(callback, "Slow down a moment");
+        return;
+      }
+
+      const result = m.room.rematch();
+      if (!result.success) {
+        fail(callback, result.error ?? "Could not restart the game");
+        return;
+      }
+
+      sendPrivateHands(io, m.room);
+      reply(callback, { success: true });
+    });
+
+    /** Abandon the current game and go back to the picker. */
+    socket.on("party_return_hub", (_data: unknown, callback: Ack) => {
+      const m = hostMembership(callback);
+      if (!m) return;
+      if (!(m.room instanceof PartyRoom)) {
+        fail(callback, "This room has no hub");
+        return;
+      }
+      m.room.returnToHub();
+      reply(callback, { success: true });
+    });
+
+    /**
+     * Leave for good, as opposed to disconnecting. A disconnect keeps the
+     * seat warm for a reconnect; this frees it so the party isn't stuck at
+     * "5/5 players" with a ghost in one chair.
+     */
+    socket.on("party_leave", (_data: unknown, callback: Ack) => {
+      const m = membership();
+      if (!m) {
+        reply(callback, { success: true });
+        return;
+      }
+      const { room, player } = m;
+
+      if (room instanceof PartyRoom) {
+        room.removePlayer(player.id);
+        room.activeSubRoom?.handleDisconnect(socket.id);
+      } else {
+        room.handleDisconnect(socket.id);
+      }
+
+      registry.unbindSocket(socket.id);
+      socket.leave(room.roomId);
+      broadcastState(io, room);
+      reply(callback, { success: true });
+    });
+
     // ===== LOBBY MODE SUB-GAMES =====
 
     socket.on(
@@ -993,6 +1058,19 @@ export function registerSocketHandlers(
         const m = hostMembership(callback);
         if (!m) return;
         const { room } = m;
+
+        // Legacy alias for party_pick_game. Kept because clients cached on
+        // a user's phone will keep sending it for a while after deploy.
+        if (room instanceof PartyRoom) {
+          const result = room.pickGame(String(data?.gameId ?? ""), data?.options ?? {});
+          if (!result.success) {
+            fail(callback, result.error ?? "Failed to start sub-game");
+            return;
+          }
+          sendPrivateHands(io, room);
+          reply(callback, { success: true });
+          return;
+        }
 
         if (!(room instanceof LobbyRoom)) {
           fail(callback, "Not in a lobby room");
@@ -1014,6 +1092,13 @@ export function registerSocketHandlers(
       const m = hostMembership(callback);
       if (!m) return;
       const { room } = m;
+
+      // Legacy alias for party_return_hub.
+      if (room instanceof PartyRoom) {
+        room.returnToHub();
+        reply(callback, { success: true });
+        return;
+      }
 
       if (!(room instanceof LobbyRoom)) {
         fail(callback, "Not in a lobby room");

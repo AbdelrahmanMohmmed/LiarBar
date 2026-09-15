@@ -6,6 +6,8 @@ import { config } from "./config.js";
 import { RoomRegistry } from "./core/RoomRegistry.js";
 import { registerSocketHandlers } from "./socket/handlers.js";
 import { GameManager } from "./games/liars-bar/GameManager.js";
+import { PartyRoom } from "./games/party/PartyRoom.js";
+import { publicCatalog } from "./games/catalog.js";
 
 const app = express();
 app.use(cors({ origin: config.allowedOrigins, credentials: true }));
@@ -29,6 +31,11 @@ app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", rooms: registry.size, uptime: process.uptime() });
 });
 
+/**
+ * Room preview, used by the join page so someone opening an invite link sees
+ * "Ahmed's party — 4 playing Domino" before they type a name, instead of a
+ * bare code. Deliberately reveals nothing private: no player names, no hands.
+ */
 app.get("/api/room/:roomId", (req, res) => {
   const room = registry.get(req.params.roomId.toUpperCase());
   if (!room) {
@@ -41,10 +48,23 @@ app.get("/api/room/:roomId", (req, res) => {
     phase: room.phase,
     playerCount: room.players.length,
     maxPlayers: room.maxPlayers,
+    ...(room instanceof PartyRoom
+      ? {
+          activeGameId: room.activeGameId,
+          /** Parties accept latecomers; the join page shows this as "you can hop in". */
+          joinable: room.players.length < room.maxPlayers,
+        }
+      : {}),
     ...(room instanceof GameManager
       ? { variant: room.variant, deckCount: room.deckCount }
       : {}),
   });
+});
+
+/** Which games exist and how many people each needs. Cached hard by clients. */
+app.get("/api/games", (_req, res) => {
+  res.set("Cache-Control", "public, max-age=300");
+  res.json({ games: publicCatalog() });
 });
 
 // ============ Socket.IO ============

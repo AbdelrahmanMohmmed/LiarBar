@@ -1,6 +1,7 @@
 import createContextHook from "../utils/createContextHook";
 import { useState, useCallback, useEffect, useRef } from "react";
 import { getSocket, connectSocket, disconnectSocket } from "./socket";
+import { BRAND } from "./brand";
 import type {
   GameState,
   Card,
@@ -19,6 +20,8 @@ import type {
   CodenamesLang,
   HigherLowerState,
   LobbyState,
+  PartyState,
+  GameSpecPublic,
   DominoState,
   Dominoe,
   RentoState,
@@ -93,10 +96,22 @@ interface GameActions {
   dominoDrawTile: () => Promise<void>;
   dominoPass: () => Promise<void>;
   dominoRematch: () => Promise<void>;
+  /** Switch the whole party into a different game. Keeps the room + voice. */
+  partyPickGame: (gameId: string, options?: Record<string, unknown>) => Promise<void>;
+  /** Same game, same settings, same people, fresh deal. */
+  partyRematch: () => Promise<void>;
+  /** Abandon the current game, back to the picker. */
+  partyReturnHub: () => Promise<void>;
+  /** Free the seat for good (as opposed to disconnecting). */
+  partyLeave: () => Promise<void>;
+  /** Which games exist and how many players each needs. */
+  loadGameCatalog: () => Promise<GameSpecPublic[]>;
 }
 
 interface GameContextValue extends GameActions {
   // State
+  partyState: PartyState | null;
+  gameCatalog: GameSpecPublic[];
   lobbyState: LobbyState | null;
   gameState: GameState | null;
   codenamesState: CodenamesState | null;
@@ -112,11 +127,35 @@ interface GameContextValue extends GameActions {
   error: string | null;
 }
 
-// Local storage keys
-const LS_ROOM_ID = "liarsbar_roomId";
-const LS_PLAYER_ID = "liarsbar_playerId";
+/** Anything the server can send on `game_state` or a command ack. */
+export type AnyRoomState =
+  | PartyState
+  | LobbyState
+  | GameState
+  | CodenamesState
+  | HigherLowerState
+  | DominoState
+  | RentoState;
+
+// Local storage keys. Prefixed by brand id so a rename doesn't silently
+// resurrect a stale room from a previous build.
+const LS_ROOM_ID = `${BRAND.id}_roomId`;
+const LS_PLAYER_ID = `${BRAND.id}_playerId`;
+/** Older builds used these; read once so a returning player isn't logged out. */
+const LEGACY_LS_ROOM_ID = "liarsbar_roomId";
+const LEGACY_LS_PLAYER_ID = "liarsbar_playerId";
+
+function readStored(key: string, legacyKey: string): string | null {
+  try {
+    return localStorage.getItem(key) ?? localStorage.getItem(legacyKey);
+  } catch {
+    return null;
+  }
+}
 
 export const [GameProvider, useGame] = createContextHook(() => {
+  const [partyState, setPartyState] = useState<PartyState | null>(null);
+  const [gameCatalog, setGameCatalog] = useState<GameSpecPublic[]>([]);
   const [lobbyState, setLobbyState] = useState<LobbyState | null>(null);
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [codenamesState, setCodenamesState] = useState<CodenamesState | null>(null);
@@ -156,6 +195,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
     // room session — otherwise the same connection is still "in a room" server-side
     // and the next create_room/join_room fails with "Already in a room".
     disconnectSocket();
+    setPartyState(null);
     setLobbyState(null);
     setGameState(null);
     setCodenamesState(null);
@@ -177,10 +217,15 @@ export const [GameProvider, useGame] = createContextHook(() => {
     try {
       localStorage.removeItem(LS_ROOM_ID);
       localStorage.removeItem(LS_PLAYER_ID);
+      localStorage.removeItem(LEGACY_LS_ROOM_ID);
+      localStorage.removeItem(LEGACY_LS_PLAYER_ID);
     } catch {
       /* ignore */
     }
   }, [resetGame]);
+
+  const leaveRoomRef = useRef(leaveRoom);
+  leaveRoomRef.current = leaveRoom;
 
   // Socket setup
   useEffect(() => {
@@ -194,64 +239,8 @@ export const [GameProvider, useGame] = createContextHook(() => {
       setIsConnected(false);
     };
 
-    const onGameState = (state: GameState | CodenamesState | HigherLowerState | LobbyState | DominoState | RentoState) => {
-      if ((state as LobbyState).gameId === "lobby") {
-        const next = state as LobbyState;
-        setLobbyState(next);
-        if (next.activeGameId === "liars-bar") {
-          setGameState(next.subGameState);
-          setCodenamesState(null);
-          setHigherLowerState(null);
-          setDominoState(null);
-        } else if (next.activeGameId === "codenames") {
-          setCodenamesState((prev) => {
-            const nextSub = next.subGameState as CodenamesState;
-            return nextSub ? { ...nextSub, you: prev?.you, key: prev?.key } : null;
-          });
-          setGameState(null);
-          setHigherLowerState(null);
-          setDominoState(null);
-        } else if (next.activeGameId === "higher-lower") {
-          setHigherLowerState((prev) => {
-            const nextSub = next.subGameState as HigherLowerState;
-            return nextSub ? { ...nextSub, mySecretNumber: prev?.mySecretNumber } : null;
-          });
-          setGameState(null);
-          setCodenamesState(null);
-          setDominoState(null);
-        } else if (next.activeGameId === "domino") {
-          setDominoState((prev) => {
-            const nextSub = next.subGameState as DominoState;
-            return nextSub ? { ...nextSub, hand: prev?.hand } : null;
-          });
-          setGameState(null);
-          setCodenamesState(null);
-          setHigherLowerState(null);
-        } else {
-          setGameState(null);
-          setCodenamesState(null);
-          setHigherLowerState(null);
-          setDominoState(null);
-          setRentoState(null);
-        }
-      } else if ((state as CodenamesState).gameId === "codenames") {
-        const next = state as CodenamesState;
-        setCodenamesState((prev) => ({ ...next, you: prev?.you, key: prev?.key }));
-      } else if ((state as HigherLowerState).gameId === "higher-lower") {
-        const next = state as HigherLowerState;
-        setHigherLowerState((prev) => ({ ...next, mySecretNumber: prev?.mySecretNumber }));
-      } else if ((state as DominoState).gameId === "domino") {
-        const next = state as DominoState;
-        setDominoState((prev) => ({ ...next, hand: prev?.hand }));
-      } else if ((state as RentoState).gameId === "rento") {
-        setRentoState(state as RentoState);
-        setGameState(null);
-        setCodenamesState(null);
-        setHigherLowerState(null);
-        setDominoState(null);
-      } else {
-        setGameState(state as GameState);
-      }
+    const onGameState = (state: AnyRoomState) => {
+      applyRoomStateRef.current(state);
     };
 
     const onYourHand = (data: { hand: Card[] }) => {
@@ -303,8 +292,8 @@ export const [GameProvider, useGame] = createContextHook(() => {
     socket.on("error", onError);
 
     // Check for stored room/player
-    const storedRoomId = localStorage.getItem(LS_ROOM_ID);
-    const storedPlayerId = localStorage.getItem(LS_PLAYER_ID);
+    const storedRoomId = readStored(LS_ROOM_ID, LEGACY_LS_ROOM_ID);
+    const storedPlayerId = readStored(LS_PLAYER_ID, LEGACY_LS_PLAYER_ID);
 
     if (storedRoomId && storedPlayerId) {
       setMyRoomId(storedRoomId);
@@ -341,49 +330,105 @@ export const [GameProvider, useGame] = createContextHook(() => {
     [],
   );
 
-  const applyRoomState = useCallback((state: GameState | CodenamesState | HigherLowerState | LobbyState | DominoState | RentoState) => {
-    if ((state as LobbyState).gameId === "lobby") {
-      const next = state as LobbyState;
-      setLobbyState(next);
-      if (next.activeGameId === "liars-bar") {
-        setGameState(next.subGameState);
-        setCodenamesState(null);
-        setHigherLowerState(null);
-        setDominoState(null);
-      } else if (next.activeGameId === "codenames") {
-        setCodenamesState(next.subGameState);
-        setGameState(null);
-        setHigherLowerState(null);
-        setDominoState(null);
-      } else if (next.activeGameId === "higher-lower") {
-        setHigherLowerState(next.subGameState);
-        setGameState(null);
-        setCodenamesState(null);
-        setDominoState(null);
-      } else if (next.activeGameId === "domino") {
-        setDominoState(next.subGameState);
-        setGameState(null);
-        setCodenamesState(null);
-        setHigherLowerState(null);
-      } else {
-        setGameState(null);
-        setCodenamesState(null);
-        setHigherLowerState(null);
-        setDominoState(null);
-        setRentoState(null);
+  /**
+   * Which state slot each game writes into, and which fields of that slot are
+   * private (delivered over a `*_private` event, absent from the public
+   * broadcast) and must therefore survive a public update.
+   *
+   * Adding a game with hidden information means adding one line here. Before
+   * this table the same knowledge was spelled out four times across two
+   * functions, which is how the Codenames key got lost on reconnect.
+   */
+  const routeSubState = useCallback(
+    (gameId: string | null, sub: unknown) => {
+      const clearOthers = (keep: string | null) => {
+        if (keep !== "liars-bar") setGameState(null);
+        if (keep !== "codenames") setCodenamesState(null);
+        if (keep !== "higher-lower") setHigherLowerState(null);
+        if (keep !== "domino") setDominoState(null);
+        if (keep !== "rento") setRentoState(null);
+      };
+
+      if (!gameId || !sub) {
+        clearOthers(null);
+        return;
       }
-    } else if ((state as CodenamesState).gameId === "codenames") {
-      setCodenamesState(state as CodenamesState);
-    } else if ((state as HigherLowerState).gameId === "higher-lower") {
-      setHigherLowerState(state as HigherLowerState);
-    } else if ((state as DominoState).gameId === "domino") {
-      setDominoState(state as DominoState);
-    } else if ((state as RentoState).gameId === "rento") {
-      setRentoState(state as RentoState);
-    } else {
-      setGameState(state as GameState);
+
+      switch (gameId) {
+        case "liars-bar":
+          setGameState(sub as GameState);
+          break;
+        case "codenames":
+          // `you` (your team/role) and `key` (the spymaster grid) only ever
+          // arrive on codenames_private — never clobber them with a public update.
+          setCodenamesState((prev) => ({
+            ...(sub as CodenamesState),
+            you: (sub as CodenamesState).you ?? prev?.you,
+            key: (sub as CodenamesState).key ?? prev?.key,
+          }));
+          break;
+        case "higher-lower":
+          setHigherLowerState((prev) => ({
+            ...(sub as HigherLowerState),
+            mySecretNumber:
+              (sub as HigherLowerState).mySecretNumber ?? prev?.mySecretNumber,
+          }));
+          break;
+        case "domino":
+          setDominoState((prev) => ({
+            ...(sub as DominoState),
+            hand: (sub as DominoState).hand ?? prev?.hand,
+          }));
+          break;
+        case "rento":
+          setRentoState(sub as RentoState);
+          break;
+        default:
+          // Arcade-style games (tetris, snake, fighter, ...) render straight
+          // from the party envelope and keep no dedicated slot.
+          break;
+      }
+      clearOthers(gameId);
+    },
+    [],
+  );
+
+  /**
+   * Route one inbound room state into the right slot.
+   *
+   * Rooms come in two shapes: a *container* (a party, or the legacy lobby)
+   * whose real game hangs off `subGameState`, and a bare game engine's own
+   * state. Previously this logic existed twice — once in the socket listener
+   * and once for command acks — as two parallel if-chains that had already
+   * drifted apart (the ack path dropped the private-state merge, so a
+   * Codenames spymaster who reconnected lost their key). One router, used by
+   * both paths, is the fix.
+   *
+   * The merge callbacks matter: `game_state` is the PUBLIC broadcast and by
+   * design contains no hidden information, so naively replacing state with it
+   * would wipe the private slice delivered separately over `*_private`. Each
+   * game names the private fields to carry forward.
+   */
+  const applyRoomState = useCallback((state: AnyRoomState) => {
+    if (!state) return;
+
+    const container = state as PartyState | LobbyState;
+    if (container.gameId === "party" || container.gameId === "lobby") {
+      if (container.gameId === "party") setPartyState(state as PartyState);
+      else setLobbyState(state as LobbyState);
+
+      routeSubState(container.activeGameId, container.subGameState);
+      return;
     }
+
+    // A bare engine state (a standalone room, or a direct `*_private` push).
+    routeSubState((state as { gameId?: string }).gameId ?? null, state);
   }, []);
+
+  // Callbacks are stable, but the socket listener is registered once on mount
+  // and must always call the current router.
+  const applyRoomStateRef = useRef(applyRoomState);
+  applyRoomStateRef.current = applyRoomState;
 
   const createRoom = useCallback(
     async (
@@ -648,6 +693,52 @@ export const [GameProvider, useGame] = createContextHook(() => {
     await emitWithAck("domino_rematch", {});
   }, [myRoomId, emitWithAck]);
 
+  // ===== Party =====
+  //
+  // The point of these: the room code, the roster, the chat and the WebRTC
+  // voice mesh all survive a game change, so a group never has to re-share a
+  // link on WhatsApp just because they finished a game.
+
+  const partyPickGame = useCallback(
+    async (gameId: string, options: Record<string, unknown> = {}) => {
+      if (!myRoomId) throw new Error("Not in a room");
+      await emitWithAck("party_pick_game", { gameId, options });
+    },
+    [myRoomId, emitWithAck],
+  );
+
+  const partyRematch = useCallback(async () => {
+    if (!myRoomId) throw new Error("Not in a room");
+    await emitWithAck("party_rematch", {});
+  }, [myRoomId, emitWithAck]);
+
+  const partyReturnHub = useCallback(async () => {
+    if (!myRoomId) throw new Error("Not in a room");
+    await emitWithAck("party_return_hub", {});
+  }, [myRoomId, emitWithAck]);
+
+  /**
+   * Leave for good. Distinct from a disconnect: this frees the seat, so the
+   * party isn't stuck showing "5/5" with a ghost in one chair.
+   */
+  const partyLeave = useCallback(async () => {
+    try {
+      if (myRoomId) await emitWithAck("party_leave", {});
+    } catch {
+      /* Server already forgot us, or we're offline. Leave locally anyway. */
+    }
+    leaveRoomRef.current();
+  }, [myRoomId, emitWithAck]);
+
+  const loadGameCatalog = useCallback(async (): Promise<GameSpecPublic[]> => {
+    const res = await emitWithAck<{ success: boolean; games: GameSpecPublic[] }>(
+      "party_catalog",
+      {},
+    );
+    setGameCatalog(res.games ?? []);
+    return res.games ?? [];
+  }, [emitWithAck]);
+
   const sendWebRTCSignal = useCallback(
     (targetId: string, signal: unknown) => {
       if (!myRoomId) return;
@@ -701,6 +792,8 @@ export const [GameProvider, useGame] = createContextHook(() => {
   }, [gameState?.actionLog]);
 
   return {
+    partyState,
+    gameCatalog,
     lobbyState,
     gameState,
     codenamesState,
@@ -745,5 +838,10 @@ export const [GameProvider, useGame] = createContextHook(() => {
     dominoDrawTile,
     dominoPass,
     dominoRematch,
-  };
+    partyPickGame,
+    partyRematch,
+    partyReturnHub,
+    partyLeave,
+    loadGameCatalog,
+  } satisfies GameContextValue;
 });

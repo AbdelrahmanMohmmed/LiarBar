@@ -76,6 +76,7 @@ function getAudioSink(): HTMLElement {
 
 export const [VoiceProvider, useVoice] = createContextHook(() => {
   const {
+    partyState,
     lobbyState,
     gameState,
     codenamesState,
@@ -317,16 +318,25 @@ export const [VoiceProvider, useVoice] = createContextHook(() => {
 
   // The set of human peers to hold connections with, as a stable string so the
   // mesh effect re-runs when players join/leave rather than on every game tick.
-  // Every room-level game state must be listed here or its rooms get no voice.
-  const activePlayers: VoicePeer[] = lobbyState
-    ? lobbyState.players
-    : (
-        gameState ||
-        codenamesState ||
-        higherLowerState ||
-        dominoState ||
-        rentoState
-      )?.players ?? [];
+  //
+  // The party roster comes FIRST and deliberately so. During a game switch the
+  // sub-game state is briefly null while the old engine is destroyed and the
+  // new one is built; deriving peers from sub-game state alone would see an
+  // empty roster for that instant, tear down every peer connection, and then
+  // rebuild them — an audible dropout on every single game change, which is
+  // exactly the moment the group is talking most. The party roster never goes
+  // empty, so the mesh never notices the switch happened.
+  const activePlayers: VoicePeer[] =
+    partyState?.players ??
+    lobbyState?.players ??
+    (
+      gameState ||
+      codenamesState ||
+      higherLowerState ||
+      dominoState ||
+      rentoState
+    )?.players ??
+    [];
 
   const peerKey = useMemo(
     () =>

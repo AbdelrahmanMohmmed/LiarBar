@@ -8,6 +8,7 @@ import type { GameVariant, ClaimType } from "./liars-bar/Deck.js";
 import { CodenamesGame } from "./codenames/CodenamesGame.js";
 import { HigherLowerGame } from "./higher-lower/HigherLowerGame.js";
 import { LobbyRoom } from "./lobby/LobbyRoom.js";
+import { PartyRoom } from "./party/PartyRoom.js";
 import { TicTacToeGame } from "./tictactoe/TicTacToeGame.js";
 import { SnakeGame } from "./snake/SnakeGame.js";
 import { SpaceInvadersGame } from "./space-invaders/SpaceInvadersGame.js";
@@ -128,6 +129,16 @@ registerGame("lobby", (roomId, options, callbacks) => {
     options.maxPlayers,
     callbacks,
   );
+});
+
+/**
+ * A party: a durable group of people whose *game* is a slot inside the room
+ * rather than the room itself. Every room created from the client is one of
+ * these, so switching games never costs a new invite link.
+ * See games/party/PartyRoom.ts.
+ */
+registerGame("party", (roomId, options, callbacks) => {
+  return new PartyRoom(roomId, options.maxPlayers, callbacks);
 });
 
 registerGame("tictactoe", (roomId, options, callbacks) => {

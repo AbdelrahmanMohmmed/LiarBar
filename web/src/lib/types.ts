@@ -309,6 +309,53 @@ export interface LobbyState {
   subGameState: any;
 }
 
+// ---------------------------------------------------------------------------
+// Party
+// ---------------------------------------------------------------------------
+
+/** One player's standing across every game played tonight. */
+export interface PartyScoreEntry {
+  playerId: string;
+  name: string;
+  wins: number;
+  played: number;
+}
+
+export interface PartyHistoryEntry {
+  gameId: string;
+  winnerId: string | null;
+  winnerName: string | null;
+  endedAt: number;
+}
+
+/**
+ * The envelope every room now sends. The *party* is durable; `activeGameId`
+ * and `subGameState` change underneath it as the group switches games, and
+ * the room code, roster, chat and voice mesh never do.
+ */
+export interface PartyState {
+  roomId: string;
+  gameId: "party";
+  phase: "hub" | "playing";
+  activeGameId: string | null;
+  players: PlayerData[];
+  maxPlayers: number;
+  leaderboard: PartyScoreEntry[];
+  history: PartyHistoryEntry[];
+  subGameState: any;
+  hand?: Card[];
+}
+
+/** What a game needs in order to be offered in the picker. */
+export interface GameSpecPublic {
+  id: string;
+  minPlayers: number;
+  maxPlayers: number;
+  seating: "party" | "duel" | "parallel";
+  bots: boolean;
+  voiceMatters: boolean;
+}
+
 export function parseCardString(cardStr: string): Card | null {
   // Try symbol format: "5♥", "K♠"
   const symbol = cardStr.slice(-1);
