@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Users, Clock, Mic, Bot, Check, X } from "lucide-react";
 import { useGame } from "@/lib/gameContext";
 import { useLanguage } from "@/lib/languageContext";
-import { GAMES, COLORS, type GameMeta } from "@/lib/brand";
+import { GAMES, COLORS, gameLabel, gameEmoji, type GameMeta } from "@/lib/brand";
 import type { GameSpecPublic } from "@/lib/types";
 
 /**
@@ -26,20 +26,6 @@ interface Props {
   /** Only the host can actually switch; others browse and can suggest. */
   canPick: boolean;
 }
-
-/** Games in the catalogue that have no marketing entry yet still get a card. */
-const FALLBACK_META: Record<string, { emoji: string; en: string; ar: string }> = {
-  tictactoe: { emoji: "⭕", en: "Tic-Tac-Toe", ar: "إكس أو" },
-  snake: { emoji: "🐍", en: "Snake", ar: "الثعبان" },
-  tetris: { emoji: "🧱", en: "Tetris", ar: "تتريس" },
-  "memory-puzzle": { emoji: "🧠", en: "Memory", ar: "الذاكرة" },
-  "space-invaders": { emoji: "👾", en: "Space Invaders", ar: "غزاة الفضاء" },
-  fighter: { emoji: "🥊", en: "Fighter", ar: "قتال" },
-  "snake-ladder": { emoji: "🪜", en: "Snakes & Ladders", ar: "سلم وثعبان" },
-  spyfall: { emoji: "🕶️", en: "Spyfall", ar: "برا اللعبة" },
-  chameleon: { emoji: "🦎", en: "Chameleon", ar: "الحرباية" },
-  wyr: { emoji: "🤔", en: "Would You Rather", ar: "لو خيّروك" },
-};
 
 export default function GamePicker({
   open,
@@ -83,7 +69,6 @@ export default function GamePicker({
 
     return specs.map((spec) => {
       const meta: GameMeta | undefined = GAMES.find((g) => g.id === spec.id);
-      const fb = FALLBACK_META[spec.id];
 
       // Bots only count as players in games that support them.
       const seats = spec.bots ? total : humans;
@@ -100,9 +85,9 @@ export default function GamePicker({
         spec,
         meta,
         blocked,
-        name: meta ? meta.name[lang] : fb ? fb[lang] : spec.id,
+        name: gameLabel(spec.id, lang) ?? spec.id,
         blurb: meta?.blurb[lang] ?? "",
-        emoji: meta?.emoji ?? fb?.emoji ?? "🎲",
+        emoji: gameEmoji(spec.id) ?? "🎲",
         accent: meta ? COLORS[meta.accent] : COLORS.sand,
         minutes: meta?.minutes,
       };

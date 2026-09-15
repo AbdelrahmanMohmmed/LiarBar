@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { Seo, claimedPathname } from "@/lib/seo";
-import { BRAND, GAMES } from "@/lib/brand";
+import { BRAND, GAMES, gameLabel } from "@/lib/brand";
+import { useGame } from "@/lib/gameContext";
 import { useLanguage } from "@/lib/languageContext";
 
 /**
@@ -56,7 +57,17 @@ function isPrivateRoute(pathname: string): boolean {
  * game route starts with that game's own path, so this is a prefix match
  * rather than another list to keep in sync.
  */
-function titleFor(pathname: string, lang: "en" | "ar"): string {
+function titleFor(
+  pathname: string,
+  lang: "en" | "ar",
+  activeGameId: string | null,
+): string {
+  // `/lobby/:code` is the shared shell for eight different games and its URL
+  // says which one: none of them. Ask the party instead.
+  if (/^\/lobby\//.test(pathname) && activeGameId) {
+    const label = gameLabel(activeGameId, lang);
+    if (label) return label;
+  }
   const game = GAMES.find(
     (g) => pathname === g.path || pathname.startsWith(`${g.path}/`),
   );
@@ -75,6 +86,8 @@ function titleFor(pathname: string, lang: "en" | "ar"): string {
 export default function RouteMeta() {
   const { pathname } = useLocation();
   const { lang } = useLanguage();
+  const { partyState } = useGame();
+  const activeGameId = partyState?.activeGameId ?? null;
   const [fallback, setFallback] = useState<Fallback | null>(null);
 
   useEffect(() => {
@@ -82,14 +95,14 @@ export default function RouteMeta() {
     const timer = window.setTimeout(() => {
       if (claimedPathname() === pathname) return;
       setFallback({
-        title: titleFor(pathname, lang),
+        title: titleFor(pathname, lang, activeGameId),
         description: BRAND.description[lang],
         path: pathname,
         noindex: isPrivateRoute(pathname),
       });
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [pathname, lang]);
+  }, [pathname, lang, activeGameId]);
 
   if (!fallback) return null;
 

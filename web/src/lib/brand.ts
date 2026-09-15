@@ -434,6 +434,38 @@ export function getGame(id: string): GameMeta | undefined {
   return GAMES.find((g) => g.id === id);
 }
 
+/**
+ * Names and emoji for games in the server catalogue that have no marketing
+ * entry here — the seven arcade games, which are perfectly playable but have
+ * no blurb, no art and no landing-page card.
+ *
+ * This lives next to `GAMES` rather than inside whichever component needed it
+ * first, because two of them now do: the party picker draws a card for every
+ * game the server offers, and route metadata has to title a page for whichever
+ * one a party is currently in.
+ */
+const FALLBACK_META: Record<string, { emoji: string; en: string; ar: string }> = {
+  tictactoe: { emoji: "⭕", en: "Tic-Tac-Toe", ar: "إكس أو" },
+  snake: { emoji: "🐍", en: "Snake", ar: "الثعبان" },
+  tetris: { emoji: "🧱", en: "Tetris", ar: "تتريس" },
+  "memory-puzzle": { emoji: "🧠", en: "Memory", ar: "الذاكرة" },
+  "space-invaders": { emoji: "👾", en: "Space Invaders", ar: "غزاة الفضاء" },
+  fighter: { emoji: "🥊", en: "Fighter", ar: "قتال" },
+  "snake-ladder": { emoji: "🪜", en: "Snakes & Ladders", ar: "سلم وثعبان" },
+};
+
+/** What to call a game, whether or not it has a catalogue entry. */
+export function gameLabel(id: string, lang: "en" | "ar"): string | undefined {
+  const meta = getGame(id);
+  if (meta) return meta.name[lang];
+  return FALLBACK_META[id]?.[lang];
+}
+
+/** The emoji to draw for a game, whether or not it has a catalogue entry. */
+export function gameEmoji(id: string): string | undefined {
+  return getGame(id)?.emoji ?? FALLBACK_META[id]?.emoji;
+}
+
 // ---------------------------------------------------------------------------
 // Share text
 // ---------------------------------------------------------------------------
