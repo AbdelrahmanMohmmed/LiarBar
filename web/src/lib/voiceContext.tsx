@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import createContextHook from "../utils/createContextHook";
 import { useGame } from "./gameContext";
+import { VoiceLevelMonitor } from "./voiceLevels";
 
 /**
  * Room-wide voice chat (full-mesh WebRTC).
@@ -63,6 +64,42 @@ const AUDIO_SINK_ID = "voice-audio-sink";
  */
 type VoicePeer = { id: string; isBot: boolean; isConnected: boolean };
 
+/**
+ * What the UI needs to know about one peer link, in plain terms.
+ *
+ * RTCPeerConnection exposes half a dozen overlapping state machines
+ * (connectionState, iceConnectionState, signalingState, iceGatheringState) and
+ * none of them alone answers "can this person hear me". This collapses them
+ * into the four states a player can act on.
+ */
+export type PeerHealth =
+  /** Handshaking. Normal for a second or two after someone joins. */
+  | "connecting"
+  /** Audio path is up. */
+  | "connected"
+  /** Was up, dropped, we're retrying. Usually recovers by itself. */
+  | "recovering"
+  /** Gave up. Almost always means no TURN relay and a NAT that needs one. */
+  | "failed";
+
+/** How many ICE restarts to attempt before declaring a peer failed. */
+const MAX_ICE_RESTARTS = 3;
+/** Backoff between restarts. Immediate retries just burn the same failure. */
+const ICE_RESTART_DELAYS_MS = [800, 2500, 6000];
+
+function healthFrom(pc: RTCPeerConnection): PeerHealth {
+  switch (pc.connectionState) {
+    case "connected":
+      return "connected";
+    case "failed":
+      return "failed";
+    case "disconnected":
+      return "recovering";
+    default:
+      return "connecting";
+  }
+}
+
 function getAudioSink(): HTMLElement {
   let sink = document.getElementById(AUDIO_SINK_ID);
   if (!sink) {
@@ -72,6 +109,41 @@ function getAudioSink(): HTMLElement {
     document.body.appendChild(sink);
   }
   return sink;
+}
+
+/**
+ * Is this connection relayed through TURN, or direct?
+ *
+ * Worth knowing for two reasons: a relayed call costs the TURN server real
+ * bandwidth (so "everyone is relayed" is a bill, not just a curiosity), and
+ * "nobody is ever relayed" usually means TURN isn't actually reachable and the
+ * only players who can hear each other are the ones on the same network.
+ * Neither fact is visible anywhere else.
+ */
+async function isRelayed(pc: RTCPeerConnection): Promise<boolean> {
+  try {
+    const stats = await pc.getStats();
+    let selectedPairId: string | null = null;
+    stats.forEach((report) => {
+      if (report.type === "transport" && report.selectedCandidatePairId) {
+        selectedPairId = report.selectedCandidatePairId as string;
+      }
+    });
+
+    let relayed = false;
+    stats.forEach((report) => {
+      const isSelected =
+        report.type === "candidate-pair" &&
+        (report.id === selectedPairId ||
+          (selectedPairId === null && report.nominated && report.state === "succeeded"));
+      if (!isSelected) return;
+      const local = stats.get(report.localCandidateId as string);
+      if (local?.candidateType === "relay") relayed = true;
+    });
+    return relayed;
+  } catch {
+    return false;
+  }
 }
 
 export const [VoiceProvider, useVoice] = createContextHook(() => {
@@ -92,6 +164,18 @@ export const [VoiceProvider, useVoice] = createContextHook(() => {
   const [isMuted, setIsMuted] = useState(true);
   const [isConnecting, setIsConnecting] = useState(false);
   const [peerCount, setPeerCount] = useState(0);
+  const [speakingIds, setSpeakingIds] = useState<Set<string>>(() => new Set());
+  const [peerHealth, setPeerHealth] = useState<Record<string, PeerHealth>>({});
+  /**
+   * The browser refused to play incoming audio because there has been no user
+   * gesture yet. Critically this is SILENT: the call is connected, everyone
+   * else can hear you, and you hear nothing with no error anywhere. Surfacing
+   * it is the difference between a one-tap fix and "voice doesn't work".
+   */
+  const [audioBlocked, setAudioBlocked] = useState(false);
+  const [micError, setMicError] = useState<string | null>(null);
+  /** True when at least one peer is relayed through TURN rather than direct. */
+  const [usingRelay, setUsingRelay] = useState(false);
 
   const streamRef = useRef<MediaStream | null>(null);
   const peersRef = useRef<Map<string, RTCPeerConnection>>(new Map());
@@ -103,6 +187,16 @@ export const [VoiceProvider, useVoice] = createContextHook(() => {
   // Perfect-negotiation bookkeeping, per peer.
   const makingOfferRef = useRef<Map<string, boolean>>(new Map());
   const ignoreOfferRef = useRef<Map<string, boolean>>(new Map());
+  /** ICE restart attempts per peer, reset on a successful connection. */
+  const restartCountRef = useRef<Map<string, number>>(new Map());
+  const restartTimersRef = useRef<Map<string, number>>(new Map());
+
+  // One monitor for the whole room. See lib/voiceLevels.ts for why the level
+  // map is read through a ref rather than pushed through state.
+  const levelsRef = useRef<VoiceLevelMonitor | null>(null);
+  if (levelsRef.current === null) {
+    levelsRef.current = new VoiceLevelMonitor((speaking) => setSpeakingIds(speaking));
+  }
 
   // Keep the latest signaling helper in a ref so peer-connection callbacks
   // (created once, long-lived) always call the current version.
@@ -132,6 +226,21 @@ export const [VoiceProvider, useVoice] = createContextHook(() => {
     transceiversRef.current.delete(peerId);
     makingOfferRef.current.delete(peerId);
     ignoreOfferRef.current.delete(peerId);
+    restartCountRef.current.delete(peerId);
+
+    const timer = restartTimersRef.current.get(peerId);
+    if (timer !== undefined) {
+      window.clearTimeout(timer);
+      restartTimersRef.current.delete(peerId);
+    }
+
+    levelsRef.current?.remove(peerId);
+    setPeerHealth((prev) => {
+      if (!(peerId in prev)) return prev;
+      const next = { ...prev };
+      delete next[peerId];
+      return next;
+    });
   }, []);
 
   const stopVoice = useCallback(() => {
@@ -142,9 +251,18 @@ export const [VoiceProvider, useVoice] = createContextHook(() => {
     for (const peerId of Array.from(peersRef.current.keys())) {
       closePeer(peerId);
     }
+    levelsRef.current?.remove("me");
     setIsMuted(true);
     setPeerCount(0);
+    setSpeakingIds(new Set());
+    setPeerHealth({});
+    setAudioBlocked(false);
+    setUsingRelay(false);
   }, [closePeer]);
+
+  const reportTransport = useCallback(async (pc: RTCPeerConnection) => {
+    if (await isRelayed(pc)) setUsingRelay(true);
+  }, []);
 
   const createPeerConnection = useCallback(
     (peerId: string, initiator: boolean): RTCPeerConnection => {
@@ -221,25 +339,93 @@ export const [VoiceProvider, useVoice] = createContextHook(() => {
         // event.streams is often empty — build a stream from the track itself.
         const stream = event.streams[0] ?? new MediaStream([event.track]);
         audioEl.srcObject = stream;
-        audioEl.play().catch(() => {
-          // Autoplay blocked until a user gesture; the unlock effect retries.
-        });
+
+        // Meter this peer so the room can show who is talking.
+        levelsRef.current?.add(peerId, stream);
+
+        audioEl.play().then(
+          () => setAudioBlocked(false),
+          () => {
+            // Autoplay is blocked until a user gesture. This fails SILENTLY:
+            // the call is up, everyone else hears you fine, and you hear
+            // nothing with no error surfaced anywhere. Flag it so the UI can
+            // offer the one tap that fixes it.
+            setAudioBlocked(true);
+          },
+        );
       };
 
-      pc.oniceconnectionstatechange = () => {
-        if (pc.iceConnectionState === "failed") {
-          // Recoverable: force an ICE restart rather than dropping the peer.
+      /**
+       * Recover a dropped link instead of losing the peer.
+       *
+       * The old handler called restartIce() once, on the first `failed`, and
+       * then never again — so a peer that dropped twice (a phone switching
+       * from wifi to mobile data, which is the single most common cause) was
+       * silently gone for the rest of the night with no indication why.
+       *
+       * Restarts are now retried with backoff. Immediate retries are pointless:
+       * they re-run the same gathering against the same broken path.
+       */
+      const scheduleIceRestart = () => {
+        if (restartTimersRef.current.has(peerId)) return;
+
+        const attempt = restartCountRef.current.get(peerId) ?? 0;
+        if (attempt >= MAX_ICE_RESTARTS) {
+          setPeerHealth((prev) => ({ ...prev, [peerId]: "failed" }));
+          // Reaching here nearly always means no TURN relay is configured and
+          // this pair needs one. Say so once, loudly, in the console — it's
+          // the only actionable diagnosis and it is otherwise invisible.
+          console.warn(
+            `[voice] gave up on peer ${peerId} after ${MAX_ICE_RESTARTS} ICE restarts. ` +
+              "If this happens across networks, TURN is missing or misconfigured " +
+              "(VITE_TURN_URL / VITE_TURN_USERNAME / VITE_TURN_CREDENTIAL).",
+          );
+          return;
+        }
+
+        restartCountRef.current.set(peerId, attempt + 1);
+        setPeerHealth((prev) => ({ ...prev, [peerId]: "recovering" }));
+
+        const delay = ICE_RESTART_DELAYS_MS[attempt] ?? 6000;
+        const timer = window.setTimeout(() => {
+          restartTimersRef.current.delete(peerId);
+          if (pc.connectionState === "closed") return;
           try {
             pc.restartIce();
           } catch {
-            /* not supported everywhere; the reconnect effect will retry */
+            /* Not supported on very old Safari; the mesh effect will rebuild. */
           }
+        }, delay);
+        restartTimersRef.current.set(peerId, timer);
+      };
+
+      pc.onconnectionstatechange = () => {
+        const health = healthFrom(pc);
+        setPeerHealth((prev) =>
+          prev[peerId] === health ? prev : { ...prev, [peerId]: health },
+        );
+
+        if (pc.connectionState === "connected") {
+          // A clean connection resets the budget, so a link that flaps all
+          // evening keeps recovering rather than exhausting its retries once.
+          restartCountRef.current.set(peerId, 0);
+          void reportTransport(pc);
+        } else if (
+          pc.connectionState === "failed" ||
+          pc.connectionState === "disconnected"
+        ) {
+          scheduleIceRestart();
         }
       };
 
+      pc.oniceconnectionstatechange = () => {
+        if (pc.iceConnectionState === "failed") scheduleIceRestart();
+      };
+
+      setPeerHealth((prev) => ({ ...prev, [peerId]: "connecting" }));
       return pc;
     },
-    [],
+    [reportTransport],
   );
 
   // Ensure a peer connection exists. `initiator` is decided by ID ordering so
@@ -268,6 +454,7 @@ export const [VoiceProvider, useVoice] = createContextHook(() => {
     }
 
     setIsConnecting(true);
+    setMicError(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -281,6 +468,19 @@ export const [VoiceProvider, useVoice] = createContextHook(() => {
       const track = stream.getAudioTracks()[0];
       if (track) track.enabled = true;
       setIsMuted(false);
+
+      // Meter our own mic under the reserved id "me". Seeing your own bar move
+      // is how you find out your mic works BEFORE talking into it for ten
+      // seconds and asking whether anyone can hear you.
+      levelsRef.current?.add("me", stream);
+      levelsRef.current?.resume();
+
+      // Opening the mic is itself a user gesture, so it's the right moment to
+      // retry any audio the browser refused to autoplay.
+      audioElementsRef.current.forEach((audio) => {
+        if (audio.paused) void audio.play().then(() => setAudioBlocked(false), () => {});
+      });
+
       addToast("Microphone connected", "success");
 
       // Attach the mic to every existing peer. Flipping the transceiver to
@@ -296,8 +496,23 @@ export const [VoiceProvider, useVoice] = createContextHook(() => {
         }
       }
     } catch (err) {
-      console.error("[voice] failed to get microphone:", err);
-      addToast("Could not access microphone. Check permissions.", "error");
+      // getUserMedia's failure modes need different fixes, and "check
+      // permissions" is wrong advice for three of the four. Name them.
+      const name = (err as DOMException | undefined)?.name ?? "";
+      const message =
+        name === "NotAllowedError"
+          ? "Microphone blocked. Allow it in your browser's site settings."
+          : name === "NotFoundError"
+            ? "No microphone found on this device."
+            : name === "NotReadableError"
+              ? "Your microphone is in use by another app."
+              : window.isSecureContext === false
+                ? "Voice needs a secure (https) connection."
+                : "Couldn't turn on the microphone.";
+
+      console.error("[voice] getUserMedia failed:", name, err);
+      setMicError(message);
+      addToast(message, "error");
     } finally {
       setIsConnecting(false);
     }
@@ -308,6 +523,15 @@ export const [VoiceProvider, useVoice] = createContextHook(() => {
     if (track) {
       track.enabled = false;
       setIsMuted(true);
+      // A disabled track still emits silence, so the meter would sit at zero
+      // and read as "connected but not speaking" rather than "muted". Drop it.
+      levelsRef.current?.remove("me");
+      setSpeakingIds((prev) => {
+        if (!prev.has("me")) return prev;
+        const next = new Set(prev);
+        next.delete("me");
+        return next;
+      });
     }
   }, []);
 
@@ -452,9 +676,22 @@ export const [VoiceProvider, useVoice] = createContextHook(() => {
   // ever opening the mic.
   useEffect(() => {
     const unlock = () => {
+      levelsRef.current?.resume();
+      let anyPlaying = false;
       audioElementsRef.current.forEach((audio) => {
-        if (audio.paused) audio.play().catch(() => {});
+        if (audio.paused) {
+          void audio.play().then(
+            () => {
+              anyPlaying = true;
+              setAudioBlocked(false);
+            },
+            () => {},
+          );
+        } else {
+          anyPlaying = true;
+        }
       });
+      if (anyPlaying) setAudioBlocked(false);
     };
     window.addEventListener("click", unlock);
     window.addEventListener("keydown", unlock);
@@ -469,6 +706,40 @@ export const [VoiceProvider, useVoice] = createContextHook(() => {
   // Only fires when the whole app unmounts — route changes no longer reach it.
   useEffect(() => stopVoice, [stopVoice]);
 
+  // Tear the audio graph down for good when the provider goes away. Leaving an
+  // AudioContext open keeps the device's audio hardware awake, which on a
+  // phone is a measurable battery drain for a page nobody is listening to.
+  useEffect(() => {
+    const monitor = levelsRef.current;
+    return () => monitor?.destroy();
+  }, []);
+
+  /**
+   * One-tap recovery for blocked audio.
+   *
+   * Exposed as an action rather than handled only by the passive gesture
+   * listener, because the passive listener can only fire on a gesture the
+   * player happens to make. Someone who joins, hears nothing, and sits still
+   * waiting never produces one.
+   */
+  const enableAudio = useCallback(() => {
+    levelsRef.current?.resume();
+    audioElementsRef.current.forEach((audio) => {
+      void audio.play().then(() => setAudioBlocked(false), () => {});
+    });
+  }, []);
+
+  /** Read a live 0..1 level without causing a re-render. See voiceLevels.ts. */
+  const getLevel = useCallback(
+    (id: string) => levelsRef.current?.levels.get(id) ?? 0,
+    [],
+  );
+
+  const anyoneFailed = useMemo(
+    () => Object.values(peerHealth).some((h) => h === "failed"),
+    [peerHealth],
+  );
+
   return {
     isMuted,
     isConnecting,
@@ -476,5 +747,21 @@ export const [VoiceProvider, useVoice] = createContextHook(() => {
     toggleMute,
     unmuteMic,
     muteMic,
+
+    /** Player ids currently speaking. "me" is this player's own mic. */
+    speakingIds,
+    /** Live level 0..1 for a player id, read without re-rendering. */
+    getLevel,
+    /** Per-peer link health, for showing who can't hear you and why. */
+    peerHealth,
+    /** At least one peer exhausted its ICE restarts — almost always missing TURN. */
+    anyoneFailed,
+    /** The browser is refusing to play incoming audio until a gesture. */
+    audioBlocked,
+    enableAudio,
+    /** A specific, actionable reason the mic didn't open, or null. */
+    micError,
+    /** At least one peer is relayed through TURN rather than direct. */
+    usingRelay,
   };
 }, "useVoice");

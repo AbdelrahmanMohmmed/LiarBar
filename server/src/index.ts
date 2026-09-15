@@ -2,7 +2,7 @@ import express from "express";
 import { createServer } from "node:http";
 import { Server } from "socket.io";
 import cors from "cors";
-import { config } from "./config.js";
+import { config, describeOrigins } from "./config.js";
 import { RoomRegistry } from "./core/RoomRegistry.js";
 import { registerSocketHandlers } from "./socket/handlers.js";
 import { GameManager } from "./games/liars-bar/GameManager.js";
@@ -72,8 +72,8 @@ app.get("/api/games", (_req, res) => {
 registerSocketHandlers(io, registry);
 
 httpServer.listen(config.port, "0.0.0.0", () => {
-  console.log(`Liar's Bar server running on port ${config.port} (0.0.0.0)`);
-  console.log(`Allowed origins: ${config.allowedOrigins.join(", ")}`);
+  console.log(`Game server running on port ${config.port} (0.0.0.0)`);
+  console.log(`Allowed origins: ${describeOrigins()}`);
 });
 
 // Graceful shutdown so platform restarts/redeploys (e.g. DigitalOcean)

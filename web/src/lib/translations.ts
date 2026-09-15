@@ -314,6 +314,17 @@ const translations: Record<Language, Record<string, string>> = {
     "domino.how_3": "Play out your last tile and your side takes the points still in the losers' hands. Partners' leftovers never count against you.",
     "domino.how_4": "If nobody can play, the table is locked and the lighter side takes it. First to 101 wins.",
 
+    // -- Voice --
+    "voice.tap_to_hear": "Tap to hear everyone",
+    "voice.listening_only": "You're listening. Tap the mic to talk.",
+    "voice.relay": "Relayed",
+    "voice.relay_hint": "Your audio is going through a relay server because a direct connection wasn't possible.",
+    "voice.some_failed": "Someone can't connect to you. If you're on different networks this usually means the voice relay isn't reachable.",
+    "voice.h_connecting": "Connecting",
+    "voice.h_connected": "Connected",
+    "voice.h_recovering": "Reconnecting",
+    "voice.h_failed": "Couldn't connect",
+
     "404.title": "404",
     "404.message": "Oops! Page not found",
     "404.back_home": "Return to Home",
@@ -626,6 +637,17 @@ const translations: Record<Language, Record<string, string>> = {
     "domino.how_2": "طبّق الحجر على أي طرف مفتوح. مش لاقي؟ طقّ — والكل ساعتها هيعرف رقمين معندكش منهم.",
     "domino.how_3": "خلّص آخر حجر وطقمك ياخد نقط اللي فاضلة في إيد الخصم. اللي فاضل مع شريكك مش بيتحسب عليك.",
     "domino.how_4": "لو محدش قدر يلعب، الطاولة مسكّرة والأخف هو اللي ياخدها. أول واحد لـ101 يكسب.",
+
+    // -- Voice --
+    "voice.tap_to_hear": "دوس عشان تسمع الكل",
+    "voice.listening_only": "انت بتسمع بس. دوس على المايك عشان تتكلم.",
+    "voice.relay": "عن طريق سيرفر",
+    "voice.relay_hint": "صوتك بيعدي على سيرفر وسيط لأن الاتصال المباشر مانفعش.",
+    "voice.some_failed": "في حد مش قادر يتصل بيك. لو انتوا على شبكات مختلفة، ده غالباً معناه إن سيرفر الصوت الوسيط مش شغال.",
+    "voice.h_connecting": "بيتصل",
+    "voice.h_connected": "متصل",
+    "voice.h_recovering": "بيحاول تاني",
+    "voice.h_failed": "مقدرش يتصل",
 
     "404.title": "404",
     "404.message": "عذراً! الصفحة غير موجودة",

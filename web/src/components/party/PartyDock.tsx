@@ -18,6 +18,7 @@ import { useLanguage } from "@/lib/languageContext";
 import { getGame } from "@/lib/brand";
 import GamePicker from "./GamePicker";
 import InviteSheet from "./InviteSheet";
+import VoicePanel from "./VoicePanel";
 
 /**
  * A persistent control strip for the party, mounted globally rather than per
@@ -46,7 +47,8 @@ export default function PartyDock() {
     partyLeave,
     addToast,
   } = useGame();
-  const { isMuted, isConnecting, toggleMute, peerCount } = useVoice();
+  const { isMuted, isConnecting, toggleMute, peerCount, speakingIds, audioBlocked } =
+    useVoice();
   const { t } = useLanguage();
   const navigate = useNavigate();
 
@@ -63,6 +65,18 @@ export default function PartyDock() {
   const activeMeta = partyState.activeGameId ? getGame(partyState.activeGameId) : undefined;
   const connectedCount = partyState.players.filter((p) => p.isConnected).length;
   const leader = partyState.leaderboard[0];
+
+  // Name whoever is speaking. With more than one, count them instead — a list
+  // of three names doesn't fit and reads as noise anyway.
+  const speakerNames = partyState.players
+    .filter((p) => speakingIds.has(p.id === myPlayerId ? "me" : p.id))
+    .map((p) => (p.id === myPlayerId ? t("party.you") : p.name));
+  const speakerLabel =
+    speakerNames.length === 0
+      ? null
+      : speakerNames.length === 1
+        ? `🔊 ${speakerNames[0]}`
+        : `🔊 ${speakerNames.length}`;
 
   const run = async (fn: () => Promise<void>, failMsg: string) => {
     try {
@@ -94,10 +108,17 @@ export default function PartyDock() {
                   <Users size={13} />
                   {connectedCount}
                 </span>
-                {activeMeta && (
-                  <span className="text-xs text-sand truncate hidden xs:inline">
-                    · {activeMeta.emoji}
-                  </span>
+                {/* Who's talking, in the collapsed row. This is the one piece
+                    of voice state worth permanent screen space: it answers
+                    "who said that" without anyone having to say their name. */}
+                {speakerLabel ? (
+                  <span className="text-xs text-mint truncate">{speakerLabel}</span>
+                ) : (
+                  activeMeta && (
+                    <span className="text-xs text-sand truncate hidden xs:inline">
+                      · {activeMeta.emoji}
+                    </span>
+                  )
                 )}
                 {expanded ? (
                   <ChevronDown size={15} className="ms-auto text-sand shrink-0" />
@@ -111,7 +132,17 @@ export default function PartyDock() {
               <button
                 onClick={toggleMute}
                 disabled={isConnecting}
-                className={`btn btn-sm shrink-0 ${isMuted ? "btn-ghost" : "btn-live pulse-live"}`}
+                className={[
+                  "btn btn-sm shrink-0",
+                  isMuted ? "btn-ghost" : "btn-live",
+                  // Pulse only while actually transmitting, not merely unmuted.
+                  // A permanently pulsing button is decoration; one that
+                  // pulses when your voice is going out is feedback.
+                  !isMuted && speakingIds.has("me") ? "pulse-live" : "",
+                  audioBlocked ? "!border-gold !text-gold" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
                 aria-label={isMuted ? t("voice.unmute") : t("voice.mute")}
                 aria-pressed={!isMuted}
               >
@@ -144,6 +175,10 @@ export default function PartyDock() {
                     </span>
                   </div>
                 )}
+
+                <VoicePanel players={partyState.players} />
+
+                <div className="h-px bg-border/60" />
 
                 <div className="grid grid-cols-2 gap-2">
                   <button
