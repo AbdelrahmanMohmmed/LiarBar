@@ -54,6 +54,18 @@ function upsertLink(rel: string, href: string) {
 
 const JSON_LD_ID = "route-json-ld";
 
+/**
+ * The pathname whose metadata a page has claimed by rendering <Seo>.
+ *
+ * Read by RouteMeta, which fills in a default for every route that doesn't.
+ * See the note there for why that matters beyond a wrong tab title.
+ */
+let claimedPath: string | null = null;
+
+export function claimedPathname(): string | null {
+  return claimedPath;
+}
+
 export function Seo({
   title,
   description,
@@ -71,6 +83,7 @@ export function Seo({
 
     document.title = fullTitle;
     document.documentElement.lang = lang;
+    claimedPath = window.location.pathname;
 
     upsertMeta("name", "description", description);
     upsertMeta(

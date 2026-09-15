@@ -209,6 +209,16 @@ rooms, which are `noindex` anyway.
 expire, so indexing them fills the index with dead pages — and a crawler
 following an invite link into a live room is noise for the people in it.
 
+**The head is shared state, so a route that says nothing inherits a lie.**
+`<Seo>` upserts into one `<head>`; only fourteen of forty pages render it, so
+the rest kept whatever the previous route set — including its canonical URL and
+its `index, follow`. Visibly that was a tab still saying "Chameleon" after the
+party moved to Rento. Less visibly it meant rooms opened from the landing page
+claimed to be the landing page. `components/RouteMeta.tsx` closes that: `<Seo>`
+records which pathname it claimed, and RouteMeta fills in a default one
+macrotask later for any route nobody claimed. Pages that have something
+specific to say still say it and still win.
+
 ---
 
 ## 6. Scaling

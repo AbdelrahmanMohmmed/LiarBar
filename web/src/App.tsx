@@ -14,6 +14,7 @@ import JoinParty from "./pages/party/JoinParty";
 import NotFound from "./pages/NotFound";
 import PartyDock from "./components/party/PartyDock";
 import PartyRouter from "./components/party/PartyRouter";
+import RouteMeta from "./components/RouteMeta";
 import SupersededNotice from "./components/party/SupersededNotice";
 
 /**
@@ -210,6 +211,10 @@ const App = () => (
                   Mounted here, not in PartyHub: the dock can switch games from
                   any page, so the follower has to live where the dock does. */}
               <PartyRouter />
+              {/* Fills in title / description / canonical / robots for the
+                  routes that don't set their own, so no page inherits the
+                  previous one's identity. */}
+              <RouteMeta />
               {/* Full-screen, because everything behind it is stale. */}
               <SupersededNotice />
             </BrowserRouter>
