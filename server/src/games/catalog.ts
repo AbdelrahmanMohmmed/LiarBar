@@ -141,6 +141,23 @@ export const GAME_SPECS: Record<string, GameSpec> = {
     validate: (o) => intInRange(o.targetScore, 4, 30, "Target score"),
   },
 
+  taboo: {
+    id: "taboo",
+    // Four is two a side, which is the smallest thing that is still Taboo.
+    minPlayers: 4,
+    maxPlayers: 12,
+    seating: "party",
+    // No bots, and this is the one game where that isn't a limitation worth
+    // apologising for: a bot would have to describe a word out loud to people
+    // who can hear it, and judge a spoken guess. There is no supporting task.
+    bots: false,
+    // The only game in the catalogue that does not work at all without voice.
+    voiceMatters: true,
+    validate: (o) =>
+      intInRange(o.targetScore, 5, 40, "Target score") ??
+      oneOf(o.language, ["ar", "en"], "Language"),
+  },
+
   bluff: {
     id: "bluff",
     minPlayers: 3,
@@ -270,6 +287,7 @@ export const PARTY_GAME_ORDER = [
   "domino",
   "spyfall",
   "chameleon",
+  "taboo",
   "bluff",
   "wyr",
   "liars-bar",

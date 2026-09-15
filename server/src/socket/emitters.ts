@@ -33,6 +33,7 @@ const PRIVATE_STATE_EVENTS: Record<string, string> = {
   chameleon: "chameleon_private",
   wyr: "wyr_private",
   bluff: "bluff_private",
+  taboo: "taboo_private",
 };
 
 /**

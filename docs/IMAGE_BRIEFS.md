@@ -214,6 +214,17 @@ relatively quiet — the card overlays text there.
 >
 > [style block]
 
+### 2.10 Taboo — `web/public/art/games/taboo.webp`
+
+> A single cream card held up in one hand, facing the viewer, on a dark
+> background. The card has one bold word at the top and four smaller lines
+> below it — the writing should be illegible, suggested rather than readable.
+> A second pair of hands is visible out of focus behind it, mid-gesture, as
+> though the person is describing something urgently. Warm lamp light. The
+> whole image should read as somebody talking fast.
+>
+> [style block]
+
 ---
 
 ## Priority 3 — TikTok and social

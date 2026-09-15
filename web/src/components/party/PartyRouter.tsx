@@ -69,6 +69,8 @@ export function gameRoute(gameId: string, roomId: string): string {
       return `/wyr/game/${roomId}`;
     case "bluff":
       return `/bluff/game/${roomId}`;
+    case "taboo":
+      return `/taboo/game/${roomId}`;
     case "rento":
       return `/rento/game/${roomId}`;
     default:

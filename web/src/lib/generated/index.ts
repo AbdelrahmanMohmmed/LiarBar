@@ -15,4 +15,5 @@ export * from "./chameleon";
 export * from "./domino";
 export * from "./party";
 export * from "./spyfall";
+export * from "./taboo";
 export * from "./wyr";

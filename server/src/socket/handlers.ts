@@ -36,6 +36,7 @@ import { SnakeLadderGame } from "../games/snake-ladder/SnakeLadderGame.js";
 import { SpyfallGame } from "../games/spyfall/SpyfallGame.js";
 import { ChameleonGame } from "../games/chameleon/ChameleonGame.js";
 import { BluffGame } from "../games/bluff/BluffGame.js";
+import { TabooGame } from "../games/taboo/TabooGame.js";
 import { WyrGame } from "../games/wyr/WyrGame.js";
 
 type Ack = ((response: unknown) => void) | undefined;
@@ -149,6 +150,7 @@ export function registerSocketHandlers(
     const chameleonMembership = makeMembership(ChameleonGame, { resolvePlayer: true });
     const wyrMembership = makeMembership(WyrGame, { resolvePlayer: true });
     const bluffMembership = makeMembership(BluffGame, { resolvePlayer: true });
+    const tabooMembership = makeMembership(TabooGame, { resolvePlayer: true });
 
     // ===== ROOM LIFECYCLE =====
 
@@ -1139,6 +1141,69 @@ export function registerSocketHandlers(
       }
       // The reveal makes every secret public, so private state must go back
       // out or the chameleon's own screen still says "you don't know the word".
+      sendPrivateHands(io, m.room);
+      reply(callback, { success: true });
+    });
+
+    // ===== GAMEPLAY (Taboo) =====
+
+    socket.on("taboo_correct", (_data: unknown, callback: Ack) => {
+      const m = tabooMembership(callback);
+      if (!m) return;
+      const result = m.room.correct(m.player.id);
+      if (!result.success) {
+        fail(callback, result.error ?? "Cannot do that");
+        return;
+      }
+      // A new card is dealt, and who may see it depends on which team they're
+      // on — so the private slice has to go back out, not just the broadcast.
+      sendPrivateHands(io, m.room);
+      reply(callback, { success: true });
+    });
+
+    socket.on("taboo_skip", (_data: unknown, callback: Ack) => {
+      const m = tabooMembership(callback);
+      if (!m) return;
+      const result = m.room.skip(m.player.id);
+      if (!result.success) {
+        fail(callback, result.error ?? "Cannot skip");
+        return;
+      }
+      sendPrivateHands(io, m.room);
+      reply(callback, { success: true });
+    });
+
+    socket.on("taboo_buzz", (_data: unknown, callback: Ack) => {
+      const m = tabooMembership(callback);
+      if (!m) return;
+      const result = m.room.buzz(m.player.id);
+      if (!result.success) {
+        fail(callback, result.error ?? "Cannot buzz");
+        return;
+      }
+      sendPrivateHands(io, m.room);
+      reply(callback, { success: true });
+    });
+
+    socket.on("taboo_shuffle_teams", (_data: unknown, callback: Ack) => {
+      const m = tabooMembership(callback);
+      if (!m) return;
+      const result = m.room.shuffleTeams(m.player.id);
+      if (!result.success) {
+        fail(callback, result.error ?? "Cannot shuffle");
+        return;
+      }
+      reply(callback, { success: true });
+    });
+
+    socket.on("taboo_rematch", (_data: unknown, callback: Ack) => {
+      const m = tabooMembership(callback);
+      if (!m) return;
+      const result = m.room.rematch(m.player.id);
+      if (!result.success) {
+        fail(callback, result.error ?? "Cannot restart");
+        return;
+      }
       sendPrivateHands(io, m.room);
       reply(callback, { success: true });
     });

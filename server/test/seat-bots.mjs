@@ -36,12 +36,17 @@ function act(socket, self) {
   socket.on("bluff_private", (st) => {
     self.private = st;
   });
+  socket.on("taboo_private", (st) => {
+    self.private = st;
+  });
 
   socket.on("game_state", async (envelope) => {
     const base = envelope?.gameId === "party" ? envelope.subGameState : envelope;
     if (!base) return;
     const state =
-      base.gameId === "bluff" && self.private ? { ...self.private, ...base } : base;
+      (base.gameId === "bluff" || base.gameId === "taboo") && self.private
+        ? { ...self.private, ...base }
+        : base;
 
     // Small human-ish delay, and a guard so overlapping broadcasts don't make
     // the same seat act twice for one phase.
@@ -51,7 +56,8 @@ function act(socket, self) {
     // game:phase:round made every seat act at most once for the whole clue
     // phase — the first bot spoke and the round then sat there until the
     // timer killed it, which looks exactly like the game being broken.
-    const waitingOn = state.cluePlayerId ?? state.activeSeat ?? "";
+    const waitingOn =
+      state.cluePlayerId ?? state.activeSeat ?? (state.turnResults?.length ?? "");
     const key = `${state.gameId}:${state.phase}:${state.roundNumber ?? 0}:${waitingOn}`;
     if (self.lastKey === key) return;
     self.lastKey = key;
@@ -103,6 +109,17 @@ function act(socket, self) {
         } else if (state.phase === "choosing" && !state.myChoiceId) {
           const notMine = (state.options || []).filter((o) => o.id !== state.myOptionId);
           if (notMine.length) send("bluff_choose", { optionId: pick(notMine).id });
+        }
+        break;
+
+      case "taboo":
+        // Taboo needs four players and has no bots, so a solo tester can't
+        // reach a turn at all without these. A scripted describer marks a
+        // card every couple of seconds so the turn visibly moves; scripted
+        // opponents never buzz, because a buzz is a judgement about something
+        // said out loud and there is nothing here to hear.
+        if (state.phase === "describing" && state.amDescribing) {
+          send("taboo_correct", {});
         }
         break;
 

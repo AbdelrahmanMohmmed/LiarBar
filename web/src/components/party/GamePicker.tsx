@@ -128,7 +128,7 @@ export default function GamePicker({
       // then had no way to change it short of leaving and using the game's
       // own setup page.
       const options =
-        gameId === "codenames" || gameId === "bluff"
+        gameId === "codenames" || gameId === "bluff" || gameId === "taboo"
           ? { language: lang }
           : undefined;
       await onPick(gameId, options);

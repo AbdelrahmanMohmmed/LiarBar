@@ -245,6 +245,29 @@ export const GAMES: GameMeta[] = [
     art: "/art/games/chameleon.webp",
   },
   {
+    id: "taboo",
+    name: { en: "Taboo", ar: "تابو" },
+    blurb: {
+      en: "Describe the word. Without saying any of the easy ones.",
+      ar: "وصّف الكلمة. من غير ما تقول أسهل أربع كلمات.",
+    },
+    description: {
+      en: "One of you describes a word out loud while your team shouts guesses — and the other team is holding the card, watching for the four words you're not allowed to say. Sixty seconds a turn. It's the only game here that doesn't work without voice, and the only one nobody has to be taught.",
+      ar: "واحد فيكم بيوصّف كلمة بصوت عالي وفريقه بيخمّن — والفريق التاني ماسك الكارت وشايف الأربع كلمات اللي ممنوع تقولها. ستين ثانية للدور. دي اللعبة الوحيدة هنا اللي مبتشتغلش من غير صوت، والوحيدة اللي محدش محتاج حد يشرحهاله.",
+    },
+    category: "party",
+    status: "live",
+    minPlayers: 4,
+    maxPlayers: 12,
+    minutes: [10, 25],
+    path: "/taboo",
+    emoji: "🤐",
+    accent: "ruby",
+    voiceMatters: true,
+    supportsBots: false,
+    art: "/art/games/taboo.webp",
+  },
+  {
     id: "bluff",
     name: { en: "Bluff", ar: "بلوف" },
     blurb: {
@@ -391,6 +414,7 @@ export const PARTY_GAME_IDS = [
   "domino",
   "spyfall",
   "chameleon",
+  "taboo",
   "bluff",
   "wyr",
   "liars-bar",

@@ -21,6 +21,7 @@ import { SnakeLadderGame } from "./snake-ladder/SnakeLadderGame.js";
 import { SpyfallGame } from "./spyfall/SpyfallGame.js";
 import { ChameleonGame } from "./chameleon/ChameleonGame.js";
 import { BluffGame } from "./bluff/BluffGame.js";
+import { TabooGame } from "./taboo/TabooGame.js";
 import { WyrGame } from "./wyr/WyrGame.js";
 import type { Lang } from "./codenames/board.js";
 
@@ -234,6 +235,16 @@ registerGame("chameleon", (roomId, options, callbacks) => {
     options.maxPlayers,
     callbacks,
     Number(options.targetScore) || 8,
+  );
+});
+
+registerGame("taboo", (roomId, options, callbacks) => {
+  return new TabooGame(
+    roomId,
+    options.maxPlayers,
+    callbacks,
+    Number(options.targetScore) || 15,
+    options.language === "en" ? "en" : "ar",
   );
 });
 

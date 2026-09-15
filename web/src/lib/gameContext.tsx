@@ -30,6 +30,7 @@ import type { SpyfallState } from "./spyfallTypes";
 import type { ChameleonState } from "./chameleonTypes";
 import type { WyrState, WyrChoice } from "./wyrTypes";
 import type { BluffState } from "./bluffTypes";
+import type { TabooState } from "./tabooTypes";
 
 /**
  * Everything the client can ask the server to do about a room.
@@ -157,6 +158,14 @@ interface GameActions {
   /** Bluff: pick the answer you believe. Never your own. */
   bluffChoose: (optionId: string) => Promise<void>;
   bluffRematch: () => Promise<void>;
+  /** Taboo: the describer marks the card guessed. */
+  tabooCorrect: () => Promise<void>;
+  /** Taboo: the describer gives up on the card. Costs only the clock. */
+  tabooSkip: () => Promise<void>;
+  /** Taboo: the opposing team heard a forbidden word. */
+  tabooBuzz: () => Promise<void>;
+  tabooShuffleTeams: () => Promise<void>;
+  tabooRematch: () => Promise<void>;
 }
 
 interface GameContextValue extends GameActions {
@@ -184,6 +193,7 @@ interface GameContextValue extends GameActions {
   chameleonState: ChameleonState | null;
   wyrState: WyrState | null;
   bluffState: BluffState | null;
+  tabooState: TabooState | null;
   myHand: Card[];
   isConnected: boolean;
   myPlayerId: string | null;
@@ -207,7 +217,8 @@ export type AnyRoomState =
   | SpyfallState
   | ChameleonState
   | WyrState
-  | BluffState;
+  | BluffState
+  | TabooState;
 
 // Local storage keys. Prefixed by brand id so a rename doesn't silently
 // resurrect a stale room from a previous build.
@@ -256,6 +267,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
   const [chameleonState, setChameleonState] = useState<ChameleonState | null>(null);
   const [wyrState, setWyrState] = useState<WyrState | null>(null);
   const [bluffState, setBluffState] = useState<BluffState | null>(null);
+  const [tabooState, setTabooState] = useState<TabooState | null>(null);
   const [myHand, setMyHand] = useState<Card[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [myPlayerId, setMyPlayerId] = useState<string | null>(null);
@@ -309,6 +321,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
     setChameleonState(null);
     setWyrState(null);
     setBluffState(null);
+    setTabooState(null);
     setMyHand([]);
     setChatMessages([]);
     setToasts([]);
@@ -383,6 +396,10 @@ export const [GameProvider, useGame] = createContextHook(() => {
       setBluffState(state);
     };
 
+    const onTabooPrivate = (state: TabooState) => {
+      setTabooState(state);
+    };
+
     const onChatMessage = (msg: ChatMessage) => {
       setChatMessages((prev) => [...prev.slice(-99), msg]);
     };
@@ -419,6 +436,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
     socket.on("chameleon_private", onChameleonPrivate);
     socket.on("wyr_private", onWyrPrivate);
     socket.on("bluff_private", onBluffPrivate);
+    socket.on("taboo_private", onTabooPrivate);
     socket.on("chat_message", onChatMessage);
     socket.on("webrtc_signal", onWebRTCSignal);
     socket.on("session_superseded", onSuperseded);
@@ -445,6 +463,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
       socket.off("chameleon_private", onChameleonPrivate);
       socket.off("wyr_private", onWyrPrivate);
       socket.off("bluff_private", onBluffPrivate);
+      socket.off("taboo_private", onTabooPrivate);
       socket.off("chat_message", onChatMessage);
       socket.off("webrtc_signal", onWebRTCSignal);
       socket.off("session_superseded", onSuperseded);
@@ -489,6 +508,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
         if (keep !== "chameleon") setChameleonState(null);
         if (keep !== "wyr") setWyrState(null);
         if (keep !== "bluff") setBluffState(null);
+        if (keep !== "taboo") setTabooState(null);
       };
 
       if (!gameId || !sub) {
@@ -566,6 +586,28 @@ export const [GameProvider, useGame] = createContextHook(() => {
             isSubject: next.isSubject ?? prev?.isSubject,
             myAnswer: next.myAnswer ?? prev?.myAnswer ?? null,
             myPrediction: next.myPrediction ?? prev?.myPrediction ?? null,
+          }));
+          break;
+        }
+        case "taboo": {
+          // `card` is the one field in the codebase where `null` is a real
+          // answer and not a missing one: it means "you are on the describing
+          // team and must not see this". So this cannot use `??` the way the
+          // other games do — a teammate's deliberate null would fall through
+          // to the previous card and hand the guessers the word.
+          //
+          // Present-but-null is respected; absent is kept. A public broadcast
+          // omits these keys entirely, and a reconnect reply carries them with
+          // whatever value that player is entitled to.
+          const next = sub as TabooState;
+          const keep = <T,>(incoming: T | undefined, previous: T, fallback: T): T =>
+            incoming !== undefined ? incoming : (previous ?? fallback);
+          setTabooState((prev) => ({
+            ...next,
+            card: keep(next.card, prev?.card, null),
+            myTeam: keep(next.myTeam, prev?.myTeam, null),
+            amDescribing: keep(next.amDescribing, prev?.amDescribing, false),
+            canBuzz: keep(next.canBuzz, prev?.canBuzz, false),
           }));
           break;
         }
@@ -1007,6 +1049,22 @@ export const [GameProvider, useGame] = createContextHook(() => {
     await emitWithAck("bluff_rematch", {});
   }, [myRoomId, emitWithAck]);
 
+  const tabooAction = useCallback(
+    async (event: string) => {
+      if (!myRoomId) throw new Error("Not in a room");
+      await emitWithAck(event, {});
+    },
+    [myRoomId, emitWithAck],
+  );
+  const tabooCorrect = useCallback(() => tabooAction("taboo_correct"), [tabooAction]);
+  const tabooSkip = useCallback(() => tabooAction("taboo_skip"), [tabooAction]);
+  const tabooBuzz = useCallback(() => tabooAction("taboo_buzz"), [tabooAction]);
+  const tabooShuffleTeams = useCallback(
+    () => tabooAction("taboo_shuffle_teams"),
+    [tabooAction],
+  );
+  const tabooRematch = useCallback(() => tabooAction("taboo_rematch"), [tabooAction]);
+
   const sendWebRTCSignal = useCallback(
     (targetId: string, signal: unknown) => {
       if (!myRoomId) return;
@@ -1078,6 +1136,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
     chameleonState,
     wyrState,
     bluffState,
+    tabooState,
     myHand,
     isConnected,
     myPlayerId,
@@ -1135,5 +1194,10 @@ export const [GameProvider, useGame] = createContextHook(() => {
     bluffAnswer,
     bluffChoose,
     bluffRematch,
+    tabooCorrect,
+    tabooSkip,
+    tabooBuzz,
+    tabooShuffleTeams,
+    tabooRematch,
   } satisfies GameContextValue;
 });
