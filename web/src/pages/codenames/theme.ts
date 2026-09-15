@@ -1,23 +1,12 @@
-export const COLORS = {
-  cream: "#FDF6EC",
-  ink: "#2B2420",
-  red: "#E8574A",
-  teal: "#3AA6A6",
-  textSecondary: "#5B5147",
-  textMuted: "#8A7F73",
-  peach: "#F4C89A",
-  paleTeal: "#CFE3E1",
-  disabledBg: "#E7E1D8",
-  disabledText: "#A79C8E",
-  white: "#FFFFFF",
-} as const;
+/**
+ * This was a verbatim copy of `pages/theme.ts`. Three such copies existed and
+ * drifted independently, so a palette change had to be made four times and
+ * usually wasn't. It now re-exports the shared one, which is retargeted onto
+ * the design system — see the note at the top of `pages/theme.ts`.
+ */
+export { COLORS, BUTTON_FONT, uiFont } from "../theme";
 
-export const BUTTON_FONT = "'Baloo 2', sans-serif";
-
-export function uiFont(isAr: boolean): string {
-  return isAr ? "'Tajawal', sans-serif" : "'Baloo 2', sans-serif";
-}
-
+/** Codenames' board face. Same two families as everywhere else. */
 export function boardFont(lang: "ar" | "en"): string {
   return lang === "ar" ? "'Tajawal', sans-serif" : "'Baloo 2', sans-serif";
 }

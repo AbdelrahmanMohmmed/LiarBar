@@ -467,7 +467,7 @@ export default function DominoRoom() {
                   </button>
                 ))}
               </div>
-              <PrimaryButton onClick={handleAddBot} color={COLORS.teal}>
+              <PrimaryButton onClick={handleAddBot}>
                 {c.addBot}
               </PrimaryButton>
             </Panel>

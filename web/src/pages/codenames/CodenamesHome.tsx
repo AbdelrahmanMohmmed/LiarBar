@@ -224,7 +224,7 @@ export default function CodenamesHome() {
                   ))}
                 </select>
               </Field>
-              <PrimaryButton onClick={handleCreate} disabled={isLoading} color={COLORS.teal}>
+              <PrimaryButton onClick={handleCreate} disabled={isLoading}>
                 {isLoading ? c.creating : c.createButton}
               </PrimaryButton>
             </>
@@ -239,7 +239,7 @@ export default function CodenamesHome() {
                   style={{ ...inputStyle("center"), letterSpacing: 3, fontWeight: 700 }}
                 />
               </Field>
-              <PrimaryButton onClick={handleJoin} disabled={isLoading} color={COLORS.red}>
+              <PrimaryButton onClick={handleJoin} disabled={isLoading}>
                 {isLoading ? c.joining : c.joinButton}
               </PrimaryButton>
             </>

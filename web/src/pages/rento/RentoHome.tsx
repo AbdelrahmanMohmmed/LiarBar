@@ -453,7 +453,7 @@ export default function RentoHome() {
                 />
               </Field>
 
-              <PrimaryButton onClick={handleJoin} disabled={isLoading} color={COLORS.teal}>
+              <PrimaryButton onClick={handleJoin} disabled={isLoading}>
                 {isLoading ? c.joining : c.joinButton}
               </PrimaryButton>
             </div>

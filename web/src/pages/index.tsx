@@ -356,7 +356,7 @@ export default function Index() {
               />
             </Field>
 
-            <PrimaryButton onClick={handleJoin} disabled={isLoading} color={COLORS.teal}>
+            <PrimaryButton onClick={handleJoin} disabled={isLoading}>
               <span style={{ display: "inline-flex", alignItems: "center", gap: 8, justifyContent: "center", width: "100%" }}>
                 <Users className="w-4 h-4" />
                 {isLoading ? t("index.joining") : t("index.join_room")}

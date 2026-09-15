@@ -192,7 +192,7 @@ export default function CodenamesRoom() {
                 style={inputStyle(textAlign)}
               />
             </Field>
-            <PrimaryButton onClick={handleJoinRoom} disabled={isJoining} color={COLORS.teal}>
+            <PrimaryButton onClick={handleJoinRoom} disabled={isJoining}>
               {isJoining ? c.joining : c.joinButton}
             </PrimaryButton>
             <button
@@ -348,7 +348,7 @@ export default function CodenamesRoom() {
         <div style={{ marginTop: 20, textAlign: "center" }}>
           {isHost ? (
             <>
-              <PrimaryButton onClick={handleStart} disabled={starting || !!startIssue} color={COLORS.teal} style={{ maxWidth: 320, margin: "0 auto" }}>
+              <PrimaryButton onClick={handleStart} disabled={starting || !!startIssue} style={{ maxWidth: 320, margin: "0 auto" }}>
                 {starting ? c.starting : c.startGame}
               </PrimaryButton>
               {startIssue && (

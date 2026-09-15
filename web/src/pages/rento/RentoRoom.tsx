@@ -385,7 +385,7 @@ export default function RentoRoom() {
                   </button>
                 ))}
               </div>
-              <PrimaryButton onClick={handleAddBot} color={COLORS.teal}>
+              <PrimaryButton onClick={handleAddBot}>
                 {c.addBot}
               </PrimaryButton>
             </Panel>
