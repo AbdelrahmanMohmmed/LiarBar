@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { BRAND, SITE_URL as BRAND_SITE_URL } from "./brand";
 
 /**
  * Lightweight per-route SEO for the SPA. React 18 has no built-in document
@@ -8,9 +9,10 @@ import { useEffect } from "react";
  * cover crawlers that don't run JS.
  */
 
-const SITE_NAME = "Safariyat Games";
-export const SITE_URL = "https://games.safariyat.live";
-const DEFAULT_OG_IMAGE = `${SITE_URL}/icon.png`;
+// Identity comes from the brand config so a rename is one file, not a grep.
+const SITE_NAME = BRAND.name;
+export const SITE_URL = BRAND_SITE_URL;
+const DEFAULT_OG_IMAGE = `${SITE_URL}/og.png`;
 
 type JsonLd = Record<string, unknown> | Record<string, unknown>[];
 

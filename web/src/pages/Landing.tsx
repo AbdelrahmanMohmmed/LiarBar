@@ -1,1123 +1,416 @@
-import { useCallback } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  ArrowRight,
+  Users,
+  Clock,
+  Mic,
+  Bot,
+  Loader2,
+  Link2,
+  Zap,
+  Trophy,
+} from "lucide-react";
+import { useGame } from "@/lib/gameContext";
 import { useLanguage } from "@/lib/languageContext";
 import { Seo } from "@/lib/seo";
+import { BRAND, GAMES, COLORS, url, type GameMeta } from "@/lib/brand";
+import { Logo } from "@/components/brand/Logo";
+import { LangToggle } from "@/components/LangToggle";
+import DominoTile from "@/components/domino/DominoTile";
+
+const LS_NAME = `${BRAND.id}_playerName`;
 
 /**
- * Landing / game hub — a faithful port of the imported Claude Design
- * "Games Landing" (Safariyat Games): a warm, sticker-style card layout with
- * hard borders and offset shadows. Bilingual AR/EN with RTL support, wired to
- * the app's existing language context and routing.
+ * The landing page.
+ *
+ * ## What it is for
+ *
+ * Almost nobody arrives here. The overwhelming majority of players arrive on
+ * `/j/<code>` from a WhatsApp message, having never seen this page and never
+ * needing to. This page has exactly two jobs, in order:
+ *
+ * 1. **Get the one person who did arrive into a room in one tap**, because
+ *    they are the host and nothing happens until they act.
+ * 2. **Be legible to a search engine**, since it is the only indexable page
+ *    with real content.
+ *
+ * Everything that isn't one of those two things is cut. The previous landing
+ * was 1,123 lines including a full illustrated explanation of how to play
+ * Liar's Bar — a game-specific tutorial on a multi-game homepage, read by
+ * nobody, ranking for nothing, and the first thing a host had to scroll past.
+ *
+ * ## The one-tap start
+ *
+ * The primary action creates a party immediately. It deliberately does NOT ask
+ * which game first: a host who has to pick a game before they can send the
+ * link is a host making a decision on behalf of five people who haven't
+ * arrived yet, and if they pick wrong the group used to be stuck with it. Pick
+ * the people first, the game second — which is the whole thesis of the party
+ * model.
  */
-
-const COPY = {
-  ar: {
-    siteName: "ألعاب سفريات",
-    toggleLabel: "English",
-    heroTitle: "اختر لعبتك وابدأ اللعب",
-    heroSubtitle: "ألعاب اجتماعية بسيطة تلعبها مع أصدقائك في أي مكان.",
-    availableLabel: "متاحة الآن",
-    comingSoonLabel: "قريباً",
-    game1Title: "أشك",
-    game1Subtitle: "Liar's Bar",
-    game1Desc: "لعبة خداع وكذب مليئة بالضحك، اجمع أصدقاءك وشوف مين بيكذب علينا!",
-    playLabel: "العب الآن",
-    game2Title: "كودنيمز",
-    game2Subtitle: "Codenames",
-    game2Desc: "لعبة تخمين الكلمات بالفرق، العبها الآن مع أصدقائك!",
-    game3Title: "أعلى أو أقل",
-    game3Subtitle: "Higher or Lower",
-    game3Desc: "لعبة تخمين رقمك السري، شارك تخميناتك واعرف من يقترب للرقم السري أولاً!",
-    game4Title: "الدومينو الكلاسيكية",
-    game4Subtitle: "Classic Dominoes",
-    game4Desc: "العب الدومينو الكلاسيكية مع أصدقائك زوجي أو فردي مع البوتات وتحديد النقاط وعداد الوقت!",
-    notifyLabel: "العب الآن",
-    gameLobbyTitle: "وضع اللوبي",
-    gameLobbySubtitle: "غرفة تجمع الألعاب",
-    gameLobbyDesc: "أنشئ غرفة تجمع دائمة لأصدقائك، وتحدث معهم بالصوت، وابدأ أي لعبة بسلاسة دون انقطاع الاتصال!",
-    lobbyPlayLabel: "إنشاء لوبي",
-    arcadeTitle: "صالة الألعاب",
-    arcadeSubtitle: "Arcade",
-    arcadeDesc: "مجموعة ألعاب أركيد أحادية اللاعب تلعبها مباشرة في المتصفح — أفعى، تيك تاك تو، نزال، وغزاة الفضاء!",
-    arcadePlayLabel: "ادخل الصالة",
-    rentoTitle: "رينتو",
-    rentoSubtitle: "Rento",
-    rentoDesc: "لعبة صفقات عقارية多人. ارمِ النرد واشترِ الملكيات وافلس خصومك!",
-    rentoPlayLabel: "العب الآن",
-    footerText: "© 2026 ألعاب سفريات — العب في أي وقت، في أي مكان.",
-  },
-  en: {
-    siteName: "Safariyat Games",
-    toggleLabel: "العربية",
-    heroTitle: "Pick a game and start playing",
-    heroSubtitle: "Simple party games to play with your friends, anywhere.",
-    availableLabel: "Available now",
-    comingSoonLabel: "Coming soon",
-    game1Title: "Liar's Bar",
-    game1Subtitle: "أشك",
-    game1Desc: "A party game of lies and laughs — gather your friends and catch the liar!",
-    playLabel: "Play now",
-    game2Title: "Codenames",
-    game2Subtitle: "كودنيمز",
-    game2Desc: "The classic team word-guessing game — play it now with your friends!",
-    game3Title: "Higher or Lower",
-    game3Subtitle: "أعلى أو أقل",
-    game3Desc: "A fun number guessing game. Compare ranges with others and see who finds their secret number first!",
-    game4Title: "Classic Dominoes",
-    game4Subtitle: "الدومينو الكلاسيكية",
-    game4Desc: "Play the traditional Domino game online with friends! Supports Solo or 2v2 Teams mode with bots and turn timers.",
-    notifyLabel: "Play now",
-    gameLobbyTitle: "Lobby Mode",
-    gameLobbySubtitle: "Game Party Hub",
-    gameLobbyDesc: "Create a persistent party lobby, chat with friends via voice, and seamlessly launch any game without disconnecting!",
-    lobbyPlayLabel: "Create Lobby",
-    arcadeTitle: "Arcade",
-    arcadeSubtitle: "Arcade",
-    arcadeDesc: "A collection of single-player arcade games you can play right in your browser — Snake, Tic-Tac-Toe, Fighter, and Space Invaders!",
-    arcadePlayLabel: "Enter Arcade",
-    rentoTitle: "Rento",
-    rentoSubtitle: "Rento",
-    rentoDesc: "Multiplayer property trading. Roll dice, buy properties, and bankrupt your rivals!",
-    rentoPlayLabel: "Play now",
-    footerText: "© 2026 Safariyat Games — play anytime, anywhere.",
-  },
-} as const;
-
-const BUTTON_FONT = "'Baloo 2', sans-serif";
-
 export default function Landing() {
   const navigate = useNavigate();
-  const { lang, toggleLang } = useLanguage();
+  const { lang, t } = useLanguage();
+  const { createRoom, joinRoom, addToast } = useGame();
 
-  const isAr = lang === "ar";
-  const c = COPY[isAr ? "ar" : "en"];
-  const dir = isAr ? "rtl" : "ltr";
-  const textAlign = isAr ? "right" : "left";
-  const buttonAlign = isAr ? "flex-end" : "flex-start";
-  const badgeSide = isAr ? "left" : "right";
-  const font = isAr ? "'Tajawal', sans-serif" : "'Baloo 2', sans-serif";
+  const [name, setName] = useState("");
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState<"create" | "join" | null>(null);
 
-  const goToPlay = useCallback(() => navigate("/play"), [navigate]);
-  const goToCodenames = useCallback(() => navigate("/codenames"), [navigate]);
-  const goToHigherLower = useCallback(() => navigate("/higher-lower"), [navigate]);
-  const goToDomino = useCallback(() => navigate("/domino"), [navigate]);
-  const goToLobby = useCallback(() => navigate("/lobby"), [navigate]);
-  const goToArcade = useCallback(() => navigate("/arcade"), [navigate]);
-  const goToRento = useCallback(() => navigate("/rento"), [navigate]);
+  useEffect(() => {
+    try {
+      setName(localStorage.getItem(LS_NAME) ?? "");
+    } catch {
+      /* private mode */
+    }
+  }, []);
+
+  const remember = (value: string) => {
+    try {
+      localStorage.setItem(LS_NAME, value);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const startParty = async (gameId?: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      addToast(t("join.name_required"), "error");
+      document.getElementById("landing-name")?.focus();
+      return;
+    }
+    setBusy("create");
+    try {
+      const { roomId } = await createRoom({
+        playerName: trimmed,
+        gameId: gameId ?? "party",
+        maxPlayers: 8,
+      });
+      remember(trimmed);
+      navigate(`/r/${roomId}`);
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : t("landing.create_failed"), "error");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const join = async () => {
+    const trimmed = name.trim();
+    const roomCode = code.trim();
+    if (!roomCode) {
+      addToast(t("domino.enter_code"), "error");
+      return;
+    }
+    // With no name yet, hand off to the join page, which shows what's in the
+    // room before asking for one — much better than a bare error here.
+    if (!trimmed) {
+      navigate(`/j/${roomCode}`);
+      return;
+    }
+    setBusy("join");
+    try {
+      await joinRoom(roomCode, trimmed);
+      remember(trimmed);
+      navigate(`/r/${roomCode}`);
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : t("join.failed"), "error");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const jsonLd = useMemo(
+    () => [
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "@id": `${url("/")}#website`,
+        url: url("/"),
+        name: BRAND.name,
+        description: BRAND.description[lang],
+        inLanguage: ["en", "ar"],
+      },
+      {
+        "@context": "https://schema.org",
+        "@type": "ItemList",
+        name: `Games on ${BRAND.name}`,
+        itemListElement: GAMES.map((game, i) => ({
+          "@type": "ListItem",
+          position: i + 1,
+          item: {
+            "@type": "VideoGame",
+            name: game.name[lang],
+            url: url(game.path),
+            description: game.description[lang],
+            playMode: "MultiPlayer",
+            gamePlatform: "Web browser",
+            applicationCategory: "Game",
+            numberOfPlayers: {
+              "@type": "QuantitativeValue",
+              minValue: game.minPlayers,
+              maxValue: game.maxPlayers,
+            },
+            offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+          },
+        })),
+      },
+    ],
+    [lang],
+  );
 
   return (
-    <>
-    <Seo
-      lang={isAr ? "ar" : "en"}
-      title={isAr ? "ألعاب سفريات — ألعاب جماعية أونلاين مجانية" : "Safariyat Games — Free online multiplayer party games"}
-      description={
-        isAr
-          ? "العب ألعاب جماعية أونلاين مجانية مع أصدقائك — أشك، كودنيمز، وأعلى أو أقل. بدون تحميل وبدون تسجيل."
-          : "Play free online multiplayer party games with friends — Liar's Bar, Codenames, and Higher or Lower. No download, no sign-up."
-      }
-      path="/"
-    />
-    <div
-      dir={dir}
-      style={{
-        minHeight: "100vh",
-        background: "#FDF6EC",
-        fontFamily: font,
-        color: "#2B2420",
-        display: "flex",
-        flexDirection: "column",
-      }}
-    >
-      {/* Header */}
-      <header
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 12,
-          padding: "18px 20px",
-          maxWidth: 1180,
-          width: "100%",
-          margin: "0 auto",
-          boxSizing: "border-box",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          {/* Domino logo mark */}
-          <div
-            style={{
-              width: 42,
-              height: 42,
-              borderRadius: 10,
-              background: "#E8574A",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flexShrink: 0,
-              padding: 5,
-              boxSizing: "border-box",
-            }}
-          >
-            <div
-              style={{
-                width: "100%",
-                height: "100%",
-                background: "#FDF6EC",
-                borderRadius: 5,
-                display: "flex",
-                flexDirection: "column",
-                position: "relative",
-              }}
-            >
-              <div
-                style={{
-                  flex: 1,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 3,
-                  borderBottom: "2px solid #E8574A",
-                }}
-              >
-                <Dot />
-                <Dot />
-              </div>
-              <div
-                style={{
-                  flex: 1,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 3,
-                }}
-              >
-                <Dot />
-                <Dot />
-                <Dot />
-              </div>
-            </div>
-          </div>
-          <div style={{ fontFamily: font, fontWeight: 800, fontSize: 20, lineHeight: 1.1 }}>
-            {c.siteName}
-          </div>
-        </div>
-        <button
-          onClick={toggleLang}
-          className="dc-lang-btn"
-          style={{
-            border: "2px solid #2B2420",
-            background: "#FFFFFF",
-            color: "#2B2420",
-            fontFamily: BUTTON_FONT,
-            fontWeight: 700,
-            fontSize: 14,
-            padding: "8px 14px",
-            borderRadius: 999,
-            cursor: "pointer",
-          }}
-        >
-          {c.toggleLabel}
-        </button>
+    <div className="page max-w-3xl mx-auto pb-16">
+      <Seo
+        title={`${BRAND.name} — ${BRAND.tagline[lang]}`}
+        description={BRAND.description[lang]}
+        path="/"
+        lang={lang}
+        jsonLd={jsonLd}
+      />
+
+      <header className="flex items-center justify-between mb-10">
+        <Logo size={30} animated />
+        <LangToggle />
       </header>
 
-      {/* Main */}
-      <main
-        style={{
-          flex: 1,
-          maxWidth: 1180,
-          width: "100%",
-          margin: "0 auto",
-          padding: "8px 20px 40px",
-          boxSizing: "border-box",
-          display: "flex",
-          flexDirection: "column",
-          gap: 28,
-        }}
-      >
-        <section
-          style={{
-            textAlign,
-            display: "flex",
-            flexDirection: "column",
-            gap: 8,
-            paddingTop: 8,
-          }}
+      {/* ---------------- Hero ---------------- */}
+      <section className="text-center mb-8">
+        <h1 className="font-display text-4xl sm:text-5xl text-cream leading-tight">
+          {BRAND.tagline[lang]}
+        </h1>
+        <p className="text-base text-sand mt-3 max-w-md mx-auto">
+          {t("landing.hero_sub")}
+        </p>
+      </section>
+
+      {/* ---------------- Start ---------------- */}
+      <section className="surface-lit rounded-xl p-5 mb-8">
+        <label htmlFor="landing-name" className="block mb-3">
+          <span className="block text-xs text-sand mb-1.5">{t("join.your_name")}</span>
+          <input
+            id="landing-name"
+            className="field"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={t("join.name_placeholder")}
+            maxLength={24}
+            autoComplete="nickname"
+          />
+        </label>
+
+        <button
+          onClick={() => void startParty()}
+          disabled={busy !== null}
+          className="btn btn-primary btn-lg w-full mb-3"
         >
-          <h1
-            style={{
-              fontFamily: font,
-              fontWeight: 800,
-              fontSize: 30,
-              lineHeight: 1.25,
-              margin: 0,
-              color: "#2B2420",
-            }}
-          >
-            {c.heroTitle}
-          </h1>
-          <p
-            style={{
-              fontFamily: font,
-              fontSize: 16,
-              lineHeight: 1.6,
-              margin: 0,
-              color: "#5B5147",
-            }}
-          >
-            {c.heroSubtitle}
-          </p>
-        </section>
+          {busy === "create" ? (
+            <Loader2 size={18} className="animate-spin" />
+          ) : (
+            <>
+              {t("landing.start_party")}
+              <ArrowRight size={18} className="rtl:-scale-x-100" />
+            </>
+          )}
+        </button>
 
-        <section
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(290px, 1fr))",
-            gap: 20,
-            alignItems: "stretch",
-          }}
-        >
-          {/* Liar's Bar — available */}
-          <article
-            style={{
-              animation: "dc-pop-in 0.5s ease both",
-              background: "#FFFFFF",
-              borderRadius: 24,
-              border: "3px solid #2B2420",
-              overflow: "hidden",
-              boxShadow: "6px 6px 0 #2B2420",
-              display: "flex",
-              flexDirection: "column",
-            }}
+        <div className="flex items-center gap-2">
+          <input
+            className="field font-numeric text-center"
+            value={code}
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 8))}
+            placeholder={t("landing.code_placeholder")}
+            inputMode="numeric"
+            aria-label={t("party.room_code")}
+          />
+          <button
+            onClick={() => void join()}
+            disabled={busy !== null || !code.trim()}
+            className="btn btn-ghost shrink-0"
           >
-            <div
-              style={{
-                height: 140,
-                flexShrink: 0,
-                background: "#F4C89A",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                position: "relative",
-              }}
-            >
-              <div style={{ position: "relative", width: 140, height: 84 }}>
-                <PlayingCard rotate={-14} diamond="#E8574A" />
-                <PlayingCard rotate={0} diamond="#3AA6A6" />
-                <PlayingCard rotate={14} diamond="#E8574A" />
-              </div>
-              <span
-                style={{
-                  position: "absolute",
-                  top: 10,
-                  [badgeSide]: 10,
-                  background: "#3AA6A6",
-                  color: "#FDF6EC",
-                  fontFamily: BUTTON_FONT,
-                  fontWeight: 700,
-                  fontSize: 12,
-                  padding: "5px 12px",
-                  borderRadius: 999,
-                  animation: "dc-float-badge 2.4s ease-in-out infinite",
-                }}
-              >
-                {c.availableLabel}
+            {busy === "join" ? <Loader2 size={16} className="animate-spin" /> : t("join.join")}
+          </button>
+        </div>
+
+        <p className="text-[11px] text-sand text-center mt-3">
+          {t("landing.no_signup")}
+        </p>
+      </section>
+
+      {/* ---------------- Why ---------------- */}
+      {/* Three claims, each one a thing the product actually does that the
+          alternatives don't. No feature grid of things every website has. */}
+      <section className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-10">
+        <Pitch
+          icon={<Link2 size={18} />}
+          title={t("landing.why_1_t")}
+          body={t("landing.why_1_b")}
+          color={COLORS.coral}
+        />
+        <Pitch
+          icon={<Mic size={18} />}
+          title={t("landing.why_2_t")}
+          body={t("landing.why_2_b")}
+          color={COLORS.mint}
+        />
+        <Pitch
+          icon={<Zap size={18} />}
+          title={t("landing.why_3_t")}
+          body={t("landing.why_3_b")}
+          color={COLORS.gold}
+        />
+      </section>
+
+      {/* ---------------- Games ---------------- */}
+      <section className="mb-10">
+        <h2 className="font-display text-2xl text-cream mb-1">{t("landing.games_title")}</h2>
+        <p className="text-sm text-sand mb-4">{t("landing.games_sub")}</p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {GAMES.map((game) => (
+            <GameCard
+              key={game.id}
+              game={game}
+              onPlay={() => void startParty(game.id)}
+              busy={busy !== null}
+            />
+          ))}
+        </div>
+      </section>
+
+      {/* ---------------- How ---------------- */}
+      {/* Kept because it is the page's only substantial indexable text, and
+          because the model (one room, many games) is unusual enough that a
+          first-time visitor genuinely needs it explained once. */}
+      <section className="surface rounded-xl p-5 mb-10">
+        <h2 className="font-display text-xl text-cream mb-4">{t("landing.how_title")}</h2>
+        <ol className="space-y-4">
+          {[1, 2, 3].map((n) => (
+            <li key={n} className="flex gap-3">
+              <span className="font-numeric text-xl text-coral shrink-0 w-6">{n}</span>
+              <span>
+                <span className="block text-sm font-bold text-cream">
+                  {t(`landing.how_${n}_t`)}
+                </span>
+                <span className="block text-sm text-sand">{t(`landing.how_${n}_b`)}</span>
               </span>
-            </div>
-            <div
-              style={{
-                padding: "16px 20px 20px",
-                flex: 1,
-                display: "flex",
-                flexDirection: "column",
-                gap: 10,
-                textAlign,
-              }}
-            >
-              <div>
-                <div style={{ fontFamily: font, fontWeight: 800, fontSize: 22, color: "#2B2420" }}>
-                  {c.game1Title}
-                </div>
-                <div style={{ fontFamily: font, fontSize: 14, color: "#8A7F73", marginTop: 2 }}>
-                  {c.game1Subtitle}
-                </div>
-              </div>
-              <p style={{ fontFamily: font, fontSize: 14, lineHeight: 1.6, color: "#5B5147", margin: 0 }}>
-                {c.game1Desc}
-              </p>
-              <button
-                onClick={goToPlay}
-                className="dc-play-btn"
-                style={{
-                  alignSelf: buttonAlign,
-                  marginTop: "auto",
-                  background: "#E8574A",
-                  color: "#FDF6EC",
-                  border: "none",
-                  fontFamily: BUTTON_FONT,
-                  fontWeight: 700,
-                  fontSize: 15,
-                  padding: "10px 22px",
-                  borderRadius: 999,
-                  cursor: "pointer",
-                }}
-              >
-                {c.playLabel}
-              </button>
-            </div>
-          </article>
+            </li>
+          ))}
+        </ol>
+      </section>
 
-          {/* Codenames — available */}
-          <article
-            style={{
-              animation: "dc-pop-in 0.5s ease 0.1s both",
-              background: "#FFFFFF",
-              borderRadius: 24,
-              border: "3px solid #2B2420",
-              overflow: "hidden",
-              boxShadow: "6px 6px 0 #2B2420",
-              display: "flex",
-              flexDirection: "column",
-            }}
-          >
-            <div
-              style={{
-                height: 140,
-                flexShrink: 0,
-                background: "#CFE3E1",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                position: "relative",
-              }}
-            >
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(5, 20px)",
-                  gridTemplateRows: "repeat(3, 20px)",
-                  gap: 4,
-                }}
-              >
-                {CODENAMES_TILES.map((color, i) => (
-                  <div key={i} style={{ background: color, borderRadius: 3 }} />
-                ))}
-              </div>
-              <span
-                style={{
-                  position: "absolute",
-                  top: 10,
-                  [badgeSide]: 10,
-                  background: "#3AA6A6",
-                  color: "#FDF6EC",
-                  fontFamily: BUTTON_FONT,
-                  fontWeight: 700,
-                  fontSize: 12,
-                  padding: "5px 12px",
-                  borderRadius: 999,
-                  animation: "dc-float-badge 2.4s ease-in-out infinite",
-                }}
-              >
-                {c.availableLabel}
-              </span>
-            </div>
-            <div
-              style={{
-                padding: "16px 20px 20px",
-                flex: 1,
-                display: "flex",
-                flexDirection: "column",
-                gap: 10,
-                textAlign,
-              }}
-            >
-              <div>
-                <div style={{ fontFamily: font, fontWeight: 800, fontSize: 22, color: "#2B2420" }}>
-                  {c.game2Title}
-                </div>
-                <div style={{ fontFamily: font, fontSize: 14, color: "#8A7F73", marginTop: 2 }}>
-                  {c.game2Subtitle}
-                </div>
-              </div>
-              <p style={{ fontFamily: font, fontSize: 14, lineHeight: 1.6, color: "#5B5147", margin: 0 }}>
-                {c.game2Desc}
-              </p>
-              <button
-                onClick={goToCodenames}
-                className="dc-play-btn"
-                style={{
-                  alignSelf: buttonAlign,
-                  marginTop: "auto",
-                  background: "#3AA6A6",
-                  color: "#FDF6EC",
-                  border: "none",
-                  fontFamily: BUTTON_FONT,
-                  fontWeight: 700,
-                  fontSize: 15,
-                  padding: "10px 22px",
-                  borderRadius: 999,
-                  cursor: "pointer",
-                }}
-              >
-                {c.notifyLabel}
-              </button>
-            </div>
-          </article>
-
-          {/* Higher or Lower — available */}
-          <article
-            style={{
-              animation: "dc-pop-in 0.5s ease 0.2s both",
-              background: "#FFFFFF",
-              borderRadius: 24,
-              border: "3px solid #2B2420",
-              overflow: "hidden",
-              boxShadow: "6px 6px 0 #2B2420",
-              display: "flex",
-              flexDirection: "column",
-            }}
-          >
-            <div
-              style={{
-                height: 140,
-                flexShrink: 0,
-                background: "#FEF3C7", // Soft warm yellow
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 16,
-                position: "relative",
-              }}
-            >
-              <div
-                style={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: "50%",
-                  background: "#3AA6A6",
-                  color: "#FDF6EC",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 22,
-                  fontWeight: 800,
-                  border: "3.5px solid #2B2420",
-                  boxShadow: "3px 3px 0 #2B2420",
-                  transform: "rotate(-8deg)",
-                }}
-              >
-                ↑
-              </div>
-              <div
-                style={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: "50%",
-                  background: "#E8574A",
-                  color: "#FDF6EC",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 22,
-                  fontWeight: 800,
-                  border: "3.5px solid #2B2420",
-                  boxShadow: "3px 3px 0 #2B2420",
-                  transform: "rotate(8deg)",
-                }}
-              >
-                ↓
-              </div>
-              <span
-                style={{
-                  position: "absolute",
-                  top: 10,
-                  [badgeSide]: 10,
-                  background: "#3AA6A6",
-                  color: "#FDF6EC",
-                  fontFamily: BUTTON_FONT,
-                  fontWeight: 700,
-                  fontSize: 12,
-                  padding: "5px 12px",
-                  borderRadius: 999,
-                  animation: "dc-float-badge 2.4s ease-in-out infinite",
-                }}
-              >
-                {c.availableLabel}
-              </span>
-            </div>
-            <div
-              style={{
-                padding: "16px 20px 20px",
-                flex: 1,
-                display: "flex",
-                flexDirection: "column",
-                gap: 10,
-                textAlign,
-              }}
-            >
-              <div>
-                <div style={{ fontFamily: font, fontWeight: 800, fontSize: 22, color: "#2B2420" }}>
-                  {c.game3Title}
-                </div>
-                <div style={{ fontFamily: font, fontSize: 14, color: "#8A7F73", marginTop: 2 }}>
-                  {c.game3Subtitle}
-                </div>
-              </div>
-              <p style={{ fontFamily: font, fontSize: 14, lineHeight: 1.6, color: "#5B5147", margin: 0 }}>
-                {c.game3Desc}
-              </p>
-              <button
-                onClick={goToHigherLower}
-                className="dc-play-btn"
-                style={{
-                  alignSelf: buttonAlign,
-                  marginTop: "auto",
-                  background: "#E8574A",
-                  color: "#FDF6EC",
-                  border: "none",
-                  fontFamily: BUTTON_FONT,
-                  fontWeight: 700,
-                  fontSize: 15,
-                  padding: "10px 22px",
-                  borderRadius: 999,
-                  cursor: "pointer",
-                }}
-              >
-                {c.playLabel}
-              </button>
-            </div>
-          </article>
-
-          {/* Dominoes — available */}
-          <article
-            style={{
-              animation: "dc-pop-in 0.5s ease 0.25s both",
-              background: "#FFFFFF",
-              borderRadius: 24,
-              border: "3px solid #2B2420",
-              overflow: "hidden",
-              boxShadow: "6px 6px 0 #2B2420",
-              display: "flex",
-              flexDirection: "column",
-            }}
-          >
-            <div
-              style={{
-                height: 140,
-                flexShrink: 0,
-                background: "#D1FAE5", // Soft mint green
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 12,
-                position: "relative",
-              }}
-            >
-              <div style={{ display: "flex", gap: 10, transform: "rotate(-4deg)" }}>
-                {/* Mini Domino 1 */}
-                <div style={{ width: 44, height: 76, background: "#FCFBF7", border: "2.5px solid #2B2420", borderRadius: 6, display: "flex", flexDirection: "column", position: "relative", boxShadow: "2px 2px 0 #2B2420" }}>
-                  <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", borderBottom: "1.5px solid #2B2420" }}>
-                    <div style={{ width: 5, height: 5, background: "#2B2420", borderRadius: "50%" }} />
-                  </div>
-                  <div style={{ flex: 1, display: "flex", flexWrap: "wrap", padding: 4, gap: 3, alignItems: "center", justifyContent: "center" }}>
-                    <div style={{ width: 4, height: 4, background: "#2B2420", borderRadius: "50%" }} />
-                    <div style={{ width: 4, height: 4, background: "#2B2420", borderRadius: "50%" }} />
-                    <div style={{ width: 4, height: 4, background: "#2B2420", borderRadius: "50%" }} />
-                    <div style={{ width: 4, height: 4, background: "#2B2420", borderRadius: "50%" }} />
-                  </div>
-                  <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: 4, height: 4, background: "#D4AF37", borderRadius: "50%", border: "0.5px solid #9A7B1C" }} />
-                </div>
-                {/* Mini Domino 2 */}
-                <div style={{ width: 44, height: 76, background: "#FCFBF7", border: "2.5px solid #2B2420", borderRadius: 6, display: "flex", flexDirection: "column", position: "relative", boxShadow: "2px 2px 0 #2B2420", transform: "translateY(8px) rotate(8deg)" }}>
-                  <div style={{ flex: 1, display: "flex", flexWrap: "wrap", padding: 4, gap: 3, alignItems: "center", justifyContent: "center", borderBottom: "1.5px solid #2B2420" }}>
-                    <div style={{ width: 4, height: 4, background: "#2B2420", borderRadius: "50%" }} />
-                    <div style={{ width: 4, height: 4, background: "#2B2420", borderRadius: "50%" }} />
-                    <div style={{ width: 4, height: 4, background: "#2B2420", borderRadius: "50%" }} />
-                  </div>
-                  <div style={{ flex: 1, display: "flex", flexWrap: "wrap", padding: 4, gap: 3, alignItems: "center", justifyContent: "center" }}>
-                    <div style={{ width: 4, height: 4, background: "#2B2420", borderRadius: "50%" }} />
-                    <div style={{ width: 4, height: 4, background: "#2B2420", borderRadius: "50%" }} />
-                    <div style={{ width: 4, height: 4, background: "#2B2420", borderRadius: "50%" }} />
-                  </div>
-                  <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: 4, height: 4, background: "#D4AF37", borderRadius: "50%", border: "0.5px solid #9A7B1C" }} />
-                </div>
-              </div>
-              <span
-                style={{
-                  position: "absolute",
-                  top: 10,
-                  [badgeSide]: 10,
-                  background: "#3AA6A6",
-                  color: "#FDF6EC",
-                  fontFamily: BUTTON_FONT,
-                  fontWeight: 700,
-                  fontSize: 12,
-                  padding: "5px 12px",
-                  borderRadius: 999,
-                  animation: "dc-float-badge 2.4s ease-in-out infinite",
-                }}
-              >
-                {c.availableLabel}
-              </span>
-            </div>
-            <div
-              style={{
-                padding: "16px 20px 20px",
-                flex: 1,
-                display: "flex",
-                flexDirection: "column",
-                gap: 10,
-                textAlign,
-              }}
-            >
-              <div>
-                <div style={{ fontFamily: font, fontWeight: 800, fontSize: 22, color: "#2B2420" }}>
-                  {c.game4Title}
-                </div>
-                <div style={{ fontFamily: font, fontSize: 14, color: "#8A7F73", marginTop: 2 }}>
-                  {c.game4Subtitle}
-                </div>
-              </div>
-              <p style={{ fontFamily: font, fontSize: 14, lineHeight: 1.6, color: "#5B5147", margin: 0 }}>
-                {c.game4Desc}
-              </p>
-              <button
-                onClick={goToDomino}
-                className="dc-play-btn"
-                style={{
-                  alignSelf: buttonAlign,
-                  marginTop: "auto",
-                  background: "#3AA6A6",
-                  color: "#FDF6EC",
-                  border: "none",
-                  fontFamily: BUTTON_FONT,
-                  fontWeight: 700,
-                  fontSize: 15,
-                  padding: "10px 22px",
-                  borderRadius: 999,
-                  cursor: "pointer",
-                }}
-              >
-                {c.playLabel}
-              </button>
-            </div>
-          </article>
-
-          {/* Lobby Mode — available */}
-          <article
-            style={{
-              animation: "dc-pop-in 0.5s ease 0.3s both",
-              background: "#FFFFFF",
-              borderRadius: 24,
-              border: "3px solid #2B2420",
-              overflow: "hidden",
-              boxShadow: "6px 6px 0 #2B2420",
-              display: "flex",
-              flexDirection: "column",
-            }}
-          >
-            <div
-              style={{
-                height: 140,
-                flexShrink: 0,
-                background: "#E9D5FF", // Soft warm purple
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 12,
-                position: "relative",
-              }}
-            >
-              {/* Sticker styling representation of game lobby/chat */}
-              <div
-                style={{
-                  width: 54,
-                  height: 54,
-                  borderRadius: 12,
-                  background: "#FDF6EC",
-                  border: "3px solid #2B2420",
-                  boxShadow: "3px 3px 0 #2B2420",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 24,
-                  transform: "rotate(-6deg)",
-                }}
-              >
-                💬
-              </div>
-              <div
-                style={{
-                  width: 54,
-                  height: 54,
-                  borderRadius: 12,
-                  background: "#3AA6A6",
-                  border: "3px solid #2B2420",
-                  boxShadow: "3px 3px 0 #2B2420",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 24,
-                  transform: "rotate(6deg)",
-                }}
-              >
-                🎮
-              </div>
-              <span
-                style={{
-                  position: "absolute",
-                  top: 10,
-                  [badgeSide]: 10,
-                  background: "#3AA6A6",
-                  color: "#FDF6EC",
-                  fontFamily: BUTTON_FONT,
-                  fontWeight: 700,
-                  fontSize: 12,
-                  padding: "5px 12px",
-                  borderRadius: 999,
-                  animation: "dc-float-badge 2.4s ease-in-out infinite",
-                }}
-              >
-                {c.availableLabel}
-              </span>
-            </div>
-            <div
-              style={{
-                padding: "16px 20px 20px",
-                flex: 1,
-                display: "flex",
-                flexDirection: "column",
-                gap: 10,
-                textAlign,
-              }}
-            >
-              <div>
-                <div style={{ fontFamily: font, fontWeight: 800, fontSize: 22, color: "#2B2420" }}>
-                  {c.gameLobbyTitle}
-                </div>
-                <div style={{ fontFamily: font, fontSize: 14, color: "#8A7F73", marginTop: 2 }}>
-                  {c.gameLobbySubtitle}
-                </div>
-              </div>
-              <p style={{ fontFamily: font, fontSize: 14, lineHeight: 1.6, color: "#5B5147", margin: 0 }}>
-                {c.gameLobbyDesc}
-              </p>
-              <button
-                onClick={goToLobby}
-                className="dc-play-btn"
-                style={{
-                  alignSelf: buttonAlign,
-                  marginTop: "auto",
-                  background: "#A855F7", // Purple theme button
-                  color: "#FDF6EC",
-                  border: "none",
-                  fontFamily: BUTTON_FONT,
-                  fontWeight: 700,
-                  fontSize: 15,
-                  padding: "10px 22px",
-                  borderRadius: 999,
-                  cursor: "pointer",
-                }}
-              >
-                {c.lobbyPlayLabel}
-              </button>
-            </div>
-          </article>
-
-          {/* Rento — available */}
-          <article
-            style={{
-              animation: "dc-pop-in 0.5s ease 0.35s both",
-              background: "#FFFFFF",
-              borderRadius: 24,
-              border: "3px solid #2B2420",
-              overflow: "hidden",
-              boxShadow: "6px 6px 0 #2B2420",
-              display: "flex",
-              flexDirection: "column",
-            }}
-          >
-            <div
-              style={{
-                height: 140,
-                flexShrink: 0,
-                background: "#FEF3C7",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 14,
-                position: "relative",
-              }}
-            >
-              <div
-                style={{
-                  width: 54,
-                  height: 54,
-                  borderRadius: 12,
-                  background: "#F4C89A",
-                  border: "3px solid #2B2420",
-                  boxShadow: "3px 3px 0 #2B2420",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 24,
-                  transform: "rotate(-6deg)",
-                }}
-              >
-                🏠
-              </div>
-              <div
-                style={{
-                  width: 54,
-                  height: 54,
-                  borderRadius: 12,
-                  background: "#3AA6A6",
-                  border: "3px solid #2B2420",
-                  boxShadow: "3px 3px 0 #2B2420",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 24,
-                  transform: "rotate(6deg)",
-                }}
-              >
-                🎲
-              </div>
-              <span
-                style={{
-                  position: "absolute",
-                  top: 10,
-                  [badgeSide]: 10,
-                  background: "#3AA6A6",
-                  color: "#FDF6EC",
-                  fontFamily: BUTTON_FONT,
-                  fontWeight: 700,
-                  fontSize: 12,
-                  padding: "5px 12px",
-                  borderRadius: 999,
-                  animation: "dc-float-badge 2.4s ease-in-out infinite",
-                }}
-              >
-                {c.availableLabel}
-              </span>
-            </div>
-            <div
-              style={{
-                padding: "16px 20px 20px",
-                flex: 1,
-                display: "flex",
-                flexDirection: "column",
-                gap: 10,
-                textAlign,
-              }}
-            >
-              <div>
-                <div style={{ fontFamily: font, fontWeight: 800, fontSize: 22, color: "#2B2420" }}>
-                  {c.rentoTitle}
-                </div>
-                <div style={{ fontFamily: font, fontSize: 14, color: "#8A7F73", marginTop: 2 }}>
-                  {c.rentoSubtitle}
-                </div>
-              </div>
-              <p style={{ fontFamily: font, fontSize: 14, lineHeight: 1.6, color: "#5B5147", margin: 0 }}>
-                {c.rentoDesc}
-              </p>
-              <button
-                onClick={goToRento}
-                className="dc-play-btn"
-                style={{
-                  alignSelf: buttonAlign,
-                  marginTop: "auto",
-                  background: "#E8574A",
-                  color: "#FDF6EC",
-                  border: "none",
-                  fontFamily: BUTTON_FONT,
-                  fontWeight: 700,
-                  fontSize: 15,
-                  padding: "10px 22px",
-                  borderRadius: 999,
-                  cursor: "pointer",
-                }}
-              >
-                {c.rentoPlayLabel}
-              </button>
-            </div>
-          </article>
-
-          {/* Arcade — available */}
-          <article
-            style={{
-              animation: "dc-pop-in 0.5s ease 0.4s both",
-              background: "#FFFFFF",
-              borderRadius: 24,
-              border: "3px solid #2B2420",
-              overflow: "hidden",
-              boxShadow: "6px 6px 0 #2B2420",
-              display: "flex",
-              flexDirection: "column",
-            }}
-          >
-            <div
-              style={{
-                height: 140,
-                flexShrink: 0,
-                background: "#E0E7FF",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 14,
-                position: "relative",
-              }}
-            >
-              <div
-                style={{
-                  width: 46,
-                  height: 46,
-                  borderRadius: 12,
-                  background: "#7C3AED",
-                  border: "3px solid #2B2420",
-                  boxShadow: "3px 3px 0 #2B2420",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 22,
-                  transform: "rotate(-7deg)",
-                }}
-              >
-                🐍
-              </div>
-              <div
-                style={{
-                  width: 46,
-                  height: 46,
-                  borderRadius: 12,
-                  background: "#22D3EE",
-                  border: "3px solid #2B2420",
-                  boxShadow: "3px 3px 0 #2B2420",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 22,
-                  transform: "rotate(7deg)",
-                }}
-              >
-                👾
-              </div>
-              <span
-                style={{
-                  position: "absolute",
-                  top: 10,
-                  [badgeSide]: 10,
-                  background: "#3AA6A6",
-                  color: "#FDF6EC",
-                  fontFamily: BUTTON_FONT,
-                  fontWeight: 700,
-                  fontSize: 12,
-                  padding: "5px 12px",
-                  borderRadius: 999,
-                  animation: "dc-float-badge 2.4s ease-in-out infinite",
-                }}
-              >
-                {c.availableLabel}
-              </span>
-            </div>
-            <div
-              style={{
-                padding: "16px 20px 20px",
-                flex: 1,
-                display: "flex",
-                flexDirection: "column",
-                gap: 10,
-                textAlign,
-              }}
-            >
-              <div>
-                <div style={{ fontFamily: font, fontWeight: 800, fontSize: 22, color: "#2B2420" }}>
-                  {c.arcadeTitle}
-                </div>
-                <div style={{ fontFamily: font, fontSize: 14, color: "#8A7F73", marginTop: 2 }}>
-                  {c.arcadeSubtitle}
-                </div>
-              </div>
-              <p style={{ fontFamily: font, fontSize: 14, lineHeight: 1.6, color: "#5B5147", margin: 0 }}>
-                {c.arcadeDesc}
-              </p>
-              <button
-                onClick={goToArcade}
-                className="dc-play-btn"
-                style={{
-                  alignSelf: buttonAlign,
-                  marginTop: "auto",
-                  background: "#7C3AED",
-                  color: "#FDF6EC",
-                  border: "none",
-                  fontFamily: BUTTON_FONT,
-                  fontWeight: 700,
-                  fontSize: 15,
-                  padding: "10px 22px",
-                  borderRadius: 999,
-                  cursor: "pointer",
-                }}
-              >
-                {c.arcadePlayLabel}
-              </button>
-            </div>
-          </article>
-        </section>
-      </main>
-
-      <footer
-        style={{
-          textAlign: "center",
-          padding: "18px 20px 28px",
-          fontFamily: font,
-          fontSize: 13,
-          color: "#8A7F73",
-        }}
-      >
-        {c.footerText}
+      <footer className="text-center">
+        <div className="flex justify-center gap-1.5 mb-4 opacity-40" aria-hidden>
+          {[
+            [6, 6],
+            [6, 2],
+            [2, 0],
+          ].map(([l, r], i) => (
+            <DominoTile key={i} left={l} right={r} size={34} />
+          ))}
+        </div>
+        <p className="text-xs text-sand">
+          {BRAND.name} · {BRAND.subTagline[lang]}
+        </p>
       </footer>
     </div>
-    </>
   );
 }
 
-function Dot() {
-  return <div style={{ width: 4, height: 4, borderRadius: "50%", background: "#2B2420" }} />;
-}
+// ---------------------------------------------------------------------------
 
-function PlayingCard({ rotate, diamond }: { rotate: number; diamond: string }) {
+function Pitch({
+  icon,
+  title,
+  body,
+  color,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  body: string;
+  color: string;
+}) {
   return (
-    <div
-      style={{
-        position: "absolute",
-        left: "50%",
-        top: "50%",
-        width: 58,
-        height: 80,
-        background: "#FDF6EC",
-        border: "3px solid #2B2420",
-        borderRadius: 10,
-        transform: `translate(-50%, -50%) rotate(${rotate}deg)`,
-        boxShadow: "2px 2px 0 rgba(43,36,32,0.25)",
-      }}
-    >
-      <div
-        style={{
-          position: "absolute",
-          top: 8,
-          left: 8,
-          width: 10,
-          height: 10,
-          background: diamond,
-          transform: "rotate(45deg)",
-        }}
-      />
+    <div className="surface rounded-lg p-4">
+      <span
+        className="grid place-items-center w-9 h-9 rounded-md mb-2.5"
+        style={{ background: `${color}22`, color }}
+      >
+        {icon}
+      </span>
+      <h3 className="text-sm font-bold text-cream mb-1">{title}</h3>
+      <p className="text-xs text-sand leading-relaxed">{body}</p>
     </div>
   );
 }
 
-const CODENAMES_TILES = [
-  "#E8574A", "#FDF6EC", "#FDF6EC", "#3AA6A6", "#FDF6EC",
-  "#FDF6EC", "#3AA6A6", "#2B2420", "#FDF6EC", "#E8574A",
-  "#FDF6EC", "#E8574A", "#3AA6A6", "#FDF6EC", "#FDF6EC",
-];
+function GameCard({
+  game,
+  onPlay,
+  busy,
+}: {
+  game: GameMeta;
+  onPlay: () => void;
+  busy: boolean;
+}) {
+  const { lang, t } = useLanguage();
+  const accent = COLORS[game.accent];
+
+  return (
+    <article className="surface rounded-lg p-4 flex flex-col gap-2.5">
+      <div className="flex items-start gap-3">
+        <span
+          className="grid place-items-center w-12 h-12 rounded-md text-2xl shrink-0"
+          style={{ background: `${accent}1f` }}
+          aria-hidden
+        >
+          {game.emoji}
+        </span>
+        <div className="min-w-0 flex-1">
+          <h3 className="font-display text-base text-cream truncate">
+            {game.name[lang]}
+          </h3>
+          <p className="text-xs text-sand line-clamp-2">{game.blurb[lang]}</p>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-sand">
+        <span className="inline-flex items-center gap-1">
+          <Users size={12} />
+          {game.minPlayers}–{game.maxPlayers}
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <Clock size={12} />
+          {game.minutes[0]}–{game.minutes[1]}m
+        </span>
+        {game.supportsBots && (
+          <span className="inline-flex items-center gap-1" title={t("party.bots_ok")}>
+            <Bot size={12} />
+          </span>
+        )}
+        {game.voiceMatters && (
+          <span
+            className="inline-flex items-center gap-1 text-mint"
+            title={t("party.voice_recommended")}
+          >
+            <Mic size={12} />
+          </span>
+        )}
+      </div>
+
+      {/* Starting a game from a card still creates a PARTY with that game
+          staged, not a single-game room — so the group can switch later
+          without anyone re-sending a link. */}
+      <button
+        onClick={onPlay}
+        disabled={busy}
+        className="btn btn-ghost btn-sm mt-auto w-full"
+      >
+        <Trophy size={14} />
+        {t("landing.play_this")}
+      </button>
+    </article>
+  );
+}
