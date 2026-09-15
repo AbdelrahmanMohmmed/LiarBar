@@ -276,6 +276,8 @@ export default function DominoGamePage() {
           mySeat={mySeat}
           secondsLeft={recapSecondsLeft}
           teams={state.mode === "teams"}
+          scores={state.scores}
+          targetScore={state.targetScore}
         />
       )}
 
@@ -464,12 +466,16 @@ function RoundRecap({
   mySeat,
   secondsLeft,
   teams,
+  scores,
+  targetScore,
 }: {
   recap: NonNullable<DominoStateV2["recap"]>;
   seats: DominoSeatState[];
   mySeat: number | null;
   secondsLeft: number | null;
   teams: boolean;
+  scores: DominoStateV2["scores"];
+  targetScore: number;
 }) {
   const { t } = useLanguage();
 
@@ -542,6 +548,36 @@ function RoundRecap({
             .replace("{n}", String(recap.points))}
         </p>
       )}
+
+      {/* The running total, and the only place it appears.
+          It used to sit in a header above the board for the whole round,
+          where it was one more thing between the player and the tiles. This
+          is a race to a number and you do need to know where you are — but
+          the moment you want that is between rounds, which is here. */}
+      <div className="mt-4 pt-3 border-t-2 border-border/30">
+        <p className="text-center text-[11px] uppercase tracking-wider text-sand mb-1.5">
+          {t("domino.race_to")} {targetScore}
+        </p>
+        <ul className="flex items-center justify-center flex-wrap gap-x-4 gap-y-1">
+          {teams
+            ? (["A", "B"] as const).map((team) => (
+                <li key={team} className="inline-flex items-baseline gap-1.5">
+                  <span className="text-xs text-sand">
+                    {team === "A" ? t("domino.team_a") : t("domino.team_b")}
+                  </span>
+                  <span className="font-numeric text-lg text-gold">{scores[team]}</span>
+                </li>
+              ))
+            : seats.map((seat) => (
+                <li key={seat.seat} className="inline-flex items-baseline gap-1.5">
+                  <span className="text-xs text-sand">
+                    {seat.seat === mySeat ? t("domino.you") : seat.name.slice(0, SEAT_LABEL_MAX)}
+                  </span>
+                  <span className="font-numeric text-lg text-gold">{seat.score}</span>
+                </li>
+              ))}
+        </ul>
+      </div>
     </section>
   );
 }
