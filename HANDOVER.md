@@ -139,8 +139,42 @@ the end you can see.
 **Opening a room in a second tab left the first one a zombie** — still receiving
 updates, showing you as offline, no way to work out why. It now says so.
 
+**Seven of twelve games rendered a blank screen** once the lobby form was out
+of the way — every arcade game again, for a different reason. They read their
+state from the lobby container and only the lobby container, and in a party the
+state is on the party. The picker offered them; the room went dark.
+
+**A refresh during Liar's Bar left you holding nothing.** Every other game's
+secrets travel inside the state object the reconnect already replies with. The
+card hand travels on its own event, which reconnect never re-sent. The table
+said thirteen cards, your hand said zero, and there was no error.
+
+**Reloading mid-game stranded you on the hub**, looking at a Start button that
+did nothing — the server was already playing, so nothing changed, so the page
+never moved. It reads as a dead button; it is really a page that stopped
+agreeing with the room.
+
+**"Rematch" threw you out of the game you had just finished**, into the old
+standalone lobby, which asked a player already sitting in the party to type
+their name and join.
+
+**The Codenames board was wider than the phone.** The fifth column was clipped
+off the side of the screen — for a spymaster, five words and five key markers
+they could not see. It was called the "teal" team, too, on a board painted
+blue.
+
+**The hand sheet covered the pile.** Liar's Bar is a game about the pile; how
+much you lose by being caught is the entire decision. On a phone the sheet
+covered it and three of the four players.
+
+**Twenty-six pages wore the previous page's identity** — title, description,
+canonical URL and `index, follow` alike — because the head is shared and only
+fourteen pages set it. Rooms opened from the landing page claimed to *be* the
+landing page, which is a good way to rank for nothing.
+
 There is now a `npm run test:live` suite covering the connection-level scenarios
-these came from: refresh mid-game, second tab, host leaves, latecomer joins.
+these came from: refresh mid-game, second tab, host leaves, latecomer joins,
+and an empty hand after a refresh.
 
 ---
 
