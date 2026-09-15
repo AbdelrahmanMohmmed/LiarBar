@@ -50,8 +50,20 @@ export const COLORS = {
   textSecondary: BRAND_COLORS.sand,
   textMuted: BRAND_COLORS.sand,
 
+  /**
+   * These two were PALE BACKGROUNDS in the old cream palette — a soft peach
+   * panel, a soft mint panel. Mapping them to the saturated brand `gold` and
+   * `mint` made every panel that used them shout, and put mint on things like
+   * a "Show game log" button — which breaks the one rule the palette has, that
+   * mint means "live right now" and nothing else (DESIGN_SYSTEM.md §2).
+   *
+   * They now map to raised surfaces, which is the role they were actually
+   * playing. Where the old code used `peach` as an *accent* rather than a
+   * background it now reads as a subtle highlight, which is the closer of the
+   * two wrong answers and is correct far more often.
+   */
   peach: BRAND_COLORS.gold,
-  paleTeal: BRAND_COLORS.mint,
+  paleTeal: BRAND_COLORS.ink600,
 
   disabledBg: BRAND_COLORS.ink600,
   disabledText: BRAND_COLORS.sand,

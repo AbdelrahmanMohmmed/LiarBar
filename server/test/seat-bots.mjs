@@ -61,6 +61,19 @@ function act(socket, self) {
         }
         break;
 
+      case "codenames":
+        // Codenames can't start until every seat has a team and a role, and it
+        // has no bots — so without this the game is unreachable for one person
+        // testing alone. Seats are assigned by index so the teams are balanced
+        // and the human (who created the room) is always red spymaster.
+        if (state.phase === "lobby") {
+          const mine = state.players.findIndex((p) => p.id === self.playerId);
+          const team = mine % 2 === 0 ? "red" : "teal";
+          const role = mine < 2 ? "spymaster" : "operative";
+          send("codenames_join_team", { team, role });
+        }
+        break;
+
       case "spyfall":
         // Spyfall needs no scripted action — the round runs on its clock and
         // the human drives the accusations.

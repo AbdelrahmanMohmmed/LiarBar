@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useGame } from "@/lib/gameContext";
 
 /**
@@ -27,6 +27,21 @@ import { useGame } from "@/lib/gameContext";
  *
  * The host's action is what moves everyone; a player's own navigation is left
  * alone.
+ *
+ * ## …except on the first sighting, if the page contradicts the party
+ *
+ * Adopting the first state unconditionally had a cost that only shows up on a
+ * reload: refresh mid-game and you re-enter at `/r/:roomId`, the party says
+ * `playing`, the router adopts that and stays put — so you sit on the hub
+ * watching a "Start" button while your friends play without you. Pressing it
+ * changes nothing (the server is already playing, so the state never changes
+ * and the router never fires), which reads as a dead button.
+ *
+ * So the first sighting *does* correct the page, but only when the page is
+ * itself a party surface for this room — the hub, the join page, or a game
+ * board. Anywhere else (the landing page, another room, a game's home page) is
+ * a deliberate choice by the player and is left alone, which is what the rule
+ * was protecting in the first place.
  */
 
 /**
@@ -59,13 +74,31 @@ export function gameRoute(gameId: string, roomId: string): string {
   }
 }
 
+/**
+ * Is this path one of the pages that belong to `roomId`?
+ *
+ * Every party surface ends in the room code — `/r/364900`, `/j/364900`,
+ * `/game/364900`, `/codenames/game/364900`, `/lobby/364900` — and nothing else
+ * does, so the last segment is the whole test.
+ */
+function isPartySurface(pathname: string, roomId: string): boolean {
+  const segments = pathname.split("/").filter(Boolean);
+  return segments[segments.length - 1] === roomId;
+}
+
 export default function PartyRouter() {
   const { partyState } = useGame();
   const navigate = useNavigate();
+  const location = useLocation();
 
   // What we last acted on: `${phase}:${activeGameId}`. Null until we've seen
   // the party once, so mounting into an existing game doesn't navigate.
   const lastRef = useRef<string | null>(null);
+
+  // Read inside the effect without making the effect depend on it: we only
+  // ever consult the path at the moment the party state moves.
+  const pathRef = useRef(location.pathname);
+  pathRef.current = location.pathname;
 
   useEffect(() => {
     if (!partyState) {
@@ -74,19 +107,26 @@ export default function PartyRouter() {
     }
 
     const key = `${partyState.phase}:${partyState.activeGameId ?? ""}`;
+    const where =
+      partyState.phase === "playing" && partyState.activeGameId
+        ? gameRoute(partyState.activeGameId, partyState.roomId)
+        : partyState.phase === "hub"
+          ? `/r/${partyState.roomId}`
+          : null;
+
     if (lastRef.current === null) {
-      // First sighting — adopt it without moving anyone.
       lastRef.current = key;
+      // Adopt the state, and correct the page only if it is one of this
+      // room's own pages showing the wrong thing — see the note above.
+      if (where && isPartySurface(pathRef.current, partyState.roomId) && pathRef.current !== where) {
+        navigate(where, { replace: true });
+      }
       return;
     }
     if (lastRef.current === key) return;
     lastRef.current = key;
 
-    if (partyState.phase === "playing" && partyState.activeGameId) {
-      navigate(gameRoute(partyState.activeGameId, partyState.roomId));
-    } else if (partyState.phase === "hub") {
-      navigate(`/r/${partyState.roomId}`);
-    }
+    if (where) navigate(where);
   }, [partyState?.phase, partyState?.activeGameId, partyState?.roomId, partyState, navigate]);
 
   return null;

@@ -22,7 +22,7 @@ interface Props {
   onClose: () => void;
   /** Currently active game, highlighted as "playing now". */
   currentGameId: string | null;
-  onPick: (gameId: string) => void | Promise<void>;
+  onPick: (gameId: string, options?: Record<string, unknown>) => void | Promise<void>;
   /** Only the host can actually switch; others browse and can suggest. */
   canPick: boolean;
 }
@@ -122,7 +122,14 @@ export default function GamePicker({
     }
     setBusy(gameId);
     try {
-      await onPick(gameId);
+      // Games with a content language follow the UI the host is reading.
+      // Without this, Codenames always dealt an Arabic board because that's
+      // the server's default — including for a host playing in English, who
+      // then had no way to change it short of leaving and using the game's
+      // own setup page.
+      const options =
+        gameId === "codenames" ? { language: lang } : undefined;
+      await onPick(gameId, options);
       onClose();
     } catch (err) {
       addToast(err instanceof Error ? err.message : t("party.switch_failed"), "error");

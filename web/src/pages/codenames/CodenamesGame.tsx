@@ -14,7 +14,7 @@ const COPY = {
     copy: "نسخ",
     copied: "تم نسخ رمز الغرفة!",
     redTeam: "الفريق الأحمر",
-    tealTeam: "الفريق الأزرق المخضرّ",
+    tealTeam: "الفريق الأزرق",
     spymaster: "قائد التلميح",
     operative: "مخمّن",
     giveClue: "أعطِ تلميحاً",
@@ -26,7 +26,7 @@ const COPY = {
     endTurn: "إنهاء الدور",
     guessesLeft: "تخمينات متبقية",
     redTurn: "دور الفريق الأحمر",
-    tealTurn: "دور الفريق الأزرق المخضرّ",
+    tealTurn: "دور الفريق الأزرق",
     cluePhase: "ينتظر التلميح…",
     guessPhase: "يخمنون…",
     gameLog: "سجل اللعبة",
@@ -59,7 +59,7 @@ const COPY = {
     copy: "Copy",
     copied: "Room code copied!",
     redTeam: "Red Team",
-    tealTeam: "Teal Team",
+    tealTeam: "Blue Team",
     spymaster: "Spymaster",
     operative: "Operative",
     giveClue: "Give a Clue",
@@ -71,7 +71,7 @@ const COPY = {
     endTurn: "End Turn",
     guessesLeft: "guesses left",
     redTurn: "Red Team's Turn",
-    tealTurn: "Teal Team's Turn",
+    tealTurn: "Blue Team's Turn",
     cluePhase: "waiting for clue…",
     guessPhase: "guessing…",
     gameLog: "Game Log",
@@ -353,7 +353,7 @@ export default function CodenamesGame() {
       let resultName: string = entry.result;
       if (isAr) {
         if (entry.result === "red") resultName = "أحمر";
-        else if (entry.result === "teal") resultName = "أزرق مخضرّ";
+        else if (entry.result === "teal") resultName = "أزرق";
         else if (entry.result === "neutral") resultName = c.neutral;
         else if (entry.result === "assassin") resultName = c.assassin;
       }
@@ -419,21 +419,33 @@ export default function CodenamesGame() {
           max-width: 1080px;
           margin: 0 auto;
         }
-        .cn-board-col {
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-        }
+        /*
+         * min-width: 0 on both columns, and minmax(0, 1fr) on the board tracks.
+         *
+         * Without them a grid item's minimum width is its MIN-CONTENT width, and
+         * the min-content width of this board is the longest unbreakable word on
+         * it plus card padding -- about 400px. On a 375px phone the board simply
+         * overflowed the viewport and the fifth column was clipped off-screen,
+         * which on a spymaster's board means five words and five key markers you
+         * cannot see. The board is 5x5 by the rules, so it has to fit; the cards
+         * shrink and long words wrap instead.
+         */
+        .cn-board-col,
         .cn-side-col {
           display: flex;
           flex-direction: column;
           gap: 16px;
+          min-width: 0;
         }
         .cn-board-grid {
           display: grid;
-          grid-template-columns: repeat(5, 1fr);
+          grid-template-columns: repeat(5, minmax(0, 1fr));
           gap: 8px;
           width: 100%;
+        }
+        .cn-board-grid > * {
+          min-width: 0;
+          overflow-wrap: anywhere;
         }
         @media (min-width: 850px) {
           .cn-main-grid {
@@ -641,7 +653,12 @@ export default function CodenamesGame() {
                       justifyContent: "center",
                       textAlign: "center",
                       aspectRatio: "4/3",
-                      padding: 6,
+                      // Extra room at the top only when the key markers are on
+                      // screen: a long word wraps to two lines and, without it,
+                      // the second line runs under the spymaster's diamond —
+                      // which is the one glyph on the board they cannot afford
+                      // to misread.
+                      padding: isSpymaster ? "16px 6px 6px" : 6,
                       boxSizing: "border-box",
                       fontFamily: boardFont(codenamesState.language),
                       fontWeight: 800,

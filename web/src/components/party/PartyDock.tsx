@@ -286,7 +286,7 @@ export default function PartyDock() {
         onClose={() => setPickerOpen(false)}
         currentGameId={partyState.activeGameId}
         canPick={isHost}
-        onPick={(gameId) => partyPickGame(gameId)}
+        onPick={(gameId, options) => partyPickGame(gameId, options)}
       />
 
       <InviteSheet
