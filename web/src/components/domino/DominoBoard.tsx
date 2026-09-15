@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import DominoTile from "./DominoTile";
+import { useLanguage } from "@/lib/languageContext";
 import type { PlacedTile, BoardEnds } from "@/lib/dominoTypes";
 
 /**
@@ -46,16 +47,27 @@ function EndMarker({
   onClick,
 }: {
   value: number | null;
+  /** Internal name for which end of the snake this is. Never shown. */
   side: "left" | "right";
   highlighted: boolean;
   onClick?: () => void;
 }) {
-  const label = side === "left" ? "Left end" : "Right end";
+  const { t } = useLanguage();
+
   return (
     <button
       onClick={onClick}
       disabled={!onClick}
-      aria-label={`${label}: ${value ?? "open"}`}
+      // The visible label used to read "LEFT" / "RIGHT". In Arabic the whole
+      // row mirrors, so the marker labelled "LEFT" sat on the right of the
+      // screen and directly contradicted itself.
+      //
+      // The words are gone rather than translated, because they were never
+      // carrying their weight: a player choosing which end to play on picks by
+      // POSITION — they tap the one they can see — and "left" is an internal
+      // name for which end of the array it is, not something anyone needs.
+      // The screen reader still gets a meaningful description.
+      aria-label={`${t("domino.open_end")}: ${value ?? "—"}`}
       className={[
         "shrink-0 grid place-items-center rounded-lg border-2 transition",
         "w-12 h-16 sm:w-14 sm:h-20",
@@ -64,12 +76,13 @@ function EndMarker({
           : "border-border bg-surface-sunken",
         onClick ? "cursor-pointer active:scale-95" : "cursor-default",
       ].join(" ")}
+      data-end={side}
     >
       <span className="font-numeric text-2xl sm:text-3xl text-cream leading-none">
         {value ?? "–"}
       </span>
       <span className="text-[9px] uppercase tracking-wider text-sand mt-0.5">
-        {side}
+        {t("domino.end")}
       </span>
     </button>
   );
@@ -89,18 +102,26 @@ export default function DominoBoard({
   // Follow the play. Without this the newest tile lands off-screen the moment
   // the snake is longer than the viewport, and players lose track of the game
   // entirely — which is roughly tile nine on a phone.
+  //
+  // Scrolls an element into view rather than setting scrollLeft: in RTL the
+  // row is mirrored and browsers disagree about whether scrollLeft counts up
+  // or down from zero. scrollIntoView has no direction to get wrong.
   useEffect(() => {
     const el = scrollerRef.current;
     if (!el) return;
+    const row = el.firstElementChild;
+    if (!row || row.childElementCount === 0) return;
+
+    const target =
+      lastEnd === "left" ? row.firstElementChild : row.lastElementChild;
+    if (!(target instanceof HTMLElement)) return;
+
     const behavior: ScrollBehavior = window.matchMedia(
       "(prefers-reduced-motion: reduce)",
     ).matches
       ? "auto"
       : "smooth";
-    el.scrollTo({
-      left: lastEnd === "left" ? 0 : el.scrollWidth,
-      behavior,
-    });
+    target.scrollIntoView({ behavior, inline: "nearest", block: "nearest" });
   }, [board.length, lastEnd]);
 
   return (
