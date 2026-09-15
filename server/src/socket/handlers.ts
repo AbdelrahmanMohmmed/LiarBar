@@ -622,13 +622,36 @@ export function registerSocketHandlers(
       reply(callback, { success: true, tile: result.tile });
     });
 
+    /**
+     * Knock: "I can't play."
+     *
+     * Named for what it is at a real table rather than "pass", because it is
+     * not a silent skip — it is a public declaration that proves the knocker
+     * holds neither open pip, and the whole table plays on that afterwards.
+     * The server validates it for exactly that reason: a client that could
+     * knock while holding a legal tile would be feeding everyone a lie.
+     */
+    socket.on("domino_knock", (_data: unknown, callback: Ack) => {
+      const m = dominoMembership(callback);
+      if (!m) return;
+
+      const result = m.room.knock(m.player.id);
+      if (!result.success) {
+        fail(callback, result.error ?? "Cannot knock");
+        return;
+      }
+
+      reply(callback, { success: true });
+    });
+
+    /** Legacy alias for clients still cached on the previous build. */
     socket.on("domino_pass", (_data: unknown, callback: Ack) => {
       const m = dominoMembership(callback);
       if (!m) return;
 
-      const result = m.room.passTurn(m.player.id);
+      const result = m.room.knock(m.player.id);
       if (!result.success) {
-        fail(callback, result.error ?? "Cannot pass turn");
+        fail(callback, result.error ?? "Cannot knock");
         return;
       }
 

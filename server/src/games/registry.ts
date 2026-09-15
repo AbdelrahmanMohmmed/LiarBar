@@ -48,6 +48,8 @@ export interface CreateRoomOptions {
   aiDifficulty?: "easy" | "medium" | "hard";
   mapId?: string;
   backgroundId?: string;
+  /** Domino house rule: finishing on a double doubles the round's score. */
+  karakBonus?: boolean;
   // Memory Puzzle options
   difficulty?: "easy" | "medium" | "hard";
 }
@@ -161,10 +163,11 @@ registerGame("fighter", (roomId, options, callbacks) => {
 
 registerGame("domino", (roomId, options, callbacks) => {
   const gameMode = options.gameMode === "teams" ? "teams" : "individual";
-  const targetScore = Number(options.targetScore) || 100;
-  const turnTimeLimit = Number(options.turnTimeLimit) !== undefined ? Number(options.turnTimeLimit) : 30;
-  const tableTheme = options.tableTheme || "green";
-  const tileTheme = options.tileTheme || "ivory";
+  // 101 is the street standard: long enough that one bad round isn't fatal,
+  // short enough that a match fits in a sitting.
+  const targetScore = Number(options.targetScore) || 101;
+  const rawTimeLimit = Number(options.turnTimeLimit);
+  const turnTimeLimit = Number.isFinite(rawTimeLimit) ? rawTimeLimit : 30;
   return new DominoGame(
     roomId,
     options.maxPlayers,
@@ -172,8 +175,9 @@ registerGame("domino", (roomId, options, callbacks) => {
     targetScore,
     turnTimeLimit,
     callbacks,
-    tableTheme,
-    tileTheme
+    options.tableTheme || "green",
+    options.tileTheme || "ivory",
+    options.karakBonus === true,
   );
 });
 

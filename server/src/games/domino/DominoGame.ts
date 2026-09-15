@@ -1,48 +1,184 @@
 import { nanoid } from "nanoid";
 import { Player } from "../liars-bar/Player.js";
 import type { GameRoom, GameRoomCallbacks } from "../types.js";
-import type { Dominoe, Card } from "../liars-bar/Deck.js";
+import {
+  type Tile,
+  type PlacedTile,
+  type BoardEnds,
+  type RoundOutcome,
+  type Team,
+  TARGET_SCORE_DEFAULT,
+  deal,
+  findOpening,
+  legalPlays,
+  canPlay,
+  orient,
+  sameTile,
+  isDouble,
+  handPips,
+  teamForSeat,
+  partnerSeat,
+  scoreDomino,
+  scoreBlocked,
+  applyKarak,
+} from "./rules.js";
+import { chooseDominoPlay, botThinkMs, type BotDifficulty } from "./DominoBot.js";
 
-export interface DominoPlayerState {
+/**
+ * Egyptian / Levantine street domino.
+ *
+ * A full rewrite. The rules themselves live in `rules.ts` (pure, testable) and
+ * the opponent in `DominoBot.ts`; this file is the part that has to deal with
+ * time, sockets, people closing their laptops, and whose turn it is.
+ *
+ * ## What the rewrite fixed
+ *
+ * The previous engine had five defects that each independently broke a game:
+ *
+ * 1. **Teams were array indices.** Scoring read `players[0]` and `players[2]`
+ *    as team A. A player leaving mid-match shifted the array and silently
+ *    reassigned partners — you'd finish a round scoring for the other side.
+ *    Seats are now fixed for the life of the match and teams derive from the
+ *    seat index, so a departure can't reshuffle anybody's partner.
+ *
+ * 2. **Disconnected players were skipped entirely.** `nextTurn` walked past
+ *    anyone offline, so their tiles never entered play and a four-handed game
+ *    with one dropout could not be blocked *or* won — it just ran until the
+ *    room was swept. A disconnected seat now keeps its turn and is auto-played
+ *    by the bot after a grace period.
+ *
+ * 3. **The "all passed" test counted disconnected seats.** Block detection
+ *    compared consecutive passes against total player count, so it could
+ *    trigger early or never.
+ *
+ * 4. **No fixed opening.** Any tile could open, which removes the shared
+ *    starting position the whole reading game depends on.
+ *
+ * 5. **The timeout handler mutated the hand and then called the play path
+ *    that also mutates the hand.** On some paths the tile was removed twice.
+ *
+ * ## What the rewrite added, and why
+ *
+ * The brief was that the old game wasn't *fun*. The mechanics were roughly
+ * right; what was missing was everything that makes the physical game
+ * sociable. Three additions carry most of that:
+ *
+ * - **The knock is a first-class event, not a silent pass.** In the physical
+ *   game you rap the table and everyone hears it. It's theatre and it's
+ *   information. It's now broadcast with the numbers that were open, which is
+ *   what makes the next point possible.
+ *
+ * - **Knock memory is public and rendered.** A good player remembers that
+ *   Omar knocked when the ends were 3 and 5, and therefore knows Omar holds no
+ *   3 and no 5. Casual players don't remember, feel like they're guessing, and
+ *   conclude the game is luck. Surfacing what was always publicly derivable
+ *   turns a game people bounce off into a game people feel clever playing —
+ *   without giving anyone information they weren't entitled to.
+ *
+ * - **An event log with intent.** Every state carries the last few events
+ *   typed by kind, so the client can animate the slam, play the knock sound,
+ *   and fire the right line of chatter instead of diffing state and guessing.
+ */
+
+export type DominoMode = "individual" | "teams";
+
+export interface DominoEvent {
+  kind:
+    | "play"
+    | "knock"
+    | "draw"
+    | "round_start"
+    | "round_end"
+    | "timeout"
+    | "match_end";
+  seat: number;
   playerId: string;
-  hand: Dominoe[];
-  score: number;
+  playerName: string;
+  at: number;
+  tile?: Tile;
+  /** For a knock: the pips that were open, i.e. what this player lacks. */
+  deadOn?: number[];
+  method?: RoundOutcome["method"];
+  points?: number;
 }
 
-export interface DominoRoundRecap {
-  winnerId: string | null; // null if draw / tie in block
+export interface DominoSeatState {
+  seat: number;
+  playerId: string;
+  name: string;
+  team: Team;
+  isBot: boolean;
+  isConnected: boolean;
+  flag?: string;
+  handCount: number;
+  /** Numbers this seat has proved it doesn't hold, by knocking. */
+  knockedOn: number[];
+  score: number;
+  /** Revealed only in the recap. */
+  hand?: Tile[];
+  pips?: number;
+}
+
+export interface DominoRecap {
+  method: RoundOutcome["method"];
+  winnerSeat: number | null;
   winnerName: string | null;
-  winnerTeam: "A" | "B" | null;
-  pointsGained: number;
-  method: "domino" | "block" | "draw";
-  playerHands: Record<string, Dominoe[]>; // reveal all hands
-  scores: Record<string, number>;
-  teamScores: { A: number; B: number };
+  winnerTeam: Team | null;
+  points: number;
+  karak: boolean;
+  pipsBySeat: number[];
+  handsBySeat: Tile[][];
+  nextRoundAt: number | null;
 }
 
 export interface DominoState {
   roomId: string;
   gameId: "domino";
   phase: "lobby" | "playing" | "round_recap" | "game_over";
-  maxPlayers: number;
-  players: any[];
-  gameMode: "individual" | "teams";
+  mode: DominoMode;
   targetScore: number;
-  turnTimeLimit: number;
+  turnSeconds: number;
+  karakBonus: boolean;
   tableTheme: string;
   tileTheme: string;
-  board: Dominoe[];
-  leftEnd: number | null;
-  rightEnd: number | null;
+
+  /** Legacy alias; the client's shared player list still reads `players`. */
+  players: Array<{
+    id: string;
+    name: string;
+    isBot: boolean;
+    isHost: boolean;
+    isConnected: boolean;
+    flag?: string;
+    cardCount: number;
+    hand: never[];
+  }>;
+
+  seats: DominoSeatState[];
+  maxPlayers: number;
+
+  board: PlacedTile[];
+  ends: BoardEnds;
   boneyardCount: number;
-  activePlayerId: string | null;
+
+  activeSeat: number | null;
   turnDeadline: number | null;
   roundNumber: number;
-  winnerId: string | null; // Overall game winner
-  recap: DominoRoundRecap | null;
-  playerScores: Record<string, number>;
-  teamScores: { A: number; B: number };
+  /** How many of each pip value are visible on the table. Public read-aid. */
+  playedPipCount: number[];
+
+  scores: { A: number; B: number };
+  seatScores: number[];
+  winnerTeam: Team | null;
+  winnerId: string | null;
+
+  recap: DominoRecap | null;
+  events: DominoEvent[];
 }
+
+const RECAP_SECONDS = 8;
+/** How long a disconnected player's turn is held before the bot takes over. */
+const DISCONNECT_GRACE_MS = 6000;
 
 export class DominoGame implements GameRoom {
   readonly gameId = "domino";
@@ -51,91 +187,123 @@ export class DominoGame implements GameRoom {
   readonly maxPlayers: number;
   lastActivityAt: number;
 
-  phase: "lobby" | "playing" | "round_recap" | "game_over" = "lobby";
-  activePlayerId: string | null = null;
-  gameMode: "individual" | "teams";
-  targetScore: number;
-  turnTimeLimit: number; // 0 for unlimited, or 15, 30, 45
-  tableTheme: string;
-  tileTheme: string;
-  turnDeadline: number | null = null;
-  roundNumber = 0;
-  winnerId: string | null = null;
-  recap: DominoRoundRecap | null = null;
+  phase: DominoState["phase"] = "lobby";
 
-  board: Dominoe[] = [];
-  leftEnd: number | null = null;
-  rightEnd: number | null = null;
-  boneyard: Dominoe[] = [];
+  readonly mode: DominoMode;
+  readonly targetScore: number;
+  readonly turnSeconds: number;
+  readonly karakBonus: boolean;
+  readonly tableTheme: string;
+  readonly tileTheme: string;
 
-  private playerScores = new Map<string, number>(); // playerId -> overall score
-  private teamScores = { A: 0, B: 0 }; // A: Player 0 & 2, B: Player 1 & 3
-  private botDifficulties = new Map<string, string>(); // playerId -> difficulty
+  /**
+   * Seat order, fixed once the match starts. Everything positional — teams,
+   * turn order, partner — derives from index into this array, never from the
+   * `players` array, which can be mutated by joins and leaves.
+   */
+  private seatOrder: string[] = [];
+  private hands = new Map<string, Tile[]>();
+  private knocks = new Map<string, number[]>();
+  private seatScores = new Map<string, number>();
+  private botDifficulty = new Map<string, BotDifficulty>();
+
+  private board: PlacedTile[] = [];
+  private ends: BoardEnds = { left: null, right: null };
+  private boneyard: Tile[] = [];
+  private playedPipCount = [0, 0, 0, 0, 0, 0, 0];
+
+  private activeSeat: number | null = null;
+  private turnDeadline: number | null = null;
+  private roundNumber = 0;
+  private consecutiveKnocks = 0;
+  /** Seat that opens the next round — the last round's winner. */
+  private nextOpenerSeat: number | null = null;
+
+  private teamScores: { A: number; B: number } = { A: 0, B: 0 };
+  private winnerTeam: Team | null = null;
+  private winnerId: string | null = null;
+  private recap: DominoRecap | null = null;
+  private events: DominoEvent[] = [];
 
   private turnTimer: NodeJS.Timeout | null = null;
   private recapTimer: NodeJS.Timeout | null = null;
   private botTimer: NodeJS.Timeout | null = null;
-  private callbacks: GameRoomCallbacks;
   private destroyed = false;
-  private consecutivePasses = 0; // count of passes since last tile was played
+
+  private callbacks: GameRoomCallbacks;
 
   constructor(
     roomId: string,
     maxPlayers: number,
-    gameMode: "individual" | "teams",
+    mode: DominoMode,
     targetScore: number,
-    turnTimeLimit: number,
+    turnSeconds: number,
     callbacks: GameRoomCallbacks,
     tableTheme = "green",
-    tileTheme = "ivory"
+    tileTheme = "ivory",
+    karakBonus = false,
   ) {
     this.roomId = roomId;
-    this.gameMode = gameMode;
-    this.maxPlayers = gameMode === "teams" ? 4 : Math.max(2, Math.min(4, maxPlayers));
-    this.targetScore = targetScore;
-    this.turnTimeLimit = turnTimeLimit;
-    this.callbacks = callbacks;
+    this.mode = mode === "teams" ? "teams" : "individual";
+    this.maxPlayers =
+      this.mode === "teams" ? 4 : Math.max(2, Math.min(4, maxPlayers || 4));
+    this.targetScore = Math.max(50, Math.min(300, targetScore || TARGET_SCORE_DEFAULT));
+    this.turnSeconds = Math.max(0, Math.min(120, turnSeconds ?? 30));
+    this.karakBonus = karakBonus;
     this.tableTheme = tableTheme;
     this.tileTheme = tileTheme;
+    this.callbacks = callbacks;
     this.lastActivityAt = Date.now();
   }
 
-  addPlayer(name: string, socketId: string, isHost = false, playerId?: string): Player {
+  // =====================================================================
+  // Roster
+  // =====================================================================
+
+  addPlayer(
+    name: string,
+    socketId: string,
+    isHost = false,
+    playerId?: string,
+    flag?: string,
+  ): Player {
     const id = playerId || nanoid(8);
     const player = new Player(id, name, false, isHost);
     player.socketId = socketId;
     player.isConnected = true;
+    if (flag) player.flag = flag;
     this.players.push(player);
-
-    this.playerScores.set(id, 0);
+    this.seatScores.set(id, 0);
+    this.knocks.set(id, []);
     this.lastActivityAt = Date.now();
     return player;
   }
 
-  addBot(name: string, difficulty = "medium"): Player {
+  addBot(name: string, difficulty: string = "medium"): Player {
     const id = "bot_" + nanoid(6);
     const player = new Player(id, name, true, false);
     player.isConnected = true;
     this.players.push(player);
-
-    this.botDifficulties.set(id, difficulty);
-    this.playerScores.set(id, 0);
+    this.botDifficulty.set(
+      id,
+      difficulty === "easy" || difficulty === "hard" ? difficulty : "medium",
+    );
+    this.seatScores.set(id, 0);
+    this.knocks.set(id, []);
     this.lastActivityAt = Date.now();
     return player;
   }
 
   removeBot(botId: string): boolean {
+    // Once seats are assigned, removing a player would renumber the table
+    // mid-match. Refuse rather than silently repartnering everyone.
+    if (this.phase !== "lobby") return false;
     const idx = this.players.findIndex((p) => p.id === botId && p.isBot);
     if (idx === -1) return false;
-
     this.players.splice(idx, 1);
-    this.playerScores.delete(botId);
-    this.botDifficulties.delete(botId);
-
-    if (this.activePlayerId === botId && this.phase === "playing") {
-      this.nextTurn();
-    }
-
+    this.botDifficulty.delete(botId);
+    this.seatScores.delete(botId);
+    this.knocks.delete(botId);
     this.lastActivityAt = Date.now();
     return true;
   }
@@ -150,54 +318,61 @@ export class DominoGame implements GameRoom {
 
     player.isConnected = false;
     player.socketId = undefined;
+    this.lastActivityAt = Date.now();
 
-    if (this.activePlayerId === player.id && this.phase === "playing") {
-      // Setup small delay before botting or passing turn to allow quick reconnect
+    // Do NOT skip their seat. Skipping was the old engine's approach and it
+    // made a four-handed game with one dropout impossible to either win or
+    // block: their tiles never entered play, so the table could never lock.
+    // Instead the seat keeps its turn and the bot takes over shortly.
+    if (this.phase === "playing" && this.seatOf(player.id) === this.activeSeat) {
       this.clearTurnTimer();
-      this.turnDeadline = Date.now() + 5000;
-      this.turnTimer = setTimeout(() => {
-        this.handleTurnTimeout();
-      }, 5000);
+      this.turnDeadline = Date.now() + DISCONNECT_GRACE_MS;
+      this.turnTimer = setTimeout(() => this.autoPlay("timeout"), DISCONNECT_GRACE_MS);
     }
 
-    this.lastActivityAt = Date.now();
+    this.broadcast();
     return player;
   }
 
   handleReconnect(playerId: string, socketId: string): Player | null {
-    const player = this.players.find((p) => p.id === playerId);
+    const player = this.getPlayer(playerId);
     if (!player) return null;
 
     player.isConnected = true;
     player.socketId = socketId;
+    this.lastActivityAt = Date.now();
 
-    if (this.activePlayerId === playerId && this.phase === "playing") {
-      // Reset turn timer for reconnected player
-      this.startTurn(playerId);
+    // Give a returning player a full turn rather than whatever was left of the
+    // disconnect grace period.
+    if (this.phase === "playing" && this.seatOf(playerId) === this.activeSeat) {
+      this.beginTurn(this.activeSeat);
     }
 
-    this.lastActivityAt = Date.now();
+    this.broadcast();
     return player;
   }
 
   canStart(): boolean {
-    if (this.gameMode === "teams") {
-      return this.players.length === 4;
-    }
-    return this.players.length >= 2;
+    if (this.mode === "teams") return this.players.length === 4;
+    return this.players.length >= 2 && this.players.length <= 4;
   }
+
+  // =====================================================================
+  // Match lifecycle
+  // =====================================================================
 
   startGame(): boolean {
     if (!this.canStart()) return false;
-    this.roundNumber = 0;
-    this.winnerId = null;
-    this.recap = null;
 
-    // Reset scores
-    for (const pid of this.playerScores.keys()) {
-      this.playerScores.set(pid, 0);
-    }
+    // Seats are locked here and never change for the rest of the match.
+    this.seatOrder = this.players.map((p) => p.id);
+    for (const id of this.seatOrder) this.seatScores.set(id, 0);
     this.teamScores = { A: 0, B: 0 };
+    this.winnerTeam = null;
+    this.winnerId = null;
+    this.roundNumber = 0;
+    this.nextOpenerSeat = null;
+    this.events = [];
 
     this.startRound();
     return true;
@@ -206,654 +381,610 @@ export class DominoGame implements GameRoom {
   private startRound(): void {
     if (this.destroyed) return;
 
-    const prevWinnerId = this.recap?.winnerId;
-
-    this.roundNumber++;
+    this.clearAllTimers();
     this.phase = "playing";
     this.recap = null;
     this.board = [];
-    this.leftEnd = null;
-    this.rightEnd = null;
-    this.consecutivePasses = 0;
+    this.ends = { left: null, right: null };
+    this.playedPipCount = [0, 0, 0, 0, 0, 0, 0];
+    this.consecutiveKnocks = 0;
+    this.roundNumber++;
 
-    this.clearRecapTimer();
-    this.clearTurnTimer();
-    this.clearBotTimer();
+    for (const id of this.seatOrder) this.knocks.set(id, []);
 
-    // 1. Create a full 28 dominoes set
-    const fullSet: Dominoe[] = [];
-    for (let i = 0; i <= 6; i++) {
-      for (let j = i; j <= 6; j++) {
-        fullSet.push({ type: "dominoe", left: i, right: j });
-      }
-    }
+    const { hands, boneyard } = deal(this.seatOrder.length);
+    this.boneyard = boneyard;
+    this.seatOrder.forEach((id, seat) => this.hands.set(id, hands[seat]));
 
-    // 2. Shuffle
-    for (let i = fullSet.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [fullSet[i], fullSet[j]] = [fullSet[j], fullSet[i]];
-    }
+    let openerSeat: number;
+    if (this.roundNumber === 1 || this.nextOpenerSeat === null) {
+      // Round one: the double-six opens, and whoever holds it must lead it.
+      // A fixed opening is what makes reading the table possible from tile one.
+      const opening = findOpening(hands);
+      openerSeat = opening?.seat ?? 0;
+      this.beginTurn(openerSeat);
+      this.pushEvent({ kind: "round_start", seat: openerSeat });
 
-    // 3. Clear hands
-    for (const p of this.players) {
-      p.hand = [];
-    }
-
-    // 4. Deal 7 tiles to each player
-    for (let k = 0; k < 7; k++) {
-      for (const p of this.players) {
-        const tile = fullSet.pop();
-        if (tile) p.hand.push(tile);
-      }
-    }
-
-    // 5. Remaining tiles are in the boneyard
-    this.boneyard = fullSet;
-
-    // 6. Find who goes first (highest double)
-    let startingPlayerId: string | null = null;
-
-    if (this.roundNumber === 1) {
-      // In first round, player with highest double starts
-      let highestDouble = -1;
-      for (const p of this.players) {
-        const hand = p.hand as Dominoe[];
-        for (const tile of hand) {
-          if (tile.left === tile.right && tile.left > highestDouble) {
-            highestDouble = tile.left;
-            startingPlayerId = p.id;
-          }
-        }
-      }
-
-      // If no doubles at all, find highest sum tile
-      if (startingPlayerId === null) {
-        let highestSum = -1;
-        for (const p of this.players) {
-          const hand = p.hand as Dominoe[];
-          for (const tile of hand) {
-            const sum = tile.left + tile.right;
-            if (sum > highestSum) {
-              highestSum = sum;
-              startingPlayerId = p.id;
-            }
-          }
-        }
+      if (opening) {
+        const opener = this.seatOrder[openerSeat];
+        // Play it for them immediately — there is no decision to make, and
+        // making a player tap a forced move is friction with no game in it.
+        this.commitPlay(opener, opening.tile, "left");
+        return;
       }
     } else {
-      // In subsequent rounds, the last round winner (if any) starts
-      startingPlayerId = prevWinnerId || this.players[0].id;
+      // Later rounds: the previous winner opens, with anything they like.
+      openerSeat = this.nextOpenerSeat;
+      this.beginTurn(openerSeat);
+      this.pushEvent({ kind: "round_start", seat: openerSeat });
     }
 
-    if (!startingPlayerId) {
-      startingPlayerId = this.players[0].id;
-    }
-
-    this.startTurn(startingPlayerId);
-    this.lastActivityAt = Date.now();
     this.callbacks.onHandsChanged(this.roomId);
-    this.callbacks.broadcast(this.toState());
+    this.broadcast();
   }
 
-  private startTurn(playerId: string): void {
-    if (this.destroyed || this.phase !== "playing") return;
+  private beginTurn(seat: number | null): void {
+    if (this.destroyed || this.phase !== "playing" || seat === null) return;
 
-    this.activePlayerId = playerId;
+    this.activeSeat = seat;
     this.clearTurnTimer();
     this.clearBotTimer();
 
-    if (this.turnTimeLimit > 0) {
-      this.turnDeadline = Date.now() + this.turnTimeLimit * 1000;
-      this.turnTimer = setTimeout(() => {
-        this.handleTurnTimeout();
-      }, this.turnTimeLimit * 1000);
+    const playerId = this.seatOrder[seat];
+    const player = this.getPlayer(playerId);
+
+    if (this.turnSeconds > 0) {
+      this.turnDeadline = Date.now() + this.turnSeconds * 1000;
+      this.turnTimer = setTimeout(
+        () => this.autoPlay("timeout"),
+        this.turnSeconds * 1000,
+      );
     } else {
       this.turnDeadline = null;
     }
 
-    const activePlayer = this.getPlayer(playerId);
-    if (activePlayer?.isBot) {
-      this.scheduleBotPlay(playerId);
+    // Bots think, and so do absent humans — the bot plays for a disconnected
+    // seat so the round can still reach a conclusion.
+    if (player?.isBot) {
+      this.scheduleBot(playerId);
+    } else if (player && !player.isConnected) {
+      this.clearTurnTimer();
+      this.turnDeadline = Date.now() + DISCONNECT_GRACE_MS;
+      this.turnTimer = setTimeout(() => this.autoPlay("timeout"), DISCONNECT_GRACE_MS);
     }
   }
 
-  private handleTurnTimeout(): void {
-    if (this.destroyed || this.phase !== "playing" || !this.activePlayerId) return;
-
-    // Timeout Auto-Play Logic
-    const player = this.getPlayer(this.activePlayerId);
-    if (!player) return;
-
-    const playable = this.getPlayableTiles(player.hand as Dominoe[]);
-    if (playable.length > 0) {
-      // Play the first playable tile on the first valid end
-      const action = playable[0];
-      // Properly remove the played tile from player's hand
-      const idx = (player.hand as Dominoe[]).findIndex(
-        (t) => (t.left === action.tile.left && t.right === action.tile.right) || (t.left === action.tile.right && t.right === action.tile.left)
-      );
-      if (idx !== -1) player.hand.splice(idx, 1);
-      
-      this.executePlayTile(this.activePlayerId, action.tile, action.end);
-    } else {
-      // No playable tiles. Try drawing until playable, or pass
-      if (this.boneyard.length > 0) {
-        let drawnPlayable = false;
-        while (this.boneyard.length > 0 && !drawnPlayable) {
-          const tile = this.boneyard.pop()!;
-          const fits = this.canPlayTileOnBoard(tile);
-          if (fits) {
-            // Play immediately without putting in hand
-            this.executePlayTile(this.activePlayerId, tile, fits);
-            drawnPlayable = true;
-          } else {
-            // Doesn't fit, put in hand
-            player.hand.push(tile);
-          }
-        }
-
-        if (!drawnPlayable) {
-          // Drew everything and still cannot play, so pass
-          this.executePass(this.activePlayerId);
-        }
-      } else {
-        // No boneyard, must pass
-        this.executePass(this.activePlayerId);
-      }
-    }
+  private advanceTurn(): void {
+    if (this.destroyed || this.phase !== "playing" || this.activeSeat === null) return;
+    const next = (this.activeSeat + 1) % this.seatOrder.length;
+    this.beginTurn(next);
+    this.lastActivityAt = Date.now();
+    this.broadcast();
   }
 
-  private getPlayableTiles(hand: Dominoe[]): Array<{ tile: Dominoe; end: "left" | "right" }> {
-    const list: Array<{ tile: Dominoe; end: "left" | "right" }> = [];
-    if (this.board.length === 0) {
-      // Any tile is playable on either end
-      for (const tile of hand) {
-        list.push({ tile, end: "left" });
-      }
-      return list;
-    }
+  // =====================================================================
+  // Player actions
+  // =====================================================================
 
-    for (const tile of hand) {
-      if (tile.left === this.leftEnd || tile.right === this.leftEnd) {
-        list.push({ tile, end: "left" });
-      }
-      if (tile.left === this.rightEnd || tile.right === this.rightEnd) {
-        list.push({ tile, end: "right" });
-      }
-    }
-    return list;
-  }
+  /** Play a tile onto one end of the snake. */
+  playTile(
+    playerId: string,
+    tile: Tile,
+    end: "left" | "right",
+  ): { success: boolean; error?: string } {
+    const guard = this.guardTurn(playerId);
+    if (guard) return guard;
 
-  private canPlayTileOnBoard(tile: Dominoe): "left" | "right" | null {
-    if (this.board.length === 0) return "left";
-    if (tile.left === this.leftEnd || tile.right === this.leftEnd) return "left";
-    if (tile.left === this.rightEnd || tile.right === this.rightEnd) return "right";
-    return null;
-  }
+    const hand = this.hands.get(playerId) ?? [];
+    const index = hand.findIndex((t) => sameTile(t, tile));
+    if (index === -1) return { success: false, error: "You don't have that tile" };
 
-  playTile(playerId: string, tile: { left: number; right: number }, end: "left" | "right"): { success: boolean; error?: string } {
-    if (this.phase !== "playing") return { success: false, error: "Game is not playing" };
-    if (this.activePlayerId !== playerId) return { success: false, error: "Not your turn" };
-
-    const player = this.getPlayer(playerId);
-    if (!player) return { success: false, error: "Player not found" };
-
-    // Find tile in hand
-    const idx = (player.hand as Dominoe[]).findIndex(
-      (t) => (t.left === tile.left && t.right === tile.right) || (t.left === tile.right && t.right === tile.left)
-    );
-
-    if (idx === -1) return { success: false, error: "Tile not in hand" };
-    const handTile = player.hand[idx] as Dominoe;
-
-    // Validate play
+    const held = hand[index];
     if (this.board.length > 0) {
-      if (end === "left") {
-        if (handTile.left !== this.leftEnd && handTile.right !== this.leftEnd) {
-          return { success: false, error: "Tile does not match the left end" };
-        }
-      } else {
-        if (handTile.left !== this.rightEnd && handTile.right !== this.rightEnd) {
-          return { success: false, error: "Tile does not match the right end" };
-        }
+      const oriented = orient(held, end, this.ends);
+      if (!oriented) {
+        return {
+          success: false,
+          error: `That tile doesn't match the ${end} end`,
+        };
       }
     }
 
-    // Perform play
-    player.hand.splice(idx, 1);
-    this.executePlayTile(playerId, handTile, end);
+    this.commitPlay(playerId, held, end);
     return { success: true };
   }
 
-  private executePlayTile(playerId: string, tile: Dominoe, end: "left" | "right"): void {
-    this.clearTurnTimer();
-    this.clearBotTimer();
-    this.consecutivePasses = 0;
+  /**
+   * Knock: declare you cannot play.
+   *
+   * Validated server-side rather than trusted, because a knock is *public
+   * information* — it proves the knocker holds neither open pip, and the bots
+   * and the UI both act on that. A client that could knock while holding a
+   * legal tile could feed the whole table a lie.
+   */
+  knock(playerId: string): { success: boolean; error?: string } {
+    const guard = this.guardTurn(playerId);
+    if (guard) return guard;
 
-    if (this.board.length === 0) {
-      this.board.push(tile);
-      this.leftEnd = tile.left;
-      this.rightEnd = tile.right;
-    } else if (end === "left") {
-      if (tile.right === this.leftEnd) {
-        // [left, right] -> matches leftEnd, prepended as is
-        this.board.unshift(tile);
-        this.leftEnd = tile.left;
-      } else {
-        // [left, right] -> left matches leftEnd, needs flip
-        const flipped = { type: "dominoe" as const, left: tile.right, right: tile.left };
-        this.board.unshift(flipped);
-        this.leftEnd = tile.right;
-      }
-    } else {
-      if (tile.left === this.rightEnd) {
-        // [left, right] -> left matches rightEnd, appended as is
-        this.board.push(tile);
-        this.rightEnd = tile.right;
-      } else {
-        // [left, right] -> right matches rightEnd, needs flip
-        const flipped = { type: "dominoe" as const, left: tile.right, right: tile.left };
-        this.board.push(flipped);
-        this.rightEnd = tile.left;
-      }
+    const hand = this.hands.get(playerId) ?? [];
+    if (canPlay(hand, this.ends)) {
+      return { success: false, error: "You have a tile you can play" };
+    }
+    if (this.boneyard.length > 0) {
+      return { success: false, error: "Draw from the boneyard first" };
     }
 
-    // Check round win (hand empty)
-    const player = this.getPlayer(playerId)!;
-    if (player.hand.length === 0) {
-      this.endRound(playerId, "domino");
-      return;
-    }
-
-    this.callbacks.onHandsChanged(this.roomId);
-    this.nextTurn();
+    this.commitKnock(playerId);
+    return { success: true };
   }
 
-  drawTile(playerId: string): { success: boolean; error?: string; tile?: Dominoe } {
-    if (this.phase !== "playing") return { success: false, error: "Game is not playing" };
-    if (this.activePlayerId !== playerId) return { success: false, error: "Not your turn" };
+  /** Draw one tile. Only exists in 2- and 3-player games, which keep a boneyard. */
+  drawTile(playerId: string): { success: boolean; error?: string; tile?: Tile } {
+    const guard = this.guardTurn(playerId);
+    if (guard) return guard;
 
-    const player = this.getPlayer(playerId);
-    if (!player) return { success: false, error: "Player not found" };
-
-    // Verify player has no playable tiles
-    const playable = this.getPlayableTiles(player.hand as Dominoe[]);
-    if (playable.length > 0) {
-      return { success: false, error: "You have playable tiles in your hand" };
+    const hand = this.hands.get(playerId) ?? [];
+    if (canPlay(hand, this.ends)) {
+      return { success: false, error: "You have a tile you can play" };
     }
-
     if (this.boneyard.length === 0) {
-      return { success: false, error: "Boneyard is empty" };
+      return { success: false, error: "The boneyard is empty — knock instead" };
     }
 
     const tile = this.boneyard.pop()!;
-    player.hand.push(tile);
+    hand.push(tile);
+    this.hands.set(playerId, hand);
 
+    this.pushEvent({ kind: "draw", seat: this.seatOf(playerId) ?? 0 });
     this.lastActivityAt = Date.now();
     this.callbacks.onHandsChanged(this.roomId);
-    this.callbacks.broadcast(this.toState());
-
-    // Bot immediate replay if bot draws
-    if (player.isBot) {
-      this.scheduleBotPlay(playerId);
-    }
+    this.broadcast();
 
     return { success: true, tile };
   }
 
-  passTurn(playerId: string): { success: boolean; error?: string } {
-    if (this.phase !== "playing") return { success: false, error: "Game is not playing" };
-    if (this.activePlayerId !== playerId) return { success: false, error: "Not your turn" };
-
-    const player = this.getPlayer(playerId);
-    if (!player) return { success: false, error: "Player not found" };
-
-    // Verify no playable tiles
-    const playable = this.getPlayableTiles(player.hand as Dominoe[]);
-    if (playable.length > 0) {
-      return { success: false, error: "You cannot pass because you have playable tiles" };
+  private guardTurn(playerId: string): { success: false; error: string } | null {
+    if (this.phase !== "playing") {
+      return { success: false, error: "The round isn't running" };
     }
-
-    // Verify boneyard is empty
-    if (this.boneyard.length > 0) {
-      return { success: false, error: "You cannot pass while there are tiles in the boneyard" };
+    if (this.activeSeat === null || this.seatOrder[this.activeSeat] !== playerId) {
+      return { success: false, error: "Not your turn" };
     }
-
-    this.executePass(playerId);
-    return { success: true };
+    return null;
   }
 
-  private executePass(playerId: string): void {
+  // =====================================================================
+  // Committing moves
+  // =====================================================================
+
+  private commitPlay(playerId: string, tile: Tile, end: "left" | "right"): void {
     this.clearTurnTimer();
     this.clearBotTimer();
-    this.consecutivePasses++;
+    this.consecutiveKnocks = 0;
 
-    if (this.consecutivePasses >= this.players.length) {
-      // All players have passed, game is blocked!
-      this.endRound(null, "block");
+    const hand = this.hands.get(playerId) ?? [];
+    const index = hand.findIndex((t) => sameTile(t, tile));
+    if (index !== -1) hand.splice(index, 1);
+
+    const seat = this.seatOf(playerId) ?? 0;
+    const seq = this.board.length;
+
+    if (this.board.length === 0) {
+      this.board.push({ ...tile, playedBy: playerId, end: "spinner", seq });
+      this.ends = { left: tile.left, right: tile.right };
+    } else {
+      const oriented = orient(tile, end, this.ends)!;
+      const placed: PlacedTile = {
+        ...oriented.placed,
+        playedBy: playerId,
+        end,
+        seq,
+      };
+      if (end === "left") {
+        this.board.unshift(placed);
+        this.ends = { ...this.ends, left: oriented.newEnd };
+      } else {
+        this.board.push(placed);
+        this.ends = { ...this.ends, right: oriented.newEnd };
+      }
+    }
+
+    this.playedPipCount[tile.left]++;
+    if (!isDouble(tile)) this.playedPipCount[tile.right]++;
+    else this.playedPipCount[tile.right]++; // a double shows the value twice
+
+    this.pushEvent({ kind: "play", seat, tile });
+    this.lastActivityAt = Date.now();
+
+    if (hand.length === 0) {
+      this.endRound(scoreDomino(seat, this.handsBySeat(), this.scoreOpts()), tile);
       return;
     }
 
-    this.nextTurn();
+    this.callbacks.onHandsChanged(this.roomId);
+    this.advanceTurn();
   }
 
-  private nextTurn(): void {
-    if (this.destroyed || this.phase !== "playing") return;
-
-    const currentIdx = this.players.findIndex((p) => p.id === this.activePlayerId);
-    let nextIdx = currentIdx === -1 ? 0 : currentIdx;
-    let nextPlayer = null;
-
-    // Clockwise turn order search
-    for (let i = 1; i <= this.players.length; i++) {
-      const idx = (nextIdx + i) % this.players.length;
-      const candidate = this.players[idx];
-      if (candidate && (candidate.isBot || candidate.isConnected)) {
-        nextPlayer = candidate;
-        break;
-      }
-    }
-
-    if (nextPlayer) {
-      this.startTurn(nextPlayer.id);
-      this.lastActivityAt = Date.now();
-      this.callbacks.broadcast(this.toState());
-    } else {
-      this.activePlayerId = null;
-      this.turnDeadline = null;
-      this.clearTurnTimer();
-      this.callbacks.broadcast(this.toState());
-    }
-  }
-
-  private endRound(winnerId: string | null, method: "domino" | "block"): void {
+  private commitKnock(playerId: string): void {
     this.clearTurnTimer();
     this.clearBotTimer();
 
+    // Record what this knock proves. Both open pips are numbers the knocker
+    // demonstrably does not hold — that's the information the rest of the
+    // table (and the bots) get to use for the rest of the round.
+    const deadOn = [this.ends.left, this.ends.right].filter(
+      (v): v is number => v !== null,
+    );
+    const known = this.knocks.get(playerId) ?? [];
+    for (const value of deadOn) {
+      if (!known.includes(value)) known.push(value);
+    }
+    this.knocks.set(playerId, known);
+
+    this.consecutiveKnocks++;
+    this.pushEvent({
+      kind: "knock",
+      seat: this.seatOf(playerId) ?? 0,
+      deadOn,
+    });
+    this.lastActivityAt = Date.now();
+
+    // Everyone knocking in succession means the table is locked. Counting
+    // against seat count (not "connected player count") is deliberate: a
+    // disconnected seat is still played, by the bot, so it still knocks.
+    if (this.consecutiveKnocks >= this.seatOrder.length) {
+      this.endRound(scoreBlocked(this.handsBySeat(), this.scoreOpts()), null);
+      return;
+    }
+
+    this.advanceTurn();
+  }
+
+  /**
+   * Play for whoever's turn it is — used for timeouts and for seats whose
+   * player has dropped.
+   *
+   * It plays a real move rather than forfeiting, because forfeiting a turn in
+   * a partnership game punishes the absent player's partner, who did nothing
+   * wrong. It uses the easy bot on purpose: an absent player's seat should not
+   * suddenly start playing better than they were.
+   */
+  private autoPlay(reason: "timeout"): void {
+    if (this.destroyed || this.phase !== "playing" || this.activeSeat === null) return;
+
+    const playerId = this.seatOrder[this.activeSeat];
+    const hand = this.hands.get(playerId) ?? [];
+
+    this.pushEvent({ kind: reason, seat: this.activeSeat });
+
+    // 2–3 players: exhaust the boneyard before a knock is legal.
+    while (!canPlay(hand, this.ends) && this.boneyard.length > 0) {
+      hand.push(this.boneyard.pop()!);
+    }
+    this.hands.set(playerId, hand);
+
+    const choice = chooseDominoPlay(this.botView(this.activeSeat), "easy");
+    if (choice) this.commitPlay(playerId, choice.tile, choice.end);
+    else this.commitKnock(playerId);
+  }
+
+  // =====================================================================
+  // Round / match end
+  // =====================================================================
+
+  private endRound(outcome: RoundOutcome, lastTile: Tile | null): void {
+    this.clearAllTimers();
+
+    const scored = applyKarak(outcome, lastTile, this.scoreOpts());
     this.phase = "round_recap";
-    this.activePlayerId = null;
+    this.activeSeat = null;
     this.turnDeadline = null;
 
-    let points = 0;
-    let actualWinnerId = winnerId;
-    let winnerTeam: "A" | "B" | null = null;
-
-    // Get sum of spots in hands
-    const spotSums: Record<string, number> = {};
-    for (const p of this.players) {
-      let sum = 0;
-      for (const tile of (p.hand as Dominoe[])) {
-        sum += tile.left + tile.right;
+    if (scored.winnerSeat !== null && scored.points > 0) {
+      if (this.mode === "teams" && scored.winnerTeam) {
+        this.teamScores[scored.winnerTeam] += scored.points;
       }
-      spotSums[p.id] = sum;
+      const winnerId = this.seatOrder[scored.winnerSeat];
+      this.seatScores.set(winnerId, (this.seatScores.get(winnerId) ?? 0) + scored.points);
     }
 
-    if (method === "domino" && winnerId) {
-      const winner = this.getPlayer(winnerId)!;
-      if (this.gameMode === "individual") {
-        // Winner gets sum of everyone else's hands
-        for (const p of this.players) {
-          if (p.id !== winnerId) {
-            points += spotSums[p.id];
-          }
-        }
-        const newScore = (this.playerScores.get(winnerId) || 0) + points;
-        this.playerScores.set(winnerId, newScore);
-      } else {
-        // Teams Mode
-        const winnerIndex = this.players.findIndex((p) => p.id === winnerId);
-        winnerTeam = winnerIndex % 2 === 0 ? "A" : "B";
+    // The winner opens the next round — the reward for taking it is choosing
+    // the shape of what comes next.
+    this.nextOpenerSeat =
+      scored.winnerSeat ??
+      (this.activeSeat ?? (this.nextOpenerSeat !== null ? this.nextOpenerSeat : 0));
 
-        // Winner gets sum of opposing team's hands
-        for (let i = 0; i < this.players.length; i++) {
-          if (i % 2 !== winnerIndex % 2) {
-            points += spotSums[this.players[i].id];
-          }
-        }
+    const winnerName =
+      scored.winnerSeat !== null
+        ? this.getPlayer(this.seatOrder[scored.winnerSeat])?.name ?? null
+        : null;
 
-        if (winnerTeam === "A") {
-          this.teamScores.A += points;
-        } else {
-          this.teamScores.B += points;
-        }
-      }
-    } else if (method === "block") {
-      if (this.gameMode === "individual") {
-        // Player with lowest spot sum wins
-        let minSpots = Infinity;
-        let blockWinner: string | null = null;
-        let isTie = false;
+    this.pushEvent({
+      kind: "round_end",
+      seat: scored.winnerSeat ?? 0,
+      method: scored.method,
+      points: scored.points,
+    });
 
-        for (const p of this.players) {
-          const sum = spotSums[p.id];
-          if (sum < minSpots) {
-            minSpots = sum;
-            blockWinner = p.id;
-            isTie = false;
-          } else if (sum === minSpots) {
-            isTie = true;
-          }
-        }
-
-        if (!isTie && blockWinner) {
-          actualWinnerId = blockWinner;
-          // Score matches sum of everyone else's spots
-          for (const p of this.players) {
-            if (p.id !== blockWinner) {
-              points += spotSums[p.id];
-            }
-          }
-          const newScore = (this.playerScores.get(blockWinner) || 0) + points;
-          this.playerScores.set(blockWinner, newScore);
-        } else {
-          // Tie block, draw round
-          actualWinnerId = null;
-          points = 0;
-        }
-      } else {
-        // Teams Mode block
-        const spotsA = spotSums[this.players[0].id] + spotSums[this.players[2].id];
-        const spotsB = spotSums[this.players[1].id] + spotSums[this.players[3].id];
-
-        if (spotsA < spotsB) {
-          winnerTeam = "A";
-          points = spotsB; // Score is opposite team's spots sum
-          this.teamScores.A += points;
-          actualWinnerId = spotSums[this.players[0].id] <= spotSums[this.players[2].id] ? this.players[0].id : this.players[2].id;
-        } else if (spotsB < spotsA) {
-          winnerTeam = "B";
-          points = spotsA;
-          this.teamScores.B += points;
-          actualWinnerId = spotSums[this.players[1].id] <= spotSums[this.players[3].id] ? this.players[1].id : this.players[3].id;
-        } else {
-          // Tie
-          winnerTeam = null;
-          actualWinnerId = null;
-          points = 0;
-        }
-      }
-    }
-
-    // Reveal hands map
-    const playerHands: Record<string, Dominoe[]> = {};
-    for (const p of this.players) {
-      playerHands[p.id] = p.hand as Dominoe[];
-    }
-
-    const scoresObj: Record<string, number> = {};
-    for (const [pid, score] of this.playerScores) {
-      scoresObj[pid] = score;
-    }
-
-    const winnerName = actualWinnerId ? this.getPlayer(actualWinnerId)?.name || null : null;
+    const matchOver = this.checkMatchOver();
 
     this.recap = {
-      winnerId: actualWinnerId,
+      method: scored.method,
+      winnerSeat: scored.winnerSeat,
       winnerName,
-      winnerTeam,
-      pointsGained: points,
-      method,
-      playerHands,
-      scores: scoresObj,
-      teamScores: { ...this.teamScores },
+      winnerTeam: scored.winnerTeam,
+      points: scored.points,
+      karak: scored.karak,
+      pipsBySeat: scored.pipsBySeat,
+      handsBySeat: this.handsBySeat(),
+      nextRoundAt: matchOver ? null : Date.now() + RECAP_SECONDS * 1000,
     };
 
-    // Check game over
-    let isGameOver = false;
-    let gameWinnerId: string | null = null;
+    this.lastActivityAt = Date.now();
 
-    if (this.gameMode === "individual") {
-      for (const [pid, score] of this.playerScores) {
-        if (score >= this.targetScore) {
-          isGameOver = true;
-          gameWinnerId = pid;
-          break;
-        }
-      }
-    } else {
-      if (this.teamScores.A >= this.targetScore) {
-        isGameOver = true;
-        gameWinnerId = this.players[0].id;
-      } else if (this.teamScores.B >= this.targetScore) {
-        isGameOver = true;
-        gameWinnerId = this.players[1].id;
-      }
-    }
-
-    if (isGameOver && gameWinnerId) {
+    if (matchOver) {
       this.phase = "game_over";
-      this.winnerId = gameWinnerId;
-      this.lastActivityAt = Date.now();
-      this.callbacks.broadcast(this.toState());
-      this.callbacks.onGameEnd(this.roomId, gameWinnerId);
-    } else {
-      this.lastActivityAt = Date.now();
-      this.callbacks.broadcast(this.toState());
-
-      // Auto start next round in 7 seconds
-      this.recapTimer = setTimeout(() => {
-        this.startRound();
-      }, 7000);
+      this.broadcast();
+      if (this.winnerId) this.callbacks.onGameEnd(this.roomId, this.winnerId);
+      return;
     }
+
+    this.broadcast();
+    this.recapTimer = setTimeout(() => this.startRound(), RECAP_SECONDS * 1000);
   }
 
-  private scheduleBotPlay(botId: string): void {
-    this.clearBotTimer();
-    const delay = Math.floor(Math.random() * 1500) + 1500; // 1.5 - 3 seconds delay
-    this.botTimer = setTimeout(() => {
-      this.executeBotPlay(botId);
-    }, delay);
-  }
+  private checkMatchOver(): boolean {
+    if (this.mode === "teams") {
+      const winner: Team | null =
+        this.teamScores.A >= this.targetScore
+          ? "A"
+          : this.teamScores.B >= this.targetScore
+            ? "B"
+            : null;
+      if (!winner) return false;
 
-  private executeBotPlay(botId: string): void {
-    if (this.destroyed || this.phase !== "playing" || this.activePlayerId !== botId) return;
-
-    const bot = this.getPlayer(botId);
-    if (!bot) return;
-
-    const playable = this.getPlayableTiles(bot.hand as Dominoe[]);
-    if (playable.length > 0) {
-      // Select tile based on difficulty
-      const diff = this.botDifficulties.get(botId) || "medium";
-      let chosenPlay = playable[0];
-
-      if (diff === "easy") {
-        chosenPlay = playable[Math.floor(Math.random() * playable.length)];
-      } else if (diff === "medium") {
-        let maxSpots = -1;
-        for (const play of playable) {
-          const spots = play.tile.left + play.tile.right;
-          if (spots > maxSpots) {
-            maxSpots = spots;
-            chosenPlay = play;
-          }
+      this.winnerTeam = winner;
+      // Name the higher scorer on the winning team as the nominal winner, so
+      // the party leaderboard has a person to credit.
+      let bestId: string | null = null;
+      let bestScore = -1;
+      this.seatOrder.forEach((id, seat) => {
+        if (teamForSeat(seat) !== winner) return;
+        const score = this.seatScores.get(id) ?? 0;
+        if (score > bestScore) {
+          bestScore = score;
+          bestId = id;
         }
-      } else {
-        let bestScore = -1;
-        for (const play of playable) {
-          let score = play.tile.left + play.tile.right;
-          if (play.tile.left === play.tile.right) {
-            score += 100;
-          }
-          if (score > bestScore) {
-            bestScore = score;
-            chosenPlay = play;
-          }
-        }
-      }
+      });
+      this.winnerId = bestId;
+      this.pushEvent({ kind: "match_end", seat: 0 });
+      return true;
+    }
 
-      this.playTile(botId, chosenPlay.tile, chosenPlay.end);
-    } else {
-      // Draw or pass
-      if (this.boneyard.length > 0) {
-        this.drawTile(botId);
-      } else {
-        this.passTurn(botId);
+    for (const [id, score] of this.seatScores) {
+      if (score >= this.targetScore) {
+        this.winnerId = id;
+        this.pushEvent({ kind: "match_end", seat: this.seatOf(id) ?? 0 });
+        return true;
       }
     }
+    return false;
   }
 
+  /** Host-triggered fresh match with the same table. */
   rematch(playerId: string): { success: boolean; error?: string } {
     const player = this.getPlayer(playerId);
-    if (!player || !player.isHost) {
+    if (!player?.isHost) {
       return { success: false, error: "Only the host can start a rematch" };
     }
     if (this.phase !== "game_over") {
-      return { success: false, error: "Can only rematch when the game is over" };
+      return { success: false, error: "The match isn't over yet" };
     }
-
     this.startGame();
     return { success: true };
   }
 
-  toState(): DominoState {
-    const scoresObj: Record<string, number> = {};
-    for (const [pid, score] of this.playerScores) {
-      scoresObj[pid] = score;
-    }
+  // =====================================================================
+  // Bots
+  // =====================================================================
 
+  private scheduleBot(botId: string): void {
+    this.clearBotTimer();
+    const seat = this.seatOf(botId);
+    if (seat === null) return;
+
+    const options = legalPlays(this.hands.get(botId) ?? [], this.ends);
+    const difficulty = this.botDifficulty.get(botId) ?? "medium";
+    const delay = botThinkMs(options.length, difficulty);
+
+    this.botTimer = setTimeout(() => this.runBot(botId), delay);
+  }
+
+  private runBot(botId: string): void {
+    if (this.destroyed || this.phase !== "playing") return;
+    if (this.activeSeat === null || this.seatOrder[this.activeSeat] !== botId) return;
+
+    const hand = this.hands.get(botId) ?? [];
+
+    // Draw until playable (2–3 players only; at 4 the boneyard is empty).
+    while (!canPlay(hand, this.ends) && this.boneyard.length > 0) {
+      hand.push(this.boneyard.pop()!);
+    }
+    this.hands.set(botId, hand);
+
+    const choice = chooseDominoPlay(
+      this.botView(this.activeSeat),
+      this.botDifficulty.get(botId) ?? "medium",
+    );
+
+    if (choice) this.commitPlay(botId, choice.tile, choice.end);
+    else this.commitKnock(botId);
+  }
+
+  private botView(seat: number) {
+    const playerId = this.seatOrder[seat];
+    return {
+      hand: this.hands.get(playerId) ?? [],
+      ends: this.ends,
+      seat,
+      seatCount: this.seatOrder.length,
+      teams: this.mode === "teams" && this.seatOrder.length === 4,
+      handSizes: this.seatOrder.map((id) => (this.hands.get(id) ?? []).length),
+      knocks: this.seatOrder.map((id) => this.knocks.get(id) ?? []),
+      // What the bot can legitimately count: tiles on the table, plus its own.
+      seenPipCount: this.playedPipCount.map((count, value) => {
+        const inHand = (this.hands.get(playerId) ?? []).reduce(
+          (n, t) => n + (t.left === value ? 1 : 0) + (t.right === value ? 1 : 0),
+          0,
+        );
+        return count + inHand;
+      }),
+    };
+  }
+
+  // =====================================================================
+  // State
+  // =====================================================================
+
+  private seatOf(playerId: string): number | null {
+    const index = this.seatOrder.indexOf(playerId);
+    return index === -1 ? null : index;
+  }
+
+  private handsBySeat(): Tile[][] {
+    return this.seatOrder.map((id) => [...(this.hands.get(id) ?? [])]);
+  }
+
+  private scoreOpts() {
+    return {
+      teams: this.mode === "teams" && this.seatOrder.length === 4,
+      karakBonus: this.karakBonus,
+    };
+  }
+
+  private pushEvent(event: Omit<DominoEvent, "playerId" | "playerName" | "at">): void {
+    const playerId = this.seatOrder[event.seat] ?? "";
+    this.events.push({
+      ...event,
+      playerId,
+      playerName: this.getPlayer(playerId)?.name ?? "",
+      at: Date.now(),
+    });
+    // The client only animates the tail; an unbounded log would grow the
+    // broadcast payload for every round of a long match.
+    if (this.events.length > 12) this.events.splice(0, this.events.length - 12);
+  }
+
+  private broadcast(): void {
+    if (this.destroyed) return;
+    this.callbacks.broadcast(this.toState());
+  }
+
+  private seatStates(reveal: boolean): DominoSeatState[] {
+    const order = this.seatOrder.length > 0 ? this.seatOrder : this.players.map((p) => p.id);
+    return order.map((id, seat) => {
+      const player = this.getPlayer(id);
+      const hand = this.hands.get(id) ?? [];
+      return {
+        seat,
+        playerId: id,
+        name: player?.name ?? "—",
+        team: teamForSeat(seat),
+        isBot: player?.isBot ?? false,
+        isConnected: player?.isConnected ?? false,
+        flag: player?.flag,
+        handCount: hand.length,
+        knockedOn: [...(this.knocks.get(id) ?? [])],
+        score: this.seatScores.get(id) ?? 0,
+        ...(reveal ? { hand: [...hand], pips: handPips(hand) } : {}),
+      };
+    });
+  }
+
+  toState(): DominoState {
+    const reveal = this.phase === "round_recap" || this.phase === "game_over";
     return {
       roomId: this.roomId,
       gameId: "domino",
       phase: this.phase,
-      maxPlayers: this.maxPlayers,
-      players: this.players.map((p) => {
-        const pub = p.toPublicData();
-        return {
-          ...pub,
-          score: this.playerScores.get(p.id) || 0,
-        };
-      }),
-      gameMode: this.gameMode,
+      mode: this.mode,
       targetScore: this.targetScore,
-      turnTimeLimit: this.turnTimeLimit,
+      turnSeconds: this.turnSeconds,
+      karakBonus: this.karakBonus,
       tableTheme: this.tableTheme,
       tileTheme: this.tileTheme,
+
+      players: this.players.map((p) => ({
+        id: p.id,
+        name: p.name,
+        isBot: p.isBot,
+        isHost: p.isHost,
+        isConnected: p.isConnected,
+        flag: p.flag,
+        cardCount: (this.hands.get(p.id) ?? []).length,
+        hand: [] as never[],
+      })),
+
+      seats: this.seatStates(reveal),
+      maxPlayers: this.maxPlayers,
+
       board: this.board,
-      leftEnd: this.leftEnd,
-      rightEnd: this.rightEnd,
+      ends: this.ends,
       boneyardCount: this.boneyard.length,
-      activePlayerId: this.activePlayerId,
+
+      activeSeat: this.activeSeat,
       turnDeadline: this.turnDeadline,
       roundNumber: this.roundNumber,
+      playedPipCount: [...this.playedPipCount],
+
+      scores: { ...this.teamScores },
+      seatScores: this.seatOrder.map((id) => this.seatScores.get(id) ?? 0),
+      winnerTeam: this.winnerTeam,
       winnerId: this.winnerId,
+
       recap: this.recap,
-      playerScores: scoresObj,
-      teamScores: { ...this.teamScores },
+      events: this.events,
     };
   }
 
-  toPlayerState(playerId: string): DominoState & { hand: Dominoe[] } {
+  toPlayerState(playerId: string): DominoState & {
+    hand: Tile[];
+    mySeat: number | null;
+    myPartnerSeat: number | null;
+    /** Legal plays, precomputed — see the comment below. */
+    playable: Array<{ tile: Tile; end: "left" | "right" }>;
+  } {
     const base = this.toState();
-    const player = this.getPlayer(playerId);
+    const hand = this.hands.get(playerId) ?? [];
+    const mySeat = this.seatOf(playerId);
+    const myTurn = mySeat !== null && mySeat === this.activeSeat;
+
     return {
       ...base,
-      hand: player ? (player.hand as Dominoe[]) : [],
+      hand: [...hand],
+      mySeat,
+      myPartnerSeat:
+        mySeat === null ? null : partnerSeat(mySeat, this.seatOrder.length),
+      // The server computes which tiles are legal rather than leaving the
+      // client to re-derive it. Two reasons: the client's copy of the rule
+      // would be a second implementation that can drift from the server's
+      // (the old client did exactly that and disagreed on flipped tiles), and
+      // the UI needs this on every render to dim unplayable tiles — the single
+      // most useful affordance in the whole game on a small screen.
+      playable: myTurn && this.phase === "playing" ? legalPlays(hand, this.ends) : [],
     };
   }
+
+  // =====================================================================
+  // Teardown
+  // =====================================================================
 
   destroy(): void {
     this.destroyed = true;
+    this.clearAllTimers();
+  }
+
+  private clearAllTimers(): void {
     this.clearTurnTimer();
     this.clearRecapTimer();
     this.clearBotTimer();
