@@ -63,15 +63,33 @@ your machine's LAN IP, and add that origin to `ALLOWED_ORIGINS` in `server/.env`
 | Where | Command | What it does |
 |---|---|---|
 | `server/` | `npm run dev` | Dev server, auto-reload |
-| `server/` | `npm test` | Build, then run the domino rule tests and the match simulation |
+| `server/` | `npm test` | Offline suite: build, type-contract check, engine contracts, domino rules, 60-match sim |
+| `server/` | `npm run test:live` | Everything that needs a running server (see below) |
+| `server/` | `npm run test:engines` | Contracts all 13 engines must satisfy |
 | `server/` | `npm run test:domino` | 30 rule checks, no network |
 | `server/` | `npm run test:domino-sim` | 60 full matches + the disconnect regression |
-| `server/` | `npm run test:party` | End-to-end party flow against a running server |
+| `server/` | `npm run test:lifecycle` | Refresh, second tab, host leaves, latecomer |
+| `server/` | `npm run test:party` | Create, join, switch game, rematch, leave |
+| `server/` | `npm run types:sync` | Regenerate the client's copy of the wire contract |
 | `server/` | `npm run typecheck` | Type-check without emitting |
 | `web/` | `npm run dev` | Vite dev server with HMR |
 | `web/` | `npm run build` | Production build |
 | `web/` | `npm run brand:sync` | Regenerate `index.html`, sitemap, robots, manifest from `brand.ts` |
 | `web/` | `npm run lint` | ESLint |
+
+### Testing
+
+`npm test` needs nothing running. `npm run test:live` drives real socket
+clients against a live server, so start one first:
+
+```bash
+cd server && npm run dev        # terminal 1
+cd server && npm run test:live  # terminal 2
+```
+
+`node test/seat-bots.mjs <ROOM_CODE>` fills a room with scripted players. Three
+of the party games deliberately have no bots, which otherwise makes them
+impossible to look at in a browser on your own.
 
 ## Environment
 
