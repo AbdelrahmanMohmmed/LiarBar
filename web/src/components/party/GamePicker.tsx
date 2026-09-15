@@ -215,6 +215,13 @@ export default function GamePicker({
                     </div>
                   </div>
 
+                  {/* In flow, not absolutely positioned: the stats row below
+                      wraps to two lines on a narrow card, and an absolute
+                      message sat on top of it. */}
+                  {c.blocked && (
+                    <span className="text-[11px] font-bold text-ruby">{c.blocked}</span>
+                  )}
+
                   <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-sand">
                     <span className="inline-flex items-center gap-1">
                       <Users size={12} />
@@ -241,11 +248,6 @@ export default function GamePicker({
                     )}
                   </div>
 
-                  {c.blocked && (
-                    <span className="absolute inset-x-4 bottom-3 text-[11px] font-bold text-ruby">
-                      {c.blocked}
-                    </span>
-                  )}
                 </button>
               );
             })}
