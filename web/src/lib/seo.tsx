@@ -28,6 +28,17 @@ export interface SeoProps {
   lang?: "en" | "ar";
   /** Optional JSON-LD structured data for rich results & AI answer engines. */
   jsonLd?: JsonLd;
+  /**
+   * Set by RouteMeta only.
+   *
+   * A page rendering `<Seo>` claims the current pathname, and the fallback
+   * skips any path already claimed. Without this flag the fallback claims the
+   * path *itself* on its first render and then refuses to update it — which
+   * showed up as a party switching from Tetris to Memory with the tab still
+   * saying Tetris, because both live at `/lobby/:code` and only the title had
+   * changed.
+   */
+  isFallback?: boolean;
 }
 
 function upsertMeta(attr: "name" | "property", key: string, content: string) {
@@ -74,6 +85,7 @@ export function Seo({
   noindex = false,
   lang = "en",
   jsonLd,
+  isFallback = false,
 }: SeoProps) {
   useEffect(() => {
     const url = `${SITE_URL}${path}`;
@@ -83,7 +95,7 @@ export function Seo({
 
     document.title = fullTitle;
     document.documentElement.lang = lang;
-    claimedPath = window.location.pathname;
+    if (!isFallback) claimedPath = window.location.pathname;
 
     upsertMeta("name", "description", description);
     upsertMeta(
@@ -118,7 +130,7 @@ export function Seo({
       script.textContent = JSON.stringify(jsonLd);
       document.head.appendChild(script);
     }
-  }, [title, description, path, image, noindex, lang, jsonLd]);
+  }, [title, description, path, image, noindex, lang, jsonLd, isFallback]);
 
   return null;
 }

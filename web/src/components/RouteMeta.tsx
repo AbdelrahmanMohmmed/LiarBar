@@ -113,6 +113,7 @@ export default function RouteMeta() {
       path={fallback.path}
       noindex={fallback.noindex}
       lang={lang}
+      isFallback
     />
   );
 }
