@@ -141,6 +141,18 @@ export const GAME_SPECS: Record<string, GameSpec> = {
     validate: (o) => intInRange(o.targetScore, 4, 30, "Target score"),
   },
 
+  wyr: {
+    id: "wyr",
+    minPlayers: 3,
+    maxPlayers: 10,
+    seating: "party",
+    // No bots: the whole game is how well you know the actual people at the
+    // table. A bot has nothing to know and nothing to be known about.
+    bots: false,
+    voiceMatters: true,
+    validate: (o) => intInRange(o.targetScore, 5, 40, "Target score"),
+  },
+
   "higher-lower": {
     id: "higher-lower",
     minPlayers: 2,
@@ -240,6 +252,7 @@ export const PARTY_GAME_ORDER = [
   "domino",
   "spyfall",
   "chameleon",
+  "wyr",
   "liars-bar",
   "codenames",
   "higher-lower",

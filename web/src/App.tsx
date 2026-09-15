@@ -61,6 +61,9 @@ const SpyfallGamePage = lazyPage(() => import("./pages/spyfall/SpyfallGame"));
 const ChameleonHome = lazyPage(() => import("./pages/chameleon/ChameleonHome"));
 const ChameleonGamePage = lazyPage(() => import("./pages/chameleon/ChameleonGame"));
 
+const WyrHome = lazyPage(() => import("./pages/wyr/WyrHome"));
+const WyrGamePage = lazyPage(() => import("./pages/wyr/WyrGame"));
+
 const RentoHome = lazyPage(() => import("./pages/rento/RentoHome"));
 const RentoRoom = lazyPage(() => import("./pages/rento/RentoRoom"));
 const RentoGame = lazyPage(() => import("./pages/rento/RentoGame"));
@@ -172,6 +175,9 @@ const App = () => (
 
                   <Route path="/chameleon" element={<ChameleonHome />} />
                   <Route path="/chameleon/game/:roomId" element={<ChameleonGamePage />} />
+
+                  <Route path="/wyr" element={<WyrHome />} />
+                  <Route path="/wyr/game/:roomId" element={<WyrGamePage />} />
 
                   <Route path="/rento" element={<RentoHome />} />
                   <Route path="/rento/room/:roomId" element={<RentoRoom />} />

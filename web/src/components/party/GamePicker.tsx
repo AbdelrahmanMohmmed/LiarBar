@@ -38,6 +38,7 @@ const FALLBACK_META: Record<string, { emoji: string; en: string; ar: string }> =
   "snake-ladder": { emoji: "🪜", en: "Snakes & Ladders", ar: "سلم وثعبان" },
   spyfall: { emoji: "🕶️", en: "Spyfall", ar: "برا اللعبة" },
   chameleon: { emoji: "🦎", en: "Chameleon", ar: "الحرباية" },
+  wyr: { emoji: "🤔", en: "Would You Rather", ar: "لو خيّروك" },
 };
 
 export default function GamePicker({

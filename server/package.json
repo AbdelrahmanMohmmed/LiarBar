@@ -20,7 +20,8 @@
     "test:engines": "node test/engines.test.mjs",
     "test:chameleon": "node test/chameleon.e2e.mjs",
     "types:sync": "node scripts/sync-types.mjs",
-    "types:check": "node scripts/sync-types.mjs --check"
+    "types:check": "node scripts/sync-types.mjs --check",
+    "test:wyr": "node test/wyr.e2e.mjs"
   },
   "dependencies": {
     "cors": "^2.8.5",

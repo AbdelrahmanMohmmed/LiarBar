@@ -245,6 +245,29 @@ export const GAMES: GameMeta[] = [
     art: "/art/games/chameleon.webp",
   },
   {
+    id: "wyr",
+    name: { en: "Would You Rather", ar: "لو خيّروك" },
+    blurb: {
+      en: "Not what you would pick — what your friends think you would pick.",
+      ar: "مش انت هتختار إيه — أصحابك فاكرين إنك هتختار إيه.",
+    },
+    description: {
+      en: "One person answers an impossible question privately; everyone else guesses what they said. Score for reading your friends — and score more for surprising them. Ninety-second rounds, and the reveal is a screenshot every time.",
+      ar: "واحد بيجاوب على سؤال مستحيل في السر، والباقي بيخمّنوا إجابته. تكسب لو عرفت أصحابك — وتكسب أكتر لو فاجأتهم. جولة في تسعين ثانية، والنتيجة بتبقى صورة تتبعت.",
+    },
+    category: "party",
+    status: "live",
+    minPlayers: 3,
+    maxPlayers: 10,
+    minutes: [8, 20],
+    path: "/wyr",
+    emoji: "🤔",
+    accent: "gold",
+    voiceMatters: true,
+    supportsBots: false,
+    art: "/art/games/wyr.webp",
+  },
+  {
     id: "liars-bar",
     name: { en: "Liar's Bar", ar: "أشك" },
     blurb: {
@@ -343,6 +366,7 @@ export const PARTY_GAME_IDS = [
   "domino",
   "spyfall",
   "chameleon",
+  "wyr",
   "liars-bar",
   "codenames",
   "higher-lower",

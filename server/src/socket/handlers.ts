@@ -30,6 +30,7 @@ import { RentoGame } from "../games/rento/RentoGame.js";
 import { SnakeLadderGame } from "../games/snake-ladder/SnakeLadderGame.js";
 import { SpyfallGame } from "../games/spyfall/SpyfallGame.js";
 import { ChameleonGame } from "../games/chameleon/ChameleonGame.js";
+import { WyrGame } from "../games/wyr/WyrGame.js";
 
 type Ack = ((response: unknown) => void) | undefined;
 
@@ -140,6 +141,7 @@ export function registerSocketHandlers(
     const snakeLadderMembership = makeMembership(SnakeLadderGame);
     const spyfallMembership = makeMembership(SpyfallGame, { resolvePlayer: true });
     const chameleonMembership = makeMembership(ChameleonGame, { resolvePlayer: true });
+    const wyrMembership = makeMembership(WyrGame, { resolvePlayer: true });
 
     // ===== ROOM LIFECYCLE =====
 
@@ -1026,6 +1028,33 @@ export function registerSocketHandlers(
       // The reveal contains everyone's secret, so private state must go out
       // again immediately — otherwise the spy's own screen still says "you are
       // the spy" while everyone else is looking at the result.
+      sendPrivateHands(io, m.room);
+      reply(callback, { success: true });
+    });
+
+    // ===== GAMEPLAY (Would You Rather) =====
+
+    socket.on("wyr_choose", (data: { choice?: "a" | "b" }, callback: Ack) => {
+      const m = wyrMembership(callback);
+      if (!m) return;
+      const result = m.room.choose(m.player.id, data?.choice as "a" | "b");
+      if (!result.success) {
+        fail(callback, result.error ?? "Cannot choose");
+        return;
+      }
+      // The phase advanced; everyone's private slice changed with it.
+      sendPrivateHands(io, m.room);
+      reply(callback, { success: true });
+    });
+
+    socket.on("wyr_predict", (data: { choice?: "a" | "b" }, callback: Ack) => {
+      const m = wyrMembership(callback);
+      if (!m) return;
+      const result = m.room.predict(m.player.id, data?.choice as "a" | "b");
+      if (!result.success) {
+        fail(callback, result.error ?? "Cannot predict");
+        return;
+      }
       sendPrivateHands(io, m.room);
       reply(callback, { success: true });
     });

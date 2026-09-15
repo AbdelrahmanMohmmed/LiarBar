@@ -287,6 +287,8 @@ export function gameRoute(gameId: string, roomId: string): string | null {
       return `/spyfall/game/${roomId}`;
     case "chameleon":
       return `/chameleon/game/${roomId}`;
+    case "wyr":
+      return `/wyr/game/${roomId}`;
     case "rento":
       return `/rento/game/${roomId}`;
     default:
