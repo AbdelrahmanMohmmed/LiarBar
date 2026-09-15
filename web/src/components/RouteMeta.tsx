@@ -61,6 +61,13 @@ function titleFor(pathname: string, lang: "en" | "ar"): string {
     (g) => pathname === g.path || pathname.startsWith(`${g.path}/`),
   );
   if (game) return game.name[lang];
+  // Liar's Bar is the one game whose room and board predate the per-game
+  // route convention: its setup page is /play but it plays at /game/:code and
+  // /room/:code, which no prefix match can reach.
+  if (/^\/(game|room)\//.test(pathname)) {
+    const liars = GAMES.find((g) => g.id === "liars-bar");
+    if (liars) return liars.name[lang];
+  }
   if (pathname.startsWith("/arcade")) return lang === "ar" ? "الأركيد" : "Arcade";
   return BRAND.name;
 }

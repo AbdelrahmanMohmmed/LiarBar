@@ -3,6 +3,7 @@ import type { Card as CardType } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Send, SkipForward, ChevronDown, ChevronUp } from "lucide-react";
 import { Card } from "@/components/Card";
+import { useLanguage } from "@/lib/languageContext";
 
 interface MobileHandSheetProps {
   /** Slides the sheet on/off screen; kept mounted so the slide transition can play. */
@@ -57,6 +58,7 @@ export const MobileHandSheet = memo(function MobileHandSheet({
   onSkip,
   claimLabel,
 }: MobileHandSheetProps) {
+  const { t } = useLanguage();
   const sheetRef = useRef<HTMLDivElement>(null);
 
   /**
@@ -112,7 +114,7 @@ export const MobileHandSheet = memo(function MobileHandSheet({
         <span className="h-1 w-10 rounded-pill bg-sand/30" />
         <span className="flex w-full items-center justify-between">
           <span className="text-sm font-bold text-coral">
-            Your turn &mdash; {cards.length} card{cards.length !== 1 ? "s" : ""}
+            {t("hand.your_turn").replace("{n}", String(cards.length))}
           </span>
           {collapsed ? (
             <ChevronUp className="w-4 h-4 text-sand" />
@@ -156,12 +158,12 @@ export const MobileHandSheet = memo(function MobileHandSheet({
             {selectedCards.length > 0 ? (
               <button onClick={onPlayClick} className="btn btn-primary w-full">
                 <Send className="w-4 h-4" />
-                Make claim ({selectedCards.length})
+                {t("hand.make_claim_n").replace("{n}", String(selectedCards.length))}
               </button>
             ) : (
               <button onClick={onSkip} className="btn btn-ghost w-full">
                 <SkipForward className="w-4 h-4" />
-                Skip turn
+                {t("hand.skip_turn")}
               </button>
             )}
           </div>

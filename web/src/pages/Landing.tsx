@@ -182,7 +182,11 @@ export default function Landing() {
           {BRAND.tagline[lang]}
         </h1>
         <p className="text-base text-sand mt-3 max-w-md mx-auto">
-          {t("landing.hero_sub")}
+          {/* The count comes from the catalogue rather than the copy. Both
+              languages had a hard-coded number in this sentence, both were
+              already wrong by one, and the first line of the landing page is
+              the worst place in the product to be caught overclaiming. */}
+          {t("landing.hero_sub").replace("{n}", String(GAMES.length))}
         </p>
       </section>
 

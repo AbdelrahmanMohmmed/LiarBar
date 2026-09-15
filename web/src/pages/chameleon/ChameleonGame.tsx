@@ -119,7 +119,8 @@ export default function ChameleonGamePage() {
         {secondsLeft !== null && (
           <span className={`chip font-numeric ${secondsLeft <= 15 ? "chip-hot" : ""}`}>
             <Clock size={12} />
-            {secondsLeft}s
+            {secondsLeft}
+            {t("common.seconds_short")}
           </span>
         )}
       </header>

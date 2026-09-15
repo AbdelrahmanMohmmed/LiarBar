@@ -133,7 +133,8 @@ export default function BluffGamePage() {
         {secondsLeft !== null && (
           <span className={`chip font-numeric ${secondsLeft <= 10 ? "chip-hot" : ""}`}>
             <Clock size={12} />
-            {secondsLeft}s
+            {secondsLeft}
+            {t("common.seconds_short")}
           </span>
         )}
       </header>

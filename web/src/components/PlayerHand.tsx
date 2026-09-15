@@ -2,6 +2,7 @@ import { memo, useCallback } from "react";
 import type { Card as CardType } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Send, Hand } from "lucide-react";
+import { useLanguage } from "@/lib/languageContext";
 import { Card } from "@/components/Card";
 
 interface PlayerHandProps {
@@ -19,6 +20,7 @@ export const PlayerHand = memo(function PlayerHand({
   canPlay,
   onPlayClick,
 }: PlayerHandProps) {
+  const { t } = useLanguage();
   const handleCardClick = useCallback(
     (index: number) => onCardSelect(index),
     [onCardSelect],
@@ -29,7 +31,7 @@ export const PlayerHand = memo(function PlayerHand({
       <div className="bg-[#0d1a0d]/90 backdrop-blur-sm border-t border-amber-900/20 px-4 py-6">
         <div className="flex items-center justify-center text-amber-200/30 text-sm">
           <Hand className="w-4 h-4 mr-2" />
-          No cards in hand
+          {t("hand.no_cards")}
         </div>
       </div>
     );
@@ -40,11 +42,11 @@ export const PlayerHand = memo(function PlayerHand({
       <div className="flex items-center justify-between mb-3 max-w-2xl mx-auto">
         <div className="flex items-center gap-2">
           <span className="text-amber-200/60 text-xs">
-            Your hand &mdash; {cards.length} card{cards.length !== 1 ? "s" : ""}
+            {t("hand.your_hand").replace("{n}", String(cards.length))}
           </span>
           {selectedCards.length > 0 && (
             <span className="text-amber-400 text-xs font-bold bg-amber-900/30 px-2 py-0.5 rounded-full">
-              {selectedCards.length} selected
+              {t("hand.n_selected").replace("{n}", String(selectedCards.length))}
             </span>
           )}
         </div>
@@ -54,12 +56,12 @@ export const PlayerHand = memo(function PlayerHand({
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white font-semibold text-sm shadow-lg shadow-amber-900/30 transition-all active:scale-95"
           >
             <Send className="w-3.5 h-3.5" />
-            Make Claim
+            {t("hand.make_claim")}
           </button>
         )}
         {!canPlay && (
           <span className="text-amber-200/30 text-xs italic">
-            Wait for your turn
+            {t("hand.wait_your_turn")}
           </span>
         )}
       </div>

@@ -3,6 +3,7 @@ import type { GameState, Card, Suit } from "@/lib/types";
 import { SUIT_SYMBOLS, SUIT_COLORS, declarationToString } from "@/lib/types";
 import { Card as CardView, SuitIcon } from "@/components/Card";
 import { useTheme } from "@/lib/themeContext";
+import { useLanguage } from "@/lib/languageContext";
 import { cn } from "@/lib/utils";
 import { Crown, Bot, User, Zap, Clock, Eye } from "lucide-react";
 
@@ -112,14 +113,22 @@ function CardFan({ cards, max = 5, cardBackClass }: { cards: Card[]; max?: numbe
   );
 }
 
-function CardPile({ count, cardBackClass }: { count: number; cardBackClass?: string }) {
+function CardPile({
+  count,
+  cardBackClass,
+  emptyLabel,
+}: {
+  count: number;
+  cardBackClass?: string;
+  emptyLabel: string;
+}) {
   if (count === 0) {
     return (
       <div className="flex flex-col items-center justify-center">
         <div className="w-10 h-14 rounded-lg border-2 border-dashed border-amber-800/30 flex items-center justify-center">
           <span className="text-amber-800/30 text-xs">0</span>
         </div>
-        <p className="text-amber-200/30 text-xs mt-2 font-mono">Empty pile</p>
+        <p className="text-amber-200/30 text-xs mt-2 font-mono">{emptyLabel}</p>
       </div>
     );
   }
@@ -168,6 +177,7 @@ export const GameTable = memo(function GameTable({
   onCardSelect,
 }: GameTableProps) {
   const { assets } = useTheme();
+  const { t } = useLanguage();
   const positions = useMemo(
     () => getPlayerPositions(gameState.players.length),
     [gameState.players.length],
@@ -246,11 +256,16 @@ export const GameTable = memo(function GameTable({
           {/* Center pile */}
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="text-center">
-              <CardPile count={gameState.pileCount} cardBackClass={assets.cardBackClass} />
+              <CardPile
+                count={gameState.pileCount}
+                cardBackClass={assets.cardBackClass}
+                emptyLabel={t("table.empty_pile")}
+              />
 
               {gameState.lastDeclaration && (
                 <p className="text-amber-400/60 text-[10px] mt-1 animate-in fade-in font-mono">
-                  Claim: {declarationToString(gameState.lastDeclaration, gameState.claimType)}
+                  {t("table.claim_label")}{" "}
+                  {declarationToString(gameState.lastDeclaration, gameState.claimType)}
                 </p>
               )}
 
@@ -355,7 +370,7 @@ export const GameTable = memo(function GameTable({
               >
                 {player.name}
                 {isMe && (
-                  <span className="text-amber-400/60 ml-0.5">(you)</span>
+                  <span className="text-amber-400/60 ml-0.5">({t("table.you")})</span>
                 )}
               </p>
 
@@ -381,7 +396,10 @@ export const GameTable = memo(function GameTable({
               {isCurrent && gameState.phase === "playing" && turnCountdown !== null && (
                 <div className="flex items-center gap-0.5 text-amber-400 font-mono text-[9px] sm:text-[10px] font-bold mt-0.5 animate-pulse bg-amber-950/60 border border-amber-500/20 px-1.5 py-0.5 rounded-full shrink-0">
                   <Clock className="w-3 h-3 text-amber-400" />
-                  <span>{turnCountdown}s</span>
+                  <span>
+                    {turnCountdown}
+                    {t("common.seconds_short")}
+                  </span>
                 </div>
               )}
 

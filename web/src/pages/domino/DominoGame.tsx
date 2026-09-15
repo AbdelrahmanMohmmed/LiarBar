@@ -556,7 +556,8 @@ function SeatCard({
               secondsLeft <= 5 ? "text-ruby" : "text-sand"
             }`}
           >
-            {secondsLeft}s
+            {secondsLeft}
+            {t("common.seconds_short")}
           </span>
         )}
       </div>

@@ -529,14 +529,23 @@ export default function Game() {
           Hidden while the mobile hand sheet is up so it can't cover the
           sheet's Skip/Make Claim button, which sits in the same corner. */}
       <div
-        className="fixed left-1/2 -translate-x-1/2 z-[90] w-[calc(100%-2rem)] max-w-[420px] rounded-3xl border border-border bg-surface/95 backdrop-blur-xl shadow-3 overflow-hidden flex flex-col transition-all duration-300"
+        className="fixed left-1/2 z-[90] w-[calc(100%-2rem)] max-w-[420px] rounded-3xl border border-border bg-surface/95 backdrop-blur-xl shadow-3 overflow-hidden flex flex-col transition-all duration-300"
         style={{
           // Clears the party dock. A fixed element can't be pushed by the
           // body padding that handles everything in normal flow, so it has to
           // offset itself — otherwise the dock sits squarely on top of it.
           bottom: "calc(12px + var(--party-dock-h))",
           height: chatOpen ? 300 : 48,
-          transform: showMobileHandSheet ? "translateY(150%)" : "translateY(0)",
+          // The X half is what centres this against `left: 50%`, and it has to
+          // live in the same declaration as the Y half: `transform` is one
+          // property, so an inline `translateY(...)` silently replaced the
+          // `-translate-x-1/2` class that used to be on the element — and the
+          // pill sat with 156 of its 343 pixels off the right of the screen,
+          // in both languages, for as long as the slide-away animation has
+          // existed.
+          transform: showMobileHandSheet
+            ? "translate(-50%, 150%)"
+            : "translate(-50%, 0)",
           opacity: showMobileHandSheet ? 0 : 1,
           pointerEvents: showMobileHandSheet ? "none" : "auto",
         }}

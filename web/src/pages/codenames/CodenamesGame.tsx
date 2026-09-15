@@ -661,7 +661,16 @@ export default function CodenamesGame() {
                       boxSizing: "border-box",
                       fontFamily: boardFont(codenamesState.language),
                       fontWeight: 800,
-                      fontSize: codenamesState.language === "ar" ? "clamp(12px, 3.5vw, 18px)" : "clamp(11px, 3vw, 16px)",
+                      // Arabic runs smaller here on purpose. The cards wrap
+                      // long words rather than overflow the phone, and a
+                      // broken Arabic word is worse than a broken English one:
+                      // the letters disconnect, so "مستودع" split across two
+                      // lines stops looking like the word at all. A smaller
+                      // size means far fewer words ever reach that point.
+                      fontSize:
+                        codenamesState.language === "ar"
+                          ? "clamp(10px, 3vw, 17px)"
+                          : "clamp(11px, 3vw, 16px)",
                       userSelect: "none",
                       boxShadow,
                       transform,
