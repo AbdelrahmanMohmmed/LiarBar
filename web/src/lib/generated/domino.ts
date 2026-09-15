@@ -87,7 +87,13 @@ export interface DominoRecap {
   nextRoundAt: number | null;
 }
 
-/** One player as it appears in the shared room envelope. */
+/**
+ * One player as it appears in the shared room envelope.
+ *
+ * Mirrors `Player.toPublicData()` on the server. `icon` and `characterId` are
+ * chosen in the lobby (a board token, a fighter) and are genuinely public —
+ * every client renders them next to the name.
+ */
 export interface RoomPlayerLite {
   id: string;
   name: string;
@@ -95,7 +101,13 @@ export interface RoomPlayerLite {
   isHost: boolean;
   isConnected: boolean;
   flag?: string;
+  /** Emoji token for board games (Rento, Snakes & Ladders). */
+  icon?: string;
+  /** Chosen fighter, for the Fighter game. */
+  characterId?: string;
+  avatarUrl?: string;
   cardCount: number;
+  /** Always empty in public state; the owner's hand arrives on a private event. */
   hand: never[];
 }
 

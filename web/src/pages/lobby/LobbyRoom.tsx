@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useGame } from "@/lib/gameContext";
 import { useLanguage } from "@/lib/languageContext";
@@ -34,6 +34,7 @@ export default function LobbyRoom() {
   const { roomId: paramRoomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
   const {
+    partyState,
     lobbyState,
     myPlayerId,
     myRoomId,
@@ -50,6 +51,27 @@ export default function LobbyRoom() {
     setPlayerCharacter,
   } = useGame();
   const { t, lang } = useLanguage();
+
+  /**
+   * This shell predates the party model and was written against LobbyState.
+   * A party is the same shape with one different word for its idle phase, so
+   * rather than rewriting ~900 lines of markup, it normalises whichever one it
+   * was given.
+   *
+   * Without this, every arcade game reached through a party — tic-tac-toe,
+   * tetris, snake, memory, space invaders, fighter, snakes & ladders, seven of
+   * the twelve games in the picker — rendered a "join this lobby" form to
+   * players who were already in the room.
+   */
+  const shell = useMemo(() => {
+    if (partyState) {
+      return {
+        ...partyState,
+        phase: partyState.phase === "hub" ? ("lobby" as const) : ("playing" as const),
+      };
+    }
+    return lobbyState;
+  }, [partyState, lobbyState]);
 
   const [chatInput, setChatInput] = useState("");
   const [reconnected, setReconnected] = useState(false);
@@ -102,16 +124,18 @@ export default function LobbyRoom() {
   // Memory Puzzle options
   const [mpDifficulty, setMpDifficulty] = useState<"easy" | "medium" | "hard">("medium");
 
-  const isInRoom = myPlayerId && lobbyState?.players.some((p) => p.id === myPlayerId);
-  const me = lobbyState?.players.find((p) => p.id === myPlayerId);
+  const isInRoom = myPlayerId && shell?.players.some((p) => p.id === myPlayerId);
+  const me = shell?.players.find((p) => p.id === myPlayerId);
   const isHost = me?.isHost === true;
 
   useEffect(() => {
     if (reconnected) return;
-    const storedRoomId = localStorage.getItem("liarsbar_roomId");
-    const storedPlayerId = localStorage.getItem("liarsbar_playerId");
+    const storedRoomId =
+      localStorage.getItem("lamma_roomId") ?? localStorage.getItem("liarsbar_roomId");
+    const storedPlayerId =
+      localStorage.getItem("lamma_playerId") ?? localStorage.getItem("liarsbar_playerId");
 
-    if (storedRoomId === paramRoomId && storedPlayerId && !lobbyState) {
+    if (storedRoomId === paramRoomId && storedPlayerId && !shell) {
       reconnectRoom(storedRoomId, storedPlayerId)
         .then(() => {
           setReconnected(true);
@@ -121,10 +145,10 @@ export default function LobbyRoom() {
         });
     } else if (paramRoomId === myRoomId && isInRoom) {
       setReconnected(true);
-    } else if (!lobbyState && !storedPlayerId) {
+    } else if (!shell && !storedPlayerId) {
       setReconnected(true);
     }
-  }, [paramRoomId, myRoomId, lobbyState, reconnectRoom, reconnected, isInRoom]);
+  }, [paramRoomId, myRoomId, shell, reconnectRoom, reconnected, isInRoom]);
 
   const handleJoinRoom = useCallback(async () => {
     if (!joinName.trim()) {
@@ -245,7 +269,7 @@ export default function LobbyRoom() {
   }
 
   // Join prompt screen
-  if (!lobbyState || !isInRoom) {
+  if (!shell || !isInRoom) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-[#120717] via-[#1a0a20] to-[#120717] flex flex-col items-center justify-center p-4">
         <div className="w-full max-w-md bg-[#190c1f]/90 border border-purple-900/30 shadow-2xl rounded-2xl p-6 space-y-4">
@@ -292,7 +316,7 @@ export default function LobbyRoom() {
   }
 
   // Inline render game screen if a sub-game is active!
-  if (lobbyState.activeGameId) {
+  if (shell.activeGameId) {
     return (
       <div className="relative min-h-screen bg-[#0d070f]">
         {/* Floating Return to Lobby button for host */}
@@ -314,17 +338,17 @@ export default function LobbyRoom() {
         </div>
 
         {/* Inline Game Views */}
-        {lobbyState.activeGameId === "liars-bar" && <Game />}
-        {lobbyState.activeGameId === "codenames" && <CodenamesGame />}
-        {lobbyState.activeGameId === "higher-lower" && <HigherLowerGame />}
-        {lobbyState.activeGameId === "snake" && <SnakeLobbyGame />}
-        {lobbyState.activeGameId === "tictactoe" && <TicTacToeLobbyGame />}
-        {lobbyState.activeGameId === "space-invaders" && <SpaceInvadersLobbyGame />}
-        {lobbyState.activeGameId === "fighter" && <FighterLobbyGame />}
-        {lobbyState.activeGameId === "memory-puzzle" && <MemoryPuzzleLobbyGame />}
-        {lobbyState.activeGameId === "tetris" && <TetrisLobbyGame />}
-        {lobbyState.activeGameId === "rento" && <RentoLobbyGame />}
-        {lobbyState.activeGameId === "snake-ladder" && <SnakeLadderLobbyGame />}
+        {shell.activeGameId === "liars-bar" && <Game />}
+        {shell.activeGameId === "codenames" && <CodenamesGame />}
+        {shell.activeGameId === "higher-lower" && <HigherLowerGame />}
+        {shell.activeGameId === "snake" && <SnakeLobbyGame />}
+        {shell.activeGameId === "tictactoe" && <TicTacToeLobbyGame />}
+        {shell.activeGameId === "space-invaders" && <SpaceInvadersLobbyGame />}
+        {shell.activeGameId === "fighter" && <FighterLobbyGame />}
+        {shell.activeGameId === "memory-puzzle" && <MemoryPuzzleLobbyGame />}
+        {shell.activeGameId === "tetris" && <TetrisLobbyGame />}
+        {shell.activeGameId === "rento" && <RentoLobbyGame />}
+        {shell.activeGameId === "snake-ladder" && <SnakeLadderLobbyGame />}
       </div>
     );
   }
@@ -367,12 +391,12 @@ export default function LobbyRoom() {
             <div className="flex items-center gap-2 border-b border-purple-950/30 pb-3">
               <Users className="w-5 h-5 text-purple-400" />
               <h2 className="font-bold text-sm uppercase tracking-wider text-purple-300">
-                Party Members ({lobbyState.players.length})
+                Party Members ({shell.players.length})
               </h2>
             </div>
             
             <div className="flex-1 space-y-2 overflow-y-auto max-h-[300px] md:max-h-[none]">
-              {lobbyState.players.map((player) => (
+              {shell.players.map((player) => (
                 <div
                   key={player.id}
                   className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
@@ -410,7 +434,7 @@ export default function LobbyRoom() {
               ))}
             </div>
 
-            {!lobbyState.activeGameId && (
+            {!shell.activeGameId && (
               <div className="border-t border-purple-950/30 pt-3 space-y-3">
                 <div>
                   <p className="text-[10px] uppercase tracking-wider text-purple-300/60 font-bold mb-2">
@@ -418,7 +442,7 @@ export default function LobbyRoom() {
                   </p>
                   <div className="grid grid-cols-6 gap-1.5">
                     {PIECE_ICONS.map((icon) => {
-                      const me = lobbyState.players.find((p) => p.id === myPlayerId);
+                      const me = shell.players.find((p) => p.id === myPlayerId);
                       const active = me?.icon === icon;
                       return (
                         <button
@@ -443,7 +467,7 @@ export default function LobbyRoom() {
                   </p>
                   <div className="grid grid-cols-4 gap-1.5">
                     {CHARACTERS.map((ch) => {
-                      const me = lobbyState.players.find((p) => p.id === myPlayerId);
+                      const me = shell.players.find((p) => p.id === myPlayerId);
                       const active = (me?.characterId ?? "cat") === ch.id;
                       return (
                         <button
@@ -953,7 +977,7 @@ export default function LobbyRoom() {
                   </p>
                 ) : (
                   chatMessages.map((msg, i) => {
-                    const sender = lobbyState.players.find((p) => p.id === msg.playerId);
+                    const sender = shell.players.find((p) => p.id === msg.playerId);
                     return (
                       <div key={i} className="text-xs">
                         <div className="flex items-baseline gap-1.5">
