@@ -390,6 +390,17 @@ export class DominoGame implements GameRoom {
     const next = (this.activeSeat + 1) % this.seatOrder.length;
     this.beginTurn(next);
     this.lastActivityAt = Date.now();
+    // Private state AFTER the seat moves, not before.
+    //
+    // `playable` is computed as "legal plays, if it is your turn", and the
+    // callers that push private state do it while finishing the *previous*
+    // player's move — at which point it is still not your turn, so your
+    // playable list is empty. Nothing re-sent it once the turn actually
+    // arrived, so every tile in your hand rendered dimmed and the only control
+    // offered was Knock. Every turn. The game was unplayable by a human and
+    // looked exactly like a rules bug, because the public state was correct
+    // and only the private slice was wrong.
+    this.callbacks.onHandsChanged(this.roomId);
     this.broadcast();
   }
 
