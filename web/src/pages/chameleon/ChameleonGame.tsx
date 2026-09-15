@@ -138,7 +138,7 @@ export default function ChameleonGamePage() {
               {t("chameleon.you_are_it")}
             </p>
           ) : (
-            <p className="text-sm text-mint">
+            <p className="text-sm text-live">
               {t("chameleon.secret_is")}{" "}
               <strong className="font-display text-base">
                 {secretIndex !== null ? state.topic?.words[secretIndex][lang] : "…"}
@@ -291,7 +291,7 @@ export default function ChameleonGamePage() {
                     {seat.clue ?? "—"}
                   </span>
                   {seat.hasVoted && (
-                    <span className="text-[10px] text-mint shrink-0">
+                    <span className="text-[10px] text-live shrink-0">
                       {t("chameleon.voted")}
                     </span>
                   )}

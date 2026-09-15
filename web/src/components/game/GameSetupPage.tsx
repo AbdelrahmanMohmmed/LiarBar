@@ -214,7 +214,7 @@ export default function GameSetupPage({
 
       {voiceNote && (
         <div className="flex items-start gap-2.5 surface rounded-lg p-3 mb-4 border-mint/30">
-          <Mic size={16} className="text-mint mt-0.5 shrink-0" />
+          <Mic size={16} className="text-live mt-0.5 shrink-0" />
           <p className="text-xs text-sand">{voiceNote}</p>
         </div>
       )}

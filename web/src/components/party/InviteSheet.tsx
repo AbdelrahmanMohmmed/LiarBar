@@ -118,7 +118,7 @@ export default function InviteSheet({ roomCode, gameName, open, onClose }: Props
           <div className="mt-2 text-xs text-sand inline-flex items-center gap-1.5">
             {copied === "code" ? (
               <>
-                <Check size={13} className="text-mint" />
+                <Check size={13} className="text-live" />
                 {t("party.copied")}
               </>
             ) : (
@@ -154,7 +154,7 @@ export default function InviteSheet({ roomCode, gameName, open, onClose }: Props
         >
           <span className="truncate text-sm text-sand">{link}</span>
           {copied === "link" ? (
-            <Check size={16} className="text-mint shrink-0" />
+            <Check size={16} className="text-live shrink-0" />
           ) : (
             <Copy size={16} className="text-sand shrink-0" />
           )}

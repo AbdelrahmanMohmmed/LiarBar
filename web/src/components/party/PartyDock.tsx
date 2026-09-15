@@ -157,7 +157,7 @@ export default function PartyDock() {
                     of voice state worth permanent screen space: it answers
                     "who said that" without anyone having to say their name. */}
                 {speakerLabel ? (
-                  <span className="text-xs text-mint truncate">{speakerLabel}</span>
+                  <span className="text-xs text-live truncate">{speakerLabel}</span>
                 ) : (
                   activeMeta && (
                     <span className="text-xs text-sand truncate hidden xs:inline">

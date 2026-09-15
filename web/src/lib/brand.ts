@@ -131,7 +131,7 @@ export const COLORS = {
 
   /** Reserved for realtime/"live" state only: connected, voice on, your turn. */
   mint: "#3AA6A6",
-  mintDim: "#2E8585",
+  mintDim: "#257070",
 
   /** Scores, wins, the room code. Used sparingly so it stays special. */
   gold: "#9A5B00",

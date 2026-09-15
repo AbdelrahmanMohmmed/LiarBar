@@ -182,7 +182,7 @@ export default function SpyfallGamePage() {
               </>
             ) : (
               <>
-                <MapPin size={24} className="mx-auto text-mint mb-2" />
+                <MapPin size={24} className="mx-auto text-live mb-2" />
                 <p className="font-display text-2xl text-cream">
                   {state.locationName?.[lang]}
                 </p>

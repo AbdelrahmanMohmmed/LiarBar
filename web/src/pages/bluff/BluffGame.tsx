@@ -179,7 +179,7 @@ export default function BluffGamePage() {
           </div>
 
           {myAnswer && (
-            <p className="text-center text-sm text-mint mt-3">
+            <p className="text-center text-sm text-live mt-3">
               {t("bluff.written")}
               <span dir={boardDir} className="block text-cream font-display mt-1">
                 “{myAnswer}”
@@ -231,7 +231,7 @@ export default function BluffGamePage() {
             })}
           </ul>
           {myChoiceId && (
-            <p className="text-center text-sm text-mint mt-3">{t("bluff.chosen")}</p>
+            <p className="text-center text-sm text-live mt-3">{t("bluff.chosen")}</p>
           )}
         </section>
       )}
@@ -321,20 +321,20 @@ export default function BluffGamePage() {
               {/* Whether they've acted, never what they wrote or picked. */}
               {state.phase === "writing" && (
                 <span
-                  className={`text-[10px] ${seat.hasWritten ? "text-mint" : "text-sand"}`}
+                  className={`text-[10px] ${seat.hasWritten ? "text-live" : "text-sand"}`}
                 >
                   {seat.hasWritten ? t("wyr.locked") : t("wyr.thinking")}
                 </span>
               )}
               {state.phase === "choosing" && (
                 <span
-                  className={`text-[10px] ${seat.hasChosen ? "text-mint" : "text-sand"}`}
+                  className={`text-[10px] ${seat.hasChosen ? "text-live" : "text-sand"}`}
                 >
                   {seat.hasChosen ? t("wyr.locked") : t("wyr.thinking")}
                 </span>
               )}
               {state.phase === "reveal" && seat.roundPoints > 0 && (
-                <span className="text-[10px] text-mint font-numeric">
+                <span className="text-[10px] text-live font-numeric">
                   +{seat.roundPoints}
                 </span>
               )}

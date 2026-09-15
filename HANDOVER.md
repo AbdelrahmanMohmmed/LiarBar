@@ -5,17 +5,19 @@ in detail; this is the map.
 
 ---
 
-## Read this first: three decisions I made for you
+## Read this first
 
-**1. The brand ships as "Lamma" (لمّة).** It means *the get-together* — the
-gathering of friends — which is literally what the product is. Five letters,
-identical in Arabic and English, and it doubles as the invitation ("يلا لمّة؟").
+**1. The rename and the redesign were reverted at your request.** I proposed
+"Lamma" and a dark ink-and-coral palette; you asked for Safariyat Games and the
+old cream-and-ink system back, and that is what ships. The argument for renaming
+is still in [`docs/BRANDING.md`](docs/BRANDING.md), marked as a rejected
+proposal, in case you want the domain shortlist later. Nothing about hosting
+changed either way.
 
-It is **one line to revert**: `web/src/lib/brand.ts` → `name`. The domain
-constant still points at `games.safariyat.live`, so nothing about hosting
-changed. [`docs/BRANDING.md`](docs/BRANDING.md) has the full argument, a ranked
-domain shortlist for you to register, and seven alternative names if you dislike
-this one.
+Domino also lost everything that was sitting above the board — scoreboard, seat
+cards, the reading-the-table panel — and no longer dims the tiles that don't
+fit. Working out what you can play is the game; the screen had been doing it
+for you.
 
 **2. Domino is a different game now.** Egyptian street rules — partners across
 the table, all 28 tiles dealt, no boneyard, knock when you're stuck, race to

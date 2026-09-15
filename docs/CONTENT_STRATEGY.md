@@ -49,8 +49,9 @@ decision is downstream of protecting that sentence.
 thousand apps that have the same five-star screenshots and a better ad budget.
 
 Sell **the night**, not the game. The product is the hour your friends spend
-together; domino is just what was on the table. That's also why the brand is
-لمّة and not a game name — see [BRANDING.md](BRANDING.md).
+together; domino is just what was on the table. That is also the argument for
+a brand name that isn't a game name — see [BRANDING.md](BRANDING.md), which
+proposes one and was not acted on.
 
 **The competition is not other game apps.** It is:
 - The group chat going quiet at 11pm.

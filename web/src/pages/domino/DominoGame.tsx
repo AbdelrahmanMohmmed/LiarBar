@@ -525,7 +525,7 @@ function RoundRecap({
                 />
               ))}
               {(recap.handsBySeat[seat.seat] ?? []).length === 0 && (
-                <span className="text-xs text-mint">{t("domino.went_out")}</span>
+                <span className="text-xs text-live">{t("domino.went_out")}</span>
               )}
             </div>
             <span className="font-numeric text-sm text-sand w-7 text-end shrink-0">

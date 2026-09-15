@@ -227,7 +227,7 @@ export default function TabooGamePage() {
               <span
                 className={
                   result.outcome === "correct"
-                    ? "text-mint text-xs"
+                    ? "text-live text-xs"
                     : result.outcome === "buzzed"
                       ? "text-ruby text-xs"
                       : "text-sand text-xs"
@@ -259,7 +259,7 @@ export default function TabooGamePage() {
                 <span
                   className={
                     result.outcome === "correct"
-                      ? "text-mint text-xs"
+                      ? "text-live text-xs"
                       : result.outcome === "buzzed"
                         ? "text-ruby text-xs"
                         : "text-sand text-xs"

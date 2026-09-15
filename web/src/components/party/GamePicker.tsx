@@ -235,7 +235,7 @@ export default function GamePicker({
                     )}
                     {c.spec.voiceMatters && (
                       <span
-                        className="inline-flex items-center gap-1 text-mint"
+                        className="inline-flex items-center gap-1 text-live"
                         title={t("party.voice_recommended")}
                       >
                         <Mic size={12} />

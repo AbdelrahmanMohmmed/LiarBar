@@ -28,7 +28,7 @@ export default function SpyfallHome() {
       voiceNote={t("spyfall.voice_required")}
       hero={
         <div className="flex gap-3">
-          <span className="grid place-items-center w-12 h-12 rounded-lg bg-mint/15 text-mint">
+          <span className="grid place-items-center w-12 h-12 rounded-lg bg-mint/15 text-live">
             <MapPin size={22} />
           </span>
           <span className="grid place-items-center w-12 h-12 rounded-lg bg-ruby/15 text-ruby">

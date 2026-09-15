@@ -1,5 +1,13 @@
 # Branding
 
+> ### This is a proposal, and it was rejected.
+>
+> The product ships as **Safariyat Games**. The rename argued for below was
+> tried and reverted at the owner's request, along with the design system that
+> came with it. Everything here is kept because the *reasoning* is still the
+> reasoning — if the name is ever revisited, this is the argument and the
+> shortlist. Nothing in this file describes what is currently live.
+
 > **The whole brand is one file.** Everything the user sees — name, tagline,
 > domain, colours, social handles — comes from [`web/src/lib/brand.ts`](../web/src/lib/brand.ts).
 > Changing the brand is editing that file, not grepping the codebase.

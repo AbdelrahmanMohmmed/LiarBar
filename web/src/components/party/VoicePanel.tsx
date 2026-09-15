@@ -162,7 +162,7 @@ export default function VoicePanel({ players }: { players: PlayerData[] }) {
               />
               <span
                 className={`text-xs truncate w-20 shrink-0 transition-colors ${
-                  speaking ? "text-mint font-bold" : "text-sand"
+                  speaking ? "text-live font-bold" : "text-sand"
                 }`}
               >
                 {isMe ? t("party.you") : player.name}

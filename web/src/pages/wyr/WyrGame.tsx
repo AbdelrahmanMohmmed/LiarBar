@@ -163,7 +163,7 @@ export default function WyrGamePage() {
                   )}
                 </span>
 
-                {wasAnswer && <Check size={22} className="text-mint shrink-0 relative z-10" />}
+                {wasAnswer && <Check size={22} className="text-live shrink-0 relative z-10" />}
                 {chosen && !wasAnswer && showResult && (
                   <X size={22} className="text-ruby shrink-0 relative z-10" />
                 )}
@@ -191,7 +191,7 @@ export default function WyrGamePage() {
 
       {/* ---- Waiting / locked in ---- */}
       {myChoice && !showResult && (
-        <p className="text-center text-sm text-mint mb-4">
+        <p className="text-center text-sm text-live mb-4">
           {isSubject ? t("wyr.locked_answer") : t("wyr.locked_guess")}
         </p>
       )}
@@ -262,7 +262,7 @@ export default function WyrGamePage() {
                   {/* During predicting: only whether they've locked in, never what. */}
                   {state.phase === "predicting" && !isSubjectRow && (
                     <span
-                      className={`text-[10px] ${seat.hasPredicted ? "text-mint" : "text-sand"}`}
+                      className={`text-[10px] ${seat.hasPredicted ? "text-live" : "text-sand"}`}
                     >
                       {seat.hasPredicted ? t("wyr.locked") : t("wyr.thinking")}
                     </span>
@@ -270,7 +270,7 @@ export default function WyrGamePage() {
                   {showResult && seat.correct !== undefined && !isSubjectRow && (
                     <span className="shrink-0">
                       {seat.correct ? (
-                        <Check size={13} className="text-mint" />
+                        <Check size={13} className="text-live" />
                       ) : (
                         <X size={13} className="text-ruby" />
                       )}

@@ -42,7 +42,7 @@
 
     /* Reserved for realtime state ONLY: connected, voice live, your turn. */
     --mint: 180 48% 44%;      /* #3AA6A6 — the old teal */
-    --mint-dim: 180 49% 35%;  /* #2E8585 */
+    --mint-dim: 180 50% 29%;  /* #257070 — 5.3:1 on cream, so it works as text */
 
     /* Dark enough to read as text on cream, which the old peach was not. */
     --gold: 36 100% 30%;      /* #9A5B00 scores, room code, wins */
@@ -75,7 +75,13 @@
     --accent-foreground: var(--cream);
     --destructive: var(--ruby);
     --destructive-foreground: var(--on-accent);
-    --live: var(--mint);
+    /*
+     * `--mint` is the fill: a teal button, a teal tint behind a chip. As TEXT
+     * on cream it measures 2.9:1, which is unreadable at the 10px these status
+     * labels use — so the semantic "live" colour, which is the one components
+     * put on text, is the darker teal. Same meaning, same hue, legible.
+     */
+    --live: var(--mint-dim);
 
     --border: var(--ink-500);
     --input: var(--ink-500);

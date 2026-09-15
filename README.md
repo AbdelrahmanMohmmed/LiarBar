@@ -1,11 +1,12 @@
-# Lamma — لمّة
+# Safariyat Games
 
 **Online party games you play with your friends in one browser tab.**
 One room, one link, a dozen games, and voice chat that doesn't drop when you
 switch between them.
 
 > Live at https://games.safariyat.live
-> The brand name lives in one file — see [docs/BRANDING.md](docs/BRANDING.md).
+> The brand name lives in one file — see [docs/BRANDING.md](docs/BRANDING.md),
+> which argues for renaming and was not acted on.
 
 ---
 

@@ -34,31 +34,50 @@ That single fact decides most of the design:
 
 ### The palette
 
+This is the original cream-and-ink system. A dark palette briefly replaced it
+and was reverted; if you find a doc or a comment describing a warm near-black
+ground, it is describing the version that is gone.
+
 | Token | Hex | Role |
 |---|---|---|
-| `--ink-900` | `#14100E` | Page ground |
-| `--ink-800` | `#1C1714` | Sunken (inputs, wells) |
-| `--ink-700` | `#251E1A` | Cards, sheets, the table |
-| `--ink-600` | `#332A24` | Raised / hover |
-| `--ink-500` | `#43382F` | Hairlines, dividers |
-| `--cream`   | `#F5EDE2` | Body text |
-| `--sand`    | `#B9A895` | Secondary text |
-| `--coral`   | `#E8563F` | **The** accent — every primary action |
-| `--mint`    | `#3BD9A4` | Realtime state ONLY |
-| `--gold`    | `#F2B441` | Scores, room codes, wins |
-| `--ruby`    | `#E23D57` | Errors, elimination |
-| `--violet`  | `#9A6BF0` | Team B / secondary game accent |
-| `--sky`     | `#4EA8F5` | Team A / info |
+| `--ink-900` | `#FDF6EC` | Page ground — cream |
+| `--ink-800` | `#FFFFFF` | Inputs and wells |
+| `--ink-700` | `#FFFFFF` | Cards, sheets, panels |
+| `--ink-600` | `#E7E1D8` | Raised / hover / disabled fill |
+| `--ink-500` | `#2B2420` | Borders — 2px and solid |
+| `--cream`   | `#2B2420` | Body text — ink |
+| `--sand`    | `#5B5147` | Secondary text |
+| `--on-accent` | `#FDF6EC` | Text that sits ON a filled accent |
+| `--coral`   | `#E8574A` | **The** accent — every primary action |
+| `--mint`    | `#3AA6A6` | Realtime state ONLY (fills) |
+| `--live`    | `#257070` | Realtime state as **text** — see below |
+| `--gold`    | `#9A5B00` | Scores, room codes, wins |
+| `--ruby`    | `#B3261E` | Errors, elimination |
+| `--violet`  | `#6B4FBB` | Team B / secondary game accent |
+| `--sky`     | `#2D7FB8` | Team A / info |
+
+**The token names describe a role, not a colour.** `--ink-900` is "the page
+ground" and `--cream` is "body text"; on this palette they hold values their
+names do not suggest. That is deliberate and it is the cheaper of two bad
+options — the alternative was renaming every token at several hundred call
+sites to survive a palette change. Components depend on the role.
+
+**`--mint` and `--live` are the same hue at two lightnesses, for a reason.**
+Mint is the fill: a teal button, a teal tint behind a chip. On cream it
+measures 2.9:1 as text, which is unreadable at the 10px these status labels
+use — so `--live`, which is the one components put on *text*, is darker and
+measures 5.3:1. Same meaning, same hue, legible.
 
 ### Three decisions worth defending
 
-**1. The ground is warm, not black.**
-`#14100E`, not `#000000`. Pure black on an OLED phone is a physically-off pixel,
-so a black background reads as a hole punched in the device rather than as a
-surface. Every shadow placed on it looks like dirt because there is nothing for
-the shadow to be *on*. A warm near-black gives the elevation system something to
-work against, and it matches the physical objects the games are about — a felt
-table, wooden tiles, a dim room.
+**1. The ground is cream, and elevation comes from outlines.**
+`#FDF6EC`, with 2px ink borders and hard offset shadows (`2px 2px 0`, `4px 4px
+0`, `6px 6px 0` in ink) rather than blurs. A panel is a white card with an
+outline and a solid shadow behind it — something printed and laid on the page.
+
+This is the part that is easy to get wrong when adding a screen: a soft blurred
+shadow on cream does not read as elevation, it reads as a smudge. If a new
+surface looks wrong next to an old one, that is almost always why.
 
 **2. There is exactly one accent colour.**
 Coral. Every primary action across fifteen games is the same colour. The
@@ -89,19 +108,20 @@ new third-party button may claim the exception; a new *game* may not.
 
 ### Contrast (WCAG 2.1)
 
-Checked against the surfaces the token is actually used on.
+Checked against the surfaces the token is actually used on, and re-measured in
+the running app after the palette was restored — that pass is what caught the
+live and hot chips at 2.7:1 and the language toggle at 1.2:1.
 
 | Foreground | Background | Ratio | Verdict |
 |---|---|---|---|
-| `--cream` `#F5EDE2` | `--ink-900` `#14100E` | **15.9 : 1** | AAA (all sizes) |
-| `--cream` | `--ink-700` `#251E1A` | **12.4 : 1** | AAA |
-| `--sand` `#B9A895` | `--ink-900` | **8.1 : 1** | AAA |
-| `--sand` | `--ink-700` | **6.3 : 1** | AAA normal text |
-| `--coral` `#E8563F` | `--ink-900` | **4.9 : 1** | AA normal text |
-| `--mint` `#3BD9A4` | `--ink-900` | **10.4 : 1** | AAA |
-| `--gold` `#F2B441` | `--ink-900` | **9.9 : 1** | AAA |
-| `#FFFFFF` | `--coral` (button fill) | **3.6 : 1** | AA for ≥18.66px bold — **which is why `.btn` is 700 weight and never below 0.85rem** |
-| `--ink-900` | `--mint` (button fill) | **9.4 : 1** | AAA |
+| `--cream` `#2B2420` | `--ink-900` `#FDF6EC` | **14.6 : 1** | AAA (all sizes) |
+| `--cream` | `#FFFFFF` panel | **15.7 : 1** | AAA |
+| `--sand` `#5B5147` | `--ink-900` | **7.6 : 1** | AAA |
+| `--gold` `#9A5B00` | `--ink-900` | **5.4 : 1** | AA normal text |
+| `--live` `#257070` | `--ink-900` | **5.3 : 1** | AA normal text |
+| `--mint` `#3AA6A6` | `--ink-900` | **2.9 : 1** | **text: no.** Fills only — this is what `--live` exists for |
+| `--on-accent` `#FDF6EC` | `--coral` (button fill) | **3.3 : 1** | AA for ≥18.66px bold — **which is why `.btn` is 700 weight and never below 0.85rem** |
+| `--on-accent` | `--mint` (button fill) | **2.7 : 1** | Below AA. Inherited from the original system, which did exactly this; kept for fidelity, and it is why teal is never used for a button carrying text you must read |
 
 Two things to hold onto:
 
