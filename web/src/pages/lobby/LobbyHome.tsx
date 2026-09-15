@@ -65,18 +65,11 @@ export default function LobbyHome() {
     }
     setIsLoading(true);
     try {
-      const { roomId } = await createRoom(
-        playerName.trim(),
-        parseInt(maxPlayers, 10),
-        "cards",
-        2,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        "lobby"
-      );
+      const { roomId } = await createRoom({
+        playerName: playerName.trim(),
+        gameId: "party",
+        maxPlayers: parseInt(maxPlayers, 10),
+      });
       navigate(`/lobby/${roomId}`);
     } catch (err) {
       addToast(err instanceof Error ? err.message : "Failed to create lobby", "error");

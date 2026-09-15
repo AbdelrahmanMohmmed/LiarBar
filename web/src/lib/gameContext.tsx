@@ -27,33 +27,58 @@ import type {
   RentoState,
 } from "./types";
 
+/**
+ * Everything the client can ask the server to do about a room.
+ *
+ * `createRoom` takes an options object. It used to take 23 positional
+ * parameters, which meant every call site was a column of `undefined`s
+ * counted by hand — and the domino setup page had a "karak" toggle wired to
+ * nothing at all, because there was no 24th slot to put it in and nobody
+ * noticed the value being dropped. An options object makes adding a game
+ * setting a one-line change that cannot silently go nowhere.
+ */
+export interface CreateRoomInput {
+  playerName: string;
+  /** Server gameId. Omit for a hub-only party with no game chosen yet. */
+  gameId?: string;
+  maxPlayers: number;
+  flag?: string;
+
+  // Liar's Bar
+  variant?: GameVariant;
+  deckCount?: number;
+  claimType?: ClaimType;
+  revealTime?: number;
+  theme?: GameTheme;
+  challengeMode?: ChallengeMode;
+  challengeDuration?: number;
+
+  // Codenames
+  language?: CodenamesLang;
+
+  // Domino
+  gameMode?: "individual" | "teams";
+  targetScore?: number;
+  turnTimeLimit?: number;
+  tableTheme?: string;
+  tileTheme?: string;
+  karakBonus?: boolean;
+
+  // Rento
+  startingBalance?: number;
+  jailEnabled?: boolean;
+  freeParkingBonus?: number;
+  turnTimer?: number;
+  aiDifficulty?: "easy" | "medium" | "hard";
+  mapId?: string;
+  backgroundId?: string;
+
+  // Memory puzzle
+  difficulty?: "easy" | "medium" | "hard";
+}
+
 interface GameActions {
-  createRoom: (
-    playerName: string,
-    maxPlayers: number,
-    variant: GameVariant,
-    deckCount: number,
-    claimType?: ClaimType,
-    revealTime?: number,
-    theme?: GameTheme,
-    challengeMode?: ChallengeMode,
-    challengeDuration?: number,
-    gameId?: string,
-    language?: CodenamesLang,
-    gameMode?: "individual" | "teams",
-    targetScore?: number,
-    turnTimeLimit?: number,
-    tableTheme?: string,
-    tileTheme?: string,
-    startingBalance?: number,
-    jailEnabled?: boolean,
-    freeParkingBonus?: number,
-    turnTimer?: number,
-    aiDifficulty?: "easy" | "medium" | "hard",
-    flag?: string,
-    mapId?: string,
-    backgroundId?: string,
-  ) => Promise<{ roomId: string; playerId: string }>;
+  createRoom: (input: CreateRoomInput) => Promise<{ roomId: string; playerId: string }>;
   joinRoom: (
     roomId: string,
     playerName: string,
@@ -95,6 +120,8 @@ interface GameActions {
   dominoPlayTile: (tile: { left: number; right: number }, end: "left" | "right") => Promise<void>;
   dominoDrawTile: () => Promise<void>;
   dominoPass: () => Promise<void>;
+  /** Declare you can't play. Public: proves you hold neither open pip. */
+  dominoKnock: () => Promise<void>;
   dominoRematch: () => Promise<void>;
   /** Switch the whole party into a different game. Keeps the room + voice. */
   partyPickGame: (gameId: string, options?: Record<string, unknown>) => Promise<void>;
@@ -374,12 +401,21 @@ export const [GameProvider, useGame] = createContextHook(() => {
               (sub as HigherLowerState).mySecretNumber ?? prev?.mySecretNumber,
           }));
           break;
-        case "domino":
+        case "domino": {
+          // The public broadcast carries no private slice by design. Every
+          // one of these fields arrives only on domino_private, so a naive
+          // replace wipes them and the hand renders with nothing playable —
+          // which looked exactly like "the game thinks I'm stuck".
+          const next = sub as DominoState;
           setDominoState((prev) => ({
-            ...(sub as DominoState),
-            hand: (sub as DominoState).hand ?? prev?.hand,
+            ...next,
+            hand: next.hand ?? prev?.hand,
+            mySeat: next.mySeat ?? prev?.mySeat ?? null,
+            myPartnerSeat: next.myPartnerSeat ?? prev?.myPartnerSeat ?? null,
+            playable: next.playable ?? prev?.playable,
           }));
           break;
+        }
         case "rento":
           setRentoState(sub as RentoState);
           break;
@@ -431,63 +467,19 @@ export const [GameProvider, useGame] = createContextHook(() => {
   applyRoomStateRef.current = applyRoomState;
 
   const createRoom = useCallback(
-    async (
-      playerName: string,
-      maxPlayers: number,
-      variant: GameVariant,
-      deckCount: number,
-      claimType?: ClaimType,
-      revealTime?: number,
-      theme?: GameTheme,
-      challengeMode?: ChallengeMode,
-      challengeDuration?: number,
-      gameId?: string,
-      language?: CodenamesLang,
-      gameMode?: "individual" | "teams",
-      targetScore?: number,
-      turnTimeLimit?: number,
-      tableTheme?: string,
-      tileTheme?: string,
-      startingBalance?: number,
-      jailEnabled?: boolean,
-      freeParkingBonus?: number,
-      turnTimer?: number,
-      aiDifficulty?: "easy" | "medium" | "hard",
-      flag?: string,
-      mapId?: string,
-      backgroundId?: string,
-    ): Promise<{ roomId: string; playerId: string }> => {
+    async (input: CreateRoomInput): Promise<{ roomId: string; playerId: string }> => {
       connectSocket();
       const res = await emitWithAck<{
         success: boolean;
         roomId: string;
         playerId: string;
-        state: GameState | CodenamesState | DominoState;
+        state: AnyRoomState;
       }>("create_room", {
-        playerName,
-        maxPlayers,
-        variant,
-        deckCount,
-        claimType,
-        revealTime,
-        theme,
-        challengeMode,
-        challengeDuration,
-        gameId,
-        language,
-        gameMode,
-        targetScore,
-        turnTimeLimit,
-        tableTheme,
-        tileTheme,
-        startingBalance,
-        jailEnabled,
-        freeParkingBonus,
-        turnTimer,
-        aiDifficulty,
-        flag,
-        mapId,
-        backgroundId,
+        // Sensible shapes for the fields every game's validator reads, so a
+        // caller only has to name what its own game actually cares about.
+        variant: "cards",
+        deckCount: 1,
+        ...input,
       });
 
       setMyRoomId(res.roomId);
@@ -688,6 +680,18 @@ export const [GameProvider, useGame] = createContextHook(() => {
     await emitWithAck("domino_pass", {});
   }, [myRoomId, emitWithAck]);
 
+  /**
+   * Knock: "I can't play."
+   *
+   * Named for the physical act rather than "pass", because it isn't a silent
+   * skip — everyone at a real table hears it, and it proves the knocker holds
+   * neither open pip. The server validates it and publishes what it proved.
+   */
+  const dominoKnock = useCallback(async () => {
+    if (!myRoomId) throw new Error("Not in a room");
+    await emitWithAck("domino_knock", {});
+  }, [myRoomId, emitWithAck]);
+
   const dominoRematch = useCallback(async () => {
     if (!myRoomId) throw new Error("Not in a room");
     await emitWithAck("domino_rematch", {});
@@ -837,6 +841,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
     dominoPlayTile,
     dominoDrawTile,
     dominoPass,
+    dominoKnock,
     dominoRematch,
     partyPickGame,
     partyRematch,

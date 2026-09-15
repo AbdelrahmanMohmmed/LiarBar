@@ -274,30 +274,24 @@ export interface DominoRoundRecap {
   teamScores: { A: number; B: number };
 }
 
-export interface DominoState {
-  roomId: string;
-  gameId: "domino";
-  phase: "lobby" | "playing" | "round_recap" | "game_over";
-  maxPlayers: number;
-  players: (PlayerData & { score: number })[];
-  gameMode: "individual" | "teams";
-  targetScore: number;
-  turnTimeLimit: number;
-  tableTheme: string;
-  tileTheme: string;
-  board: Dominoe[];
-  leftEnd: number | null;
-  rightEnd: number | null;
-  boneyardCount: number;
-  activePlayerId: string | null;
-  turnDeadline: number | null;
-  roundNumber: number;
-  winnerId: string | null;
-  recap: DominoRoundRecap | null;
-  playerScores: Record<string, number>;
-  teamScores: { A: number; B: number };
-  hand?: Dominoe[];
-}
+/**
+ * Domino state.
+ *
+ * The full shape (seats, knock memory, the typed event log, server-computed
+ * legal plays) lives in `dominoTypes.ts`, which mirrors the engine 1:1. This
+ * re-export keeps the one name the shared context and older imports use.
+ */
+export type { DominoStateV2 as DominoState } from "./dominoTypes";
+export type {
+  Tile as DominoTileData,
+  PlacedTile,
+  BoardEnds,
+  DominoSeatState,
+  DominoRecap,
+  DominoEvent,
+  DominoTeam,
+  DominoMode,
+} from "./dominoTypes";
 
 export interface LobbyState {
   roomId: string;

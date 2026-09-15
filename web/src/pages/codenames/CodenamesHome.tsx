@@ -76,19 +76,12 @@ export default function CodenamesHome() {
     }
     setIsLoading(true);
     try {
-      const { roomId } = await createRoom(
-        playerName.trim(),
-        parseInt(maxPlayers, 10),
-        "cards",
-        1,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        "codenames",
-        boardLanguage,
-      );
+      const { roomId } = await createRoom({
+        playerName: playerName.trim(),
+        gameId: "codenames",
+        maxPlayers: parseInt(maxPlayers, 10),
+        language: boardLanguage,
+      });
       navigate(`/codenames/room/${roomId}`);
     } catch (err) {
       addToast(err instanceof Error ? err.message : "Failed to create room", "error");

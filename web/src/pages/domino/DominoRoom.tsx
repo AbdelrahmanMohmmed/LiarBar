@@ -311,7 +311,7 @@ export default function DominoRoom() {
             </div>
 
             {/* Layout for Teams Mode vs Individual Mode */}
-            {dominoState.gameMode === "teams" ? (
+            {dominoState.mode === "teams" ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                 {/* Team A block */}
                 <div style={{ border: `2px solid ${COLORS.teal}`, borderRadius: 16, padding: 12, background: `${COLORS.teal}0c` }}>
@@ -484,7 +484,7 @@ export default function DominoRoom() {
             <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 24, fontSize: 14 }}>
               <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #E7E1D8", paddingBottom: 8 }}>
                 <span style={{ color: COLORS.textSecondary }}>{c.gameMode}</span>
-                <span style={{ fontWeight: 700 }}>{dominoState.gameMode === "teams" ? c.teams : c.individual}</span>
+                <span style={{ fontWeight: 700 }}>{dominoState.mode === "teams" ? c.teams : c.individual}</span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #E7E1D8", paddingBottom: 8 }}>
                 <span style={{ color: COLORS.textSecondary }}>{c.targetScore}</span>
@@ -493,7 +493,7 @@ export default function DominoRoom() {
               <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #E7E1D8", paddingBottom: 8 }}>
                 <span style={{ color: COLORS.textSecondary }}>{c.turnTimeLimit}</span>
                 <span style={{ fontWeight: 700 }}>
-                  {dominoState.turnTimeLimit > 0 ? `${dominoState.turnTimeLimit} ${c.seconds}` : c.noLimit}
+                  {dominoState.turnSeconds > 0 ? `${dominoState.turnSeconds} ${c.seconds}` : c.noLimit}
                 </span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #E7E1D8", paddingBottom: 8 }}>

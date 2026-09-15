@@ -146,32 +146,19 @@ export default function RentoHome() {
     }
     setIsLoading(true);
     try {
-      const { roomId } = await createRoom(
-        playerName.trim(),
-        parseInt(maxPlayers, 10),
-        "dominoes",
-        1,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        "rento",
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        parseInt(startingBalance, 10),
+      const { roomId } = await createRoom({
+        playerName: playerName.trim(),
+        gameId: "rento",
+        maxPlayers: parseInt(maxPlayers, 10),
+        flag: localeToFlag(),
+        startingBalance: parseInt(startingBalance, 10),
         jailEnabled,
-        parseInt(freeParking, 10),
-        turnTimer * 1000,
+        freeParkingBonus: parseInt(freeParking, 10),
+        turnTimer: turnTimer * 1000,
         aiDifficulty,
-        localeToFlag(),
         mapId,
         backgroundId,
-      );
+      });
       navigate(`/rento/room/${roomId}`);
     } catch (err) {
       addToast(err instanceof Error ? err.message : "Failed to create room", "error");

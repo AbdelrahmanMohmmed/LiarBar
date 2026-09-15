@@ -68,18 +68,11 @@ export default function HigherLowerHome() {
     }
     setIsLoading(true);
     try {
-      const { roomId } = await createRoom(
-        playerName.trim(),
-        parseInt(maxPlayers, 10),
-        "cards",
-        1,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        "higher-lower"
-      );
+      const { roomId } = await createRoom({
+        playerName: playerName.trim(),
+        gameId: "higher-lower",
+        maxPlayers: parseInt(maxPlayers, 10),
+      });
       navigate(`/higher-lower/room/${roomId}`);
     } catch (err) {
       addToast(err instanceof Error ? err.message : "Failed to create room", "error");

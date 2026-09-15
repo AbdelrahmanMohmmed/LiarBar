@@ -70,17 +70,18 @@ export default function Index() {
     }
     setIsLoading(true);
     try {
-      const { roomId } = await createRoom(
-        playerName.trim(),
-        parseInt(maxPlayers),
+      const { roomId } = await createRoom({
+        playerName: playerName.trim(),
+        gameId: "liars-bar",
+        maxPlayers: parseInt(maxPlayers),
         variant,
-        parseInt(deckCount),
-        variant === "cards" ? claimType : undefined,
-        parseInt(revealTime),
+        deckCount: parseInt(deckCount),
+        claimType: variant === "cards" ? claimType : undefined,
+        revealTime: parseInt(revealTime),
         theme,
         challengeMode,
-        parseInt(challengeDuration),
-      );
+        challengeDuration: parseInt(challengeDuration),
+      });
       navigate(`/room/${roomId}`);
     } catch (err) {
       addToast(err instanceof Error ? err.message : "Failed to create room", "error");
