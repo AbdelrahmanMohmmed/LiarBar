@@ -225,12 +225,25 @@ export type AnyRoomState =
 const LS_ROOM_ID = `${BRAND.id}_roomId`;
 const LS_PLAYER_ID = `${BRAND.id}_playerId`;
 /** Older builds used these; read once so a returning player isn't logged out. */
-const LEGACY_LS_ROOM_ID = "liarsbar_roomId";
-const LEGACY_LS_PLAYER_ID = "liarsbar_playerId";
+/**
+ * Every prefix this app has ever written, newest first.
+ *
+ * The key is prefixed with the brand id so a rename can't resurrect a stale
+ * room — but a rename must also not log everyone out mid-game, which is what
+ * a single current prefix would do. Reads fall through this list; writes only
+ * ever use the current one, so the old keys die out on their own.
+ */
+const LEGACY_PREFIXES = ["lamma", "liarsbar"];
 
-function readStored(key: string, legacyKey: string): string | null {
+function readStored(key: string, suffix: string): string | null {
   try {
-    return localStorage.getItem(key) ?? localStorage.getItem(legacyKey);
+    const current = localStorage.getItem(key);
+    if (current) return current;
+    for (const prefix of LEGACY_PREFIXES) {
+      const old = localStorage.getItem(`${prefix}_${suffix}`);
+      if (old) return old;
+    }
+    return null;
   } catch {
     return null;
   }
@@ -249,8 +262,8 @@ function readStored(key: string, legacyKey: string): string | null {
  */
 export function storedSession(): { roomId: string | null; playerId: string | null } {
   return {
-    roomId: readStored(LS_ROOM_ID, LEGACY_LS_ROOM_ID),
-    playerId: readStored(LS_PLAYER_ID, LEGACY_LS_PLAYER_ID),
+    roomId: readStored(LS_ROOM_ID, "roomId"),
+    playerId: readStored(LS_PLAYER_ID, "playerId"),
   };
 }
 
@@ -338,8 +351,10 @@ export const [GameProvider, useGame] = createContextHook(() => {
     try {
       localStorage.removeItem(LS_ROOM_ID);
       localStorage.removeItem(LS_PLAYER_ID);
-      localStorage.removeItem(LEGACY_LS_ROOM_ID);
-      localStorage.removeItem(LEGACY_LS_PLAYER_ID);
+      for (const prefix of LEGACY_PREFIXES) {
+        localStorage.removeItem(`${prefix}_roomId`);
+        localStorage.removeItem(`${prefix}_playerId`);
+      }
     } catch {
       /* ignore */
     }
@@ -443,8 +458,8 @@ export const [GameProvider, useGame] = createContextHook(() => {
     socket.on("error", onError);
 
     // Check for stored room/player
-    const storedRoomId = readStored(LS_ROOM_ID, LEGACY_LS_ROOM_ID);
-    const storedPlayerId = readStored(LS_PLAYER_ID, LEGACY_LS_PLAYER_ID);
+    const storedRoomId = readStored(LS_ROOM_ID, "roomId");
+    const storedPlayerId = readStored(LS_PLAYER_ID, "playerId");
 
     if (storedRoomId && storedPlayerId) {
       setMyRoomId(storedRoomId);

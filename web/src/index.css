@@ -14,29 +14,41 @@
 @layer base {
   :root {
     /* ---- Raw palette ------------------------------------------------- */
-    /* Warm near-black. Never #000 — pure black reads as a hole on OLED and
-       kills the depth the whole UI relies on. */
-    --ink-900: 18 16% 6%;     /* #14100E page ground */
-    --ink-800: 20 15% 9%;     /* #1C1714 sunken */
-    --ink-700: 22 17% 12%;    /* #251E1A cards, sheets */
-    --ink-600: 22 18% 17%;    /* #332A24 raised / hover */
-    --ink-500: 22 18% 22%;    /* #43382F hairlines */
+    /*
+     * The original cream-and-ink system, which is what the landing page and
+     * the games were built in. The dark palette that briefly replaced it is
+     * gone; these are the literal values from the old `pages/theme.ts`.
+     *
+     * The token NAMES still describe a role, not a colour — `--ink-900` is
+     * "the page ground" and `--cream` is "body text" — so every component
+     * that reads them keeps working. The two happen to be inverted from what
+     * their names suggest now, which is the honest cost of keeping one set of
+     * names across a palette flip; the roles are what components depend on.
+     */
+    --ink-900: 35 81% 96%;    /* #FDF6EC page ground  (was the dark ground) */
+    --ink-800: 0 0% 100%;     /* #FFFFFF inputs and wells — white, not darker */
+    --ink-700: 0 0% 100%;     /* #FFFFFF cards, sheets, panels */
+    --ink-600: 36 24% 88%;    /* #E7E1D8 raised / hover / disabled fill */
+    --ink-500: 22 15% 15%;    /* #2B2420 borders — 2px and solid, not hairlines */
 
-    --cream: 33 46% 92%;      /* #F5EDE2 body text */
-    --sand: 28 22% 65%;       /* #B9A895 secondary text */
+    --cream: 22 15% 15%;      /* #2B2420 body text */
+    --sand: 30 12% 32%;       /* #5B5147 secondary text */
+    /* The light cream itself, for text that sits ON a filled accent. */
+    --on-accent: 35 81% 96%;  /* #FDF6EC */
 
     /* THE accent. Every primary action is this and nothing else is. */
-    --coral: 8 79% 58%;       /* #E8563F */
-    --coral-dim: 9 61% 45%;   /* #B83E2C */
+    --coral: 5 77% 60%;       /* #E8574A */
+    --coral-dim: 6 63% 46%;   /* #C0392B */
 
     /* Reserved for realtime state ONLY: connected, voice live, your turn. */
-    --mint: 161 68% 54%;      /* #3BD9A4 */
-    --mint-dim: 162 66% 36%;  /* #1F9B72 */
+    --mint: 180 48% 44%;      /* #3AA6A6 — the old teal */
+    --mint-dim: 180 49% 35%;  /* #2E8585 */
 
-    --gold: 39 88% 61%;       /* #F2B441 scores, room code, wins */
-    --ruby: 350 74% 56%;      /* #E23D57 errors, elimination */
-    --violet: 261 82% 68%;    /* #9A6BF0 team B, secondary game accents */
-    --sky: 209 89% 63%;       /* #4EA8F5 team A, info */
+    /* Dark enough to read as text on cream, which the old peach was not. */
+    --gold: 36 100% 30%;      /* #9A5B00 scores, room code, wins */
+    --ruby: 3 71% 41%;        /* #B3261E errors, elimination */
+    --violet: 256 44% 52%;    /* #6B4FBB team B, secondary game accents */
+    --sky: 205 61% 45%;       /* #2D7FB8 team A, info */
 
     /* ---- Semantic aliases -------------------------------------------- */
     /* These are what components should use. Swapping a raw value above
@@ -54,7 +66,7 @@
     --popover-foreground: var(--cream);
 
     --primary: var(--coral);
-    --primary-foreground: 0 0% 100%;
+    --primary-foreground: var(--on-accent);
     --secondary: var(--ink-600);
     --secondary-foreground: var(--cream);
     --muted: var(--ink-600);
@@ -62,7 +74,7 @@
     --accent: var(--ink-600);
     --accent-foreground: var(--cream);
     --destructive: var(--ruby);
-    --destructive-foreground: 0 0% 100%;
+    --destructive-foreground: var(--on-accent);
     --live: var(--mint);
 
     --border: var(--ink-500);
@@ -73,20 +85,25 @@
     /* One radius scale. Interactive things are pill-ish, containers are
        soft-square. Mixing more than three radii makes a UI look assembled
        from parts, which is exactly what this one used to look like. */
-    --radius-sm: 0.5rem;
-    --radius: 0.875rem;
+    --radius-sm: 0.75rem;
+    --radius: 1rem;
     --radius-lg: 1.25rem;
-    --radius-xl: 1.75rem;
+    --radius-xl: 1.5rem;
     --radius-pill: 999px;
 
     /* ---- Elevation ---------------------------------------------------- */
-    /* Shadows are warm, not neutral — a grey shadow on a warm ground looks
-       dirty. Each level is a tight contact shadow plus a wide ambient one. */
-    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
-    --shadow-2: 0 2px 4px rgba(0, 0, 0, 0.35), 0 8px 20px -8px rgba(0, 0, 0, 0.6);
-    --shadow-3: 0 4px 8px rgba(0, 0, 0, 0.35), 0 20px 48px -12px rgba(0, 0, 0, 0.7);
-    --shadow-coral: 0 6px 24px -6px hsl(var(--coral) / 0.5);
-    --shadow-mint: 0 6px 24px -6px hsl(var(--mint) / 0.45);
+    /*
+     * Hard offset shadows in ink, not soft blurs. This is the shape language
+     * of the original design and the thing that made it recognisable: a panel
+     * is a white card with a 2px outline and a solid shadow sitting behind it,
+     * like something printed and laid on the page. A blurred shadow on a cream
+     * ground just looks like a smudge.
+     */
+    --shadow-1: 2px 2px 0 hsl(var(--ink-500));
+    --shadow-2: 4px 4px 0 hsl(var(--ink-500));
+    --shadow-3: 6px 6px 0 hsl(var(--ink-500));
+    --shadow-coral: 4px 4px 0 hsl(var(--ink-500));
+    --shadow-mint: 4px 4px 0 hsl(var(--ink-500));
 
     /* ---- Motion ------------------------------------------------------- */
     /* Two durations and two curves. `--ease-out` for things entering or
@@ -135,14 +152,9 @@
     @apply bg-background text-foreground;
     font-family: "Tajawal", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
       sans-serif;
-    /* The ground is not flat: a very slight warm glow from the top centre
-       gives every page a light source, which is what makes the elevation
-       shadows read as elevation rather than as smudges. */
-    background-image: radial-gradient(
-      120% 80% at 50% -10%,
-      hsl(var(--ink-700) / 0.9) 0%,
-      hsl(var(--ink-900)) 60%
-    );
+    /* Flat cream. The old system had no gradient and did not want one: the
+       depth comes from the outlines and the hard shadows, not from the
+       ground. */
     background-attachment: fixed;
     overflow-x: hidden;
 
@@ -214,7 +226,7 @@
 
   .surface {
     background: hsl(var(--surface));
-    border: 1px solid hsl(var(--border) / 0.7);
+    border: 2px solid hsl(var(--border));
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-2);
   }
@@ -222,30 +234,16 @@
   /* A surface with a 1px light edge along the top, which is what actually
      sells "this is lifted toward the light source" rather than "this is a
      lighter rectangle". */
+  /* The emphasised surface. On the dark palette this carried a 1px light edge
+     along the top to sell "lifted toward the light"; on cream that edge is a
+     dark line and reads as a stray border, so the emphasis comes from a
+     deeper shadow instead — which is how the original did it. */
   .surface-lit {
     position: relative;
-    background: linear-gradient(
-      hsl(var(--surface-raised)) 0%,
-      hsl(var(--surface)) 100%
-    );
-    border: 1px solid hsl(var(--border) / 0.8);
+    background: hsl(var(--surface));
+    border: 2px solid hsl(var(--border));
     border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-2);
-  }
-  .surface-lit::before {
-    content: "";
-    position: absolute;
-    inset: 0 0 auto 0;
-    height: 1px;
-    background: linear-gradient(
-      90deg,
-      transparent,
-      hsl(var(--cream) / 0.14) 20%,
-      hsl(var(--cream) / 0.14) 80%,
-      transparent
-    );
-    border-radius: inherit;
-    pointer-events: none;
+    box-shadow: var(--shadow-3);
   }
 
   /* ---- Buttons -------------------------------------------------------- */
@@ -283,8 +281,8 @@
 
   .btn-primary {
     background: hsl(var(--coral));
-    color: #fff;
-    box-shadow: var(--shadow-coral);
+    color: hsl(var(--on-accent));
+    box-shadow: var(--shadow-1);
   }
   .btn-primary:hover:not(:disabled) {
     background: hsl(var(--coral) / 0.9);
@@ -292,8 +290,8 @@
 
   .btn-live {
     background: hsl(var(--mint));
-    color: hsl(var(--ink-900));
-    box-shadow: var(--shadow-mint);
+    color: hsl(var(--on-accent));
+    box-shadow: var(--shadow-1);
   }
   .btn-live:hover:not(:disabled) {
     background: hsl(var(--mint) / 0.9);
@@ -317,16 +315,16 @@
   .btn-whatsapp {
     background: #25d366;
     color: #06231a;
-    box-shadow: 0 6px 18px -8px rgb(37 211 102 / 0.55);
+    box-shadow: var(--shadow-1);
   }
   .btn-whatsapp:hover:not(:disabled) {
     background: #21bd5c;
   }
 
   .btn-ghost {
-    background: hsl(var(--surface-raised) / 0.6);
+    background: hsl(var(--surface));
     color: hsl(var(--foreground));
-    border: 1px solid hsl(var(--border));
+    border: 2px solid hsl(var(--border));
   }
   .btn-ghost:hover:not(:disabled) {
     background: hsl(var(--surface-raised));
@@ -359,8 +357,8 @@
     min-height: 48px;
     padding: 0 1rem;
     background: hsl(var(--surface-sunken));
-    border: 1px solid hsl(var(--border));
-    border-radius: var(--radius);
+    border: 2px solid hsl(var(--border));
+    border-radius: var(--radius-sm);
     color: hsl(var(--foreground));
     /* 16px minimum: anything smaller makes iOS Safari zoom the page on
        focus, which throws the player out of the game layout. */
@@ -389,17 +387,20 @@
     font-weight: 700;
     background: hsl(var(--surface-raised));
     color: hsl(var(--muted-foreground));
-    border: 1px solid hsl(var(--border) / 0.8);
+    border: 1px solid hsl(var(--border) / 0.45);
   }
+  /* On cream, the accent hues are too light to be small text against their
+     own tint — `--mint` at 12px scored 2.7:1. The tint stays (it is what makes
+     the chip read as "live"), the text goes to the dim variant, which passes. */
   .chip-live {
-    background: hsl(var(--mint) / 0.14);
-    color: hsl(var(--mint));
-    border-color: hsl(var(--mint) / 0.3);
+    background: hsl(var(--mint) / 0.16);
+    color: hsl(var(--mint-dim));
+    border-color: hsl(var(--mint) / 0.45);
   }
   .chip-hot {
     background: hsl(var(--coral) / 0.14);
-    color: hsl(var(--coral));
-    border-color: hsl(var(--coral) / 0.3);
+    color: hsl(var(--coral-dim));
+    border-color: hsl(var(--coral) / 0.45);
   }
   .chip-gold {
     background: hsl(var(--gold) / 0.14);
@@ -633,7 +634,7 @@
   background: linear-gradient(
     90deg,
     transparent,
-    hsl(var(--cream) / 0.06),
+    hsl(var(--surface) / 0.9),
     transparent
   );
   animation: shimmer 1.4s infinite;
@@ -643,7 +644,7 @@
 select {
   -webkit-appearance: none;
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23B9A895' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%235B5147' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 0.75rem center;
   padding-right: 2rem;

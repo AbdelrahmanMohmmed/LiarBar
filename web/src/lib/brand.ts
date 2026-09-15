@@ -34,12 +34,12 @@ export function pick(text: Bilingual, lang: Lang): string {
 
 export const BRAND = {
   /** Machine id: used for localStorage key prefixes and analytics. */
-  id: "lamma",
+  id: "safariyat",
 
   /** Display name, Latin script. */
-  name: "Lamma",
+  name: "Safariyat Games",
   /** Display name, Arabic script. */
-  nameAr: "لمّة",
+  nameAr: "سفريات جيمز",
 
   /**
    * Apex domain, no protocol, no trailing slash.
@@ -52,8 +52,8 @@ export const BRAND = {
 
   /** What the product is, in one line. Used in OG descriptions and the hero. */
   tagline: {
-    en: "Get the gang together.",
-    ar: "اللمة على بعد لينك",
+    en: "Free online party games with friends.",
+    ar: "ألعاب جماعية أونلاين مع أصحابك",
   } satisfies Bilingual,
 
   /** Second-line tagline, used where the first is already the headline. */
@@ -101,40 +101,46 @@ export function url(path = "/"): string {
  * object is for the places CSS can't reach (canvas games, meta theme-color,
  * SVG generation, the manifest).
  *
+ * This is the original cream-and-ink system: a cream page, ink outlines, red
+ * as the accent and teal beside it. The key names still describe the ROLE —
+ * `ink900` is the page ground, `cream` is body text — which is why several of
+ * them now hold a value their name does not suggest. Components depend on the
+ * role, so the names stayed put through the palette flip.
+ *
  * KEEP THE TWO IN SYNC. The design rationale is in docs/DESIGN_SYSTEM.md.
  */
 export const COLORS = {
   /** Page ground. Warm near-black — never #000, which looks like a void on OLED. */
-  ink900: "#14100E",
-  ink800: "#1C1714",
+  ink900: "#FDF6EC",
+  ink800: "#FFFFFF",
   /** Raised surfaces: cards, sheets, the table. */
-  ink700: "#251E1A",
-  ink600: "#332A24",
+  ink700: "#FFFFFF",
+  ink600: "#E7E1D8",
   /** Hairlines and dividers. */
-  ink500: "#43382F",
+  ink500: "#2B2420",
 
   /** Body text on dark. */
-  cream: "#F5EDE2",
+  cream: "#2B2420",
   /** Secondary text; passes AA on ink900. */
-  sand: "#B9A895",
+  sand: "#5B5147",
 
   /** THE accent. Every primary action is this colour and nothing else is. */
-  coral: "#E8563F",
-  coralDim: "#B83E2C",
-  coralGlow: "rgba(232, 86, 63, 0.35)",
+  coral: "#E8574A",
+  coralDim: "#C0392B",
+  coralGlow: "rgba(232, 87, 74, 0.30)",
 
   /** Reserved for realtime/"live" state only: connected, voice on, your turn. */
-  mint: "#3BD9A4",
-  mintDim: "#1F9B72",
+  mint: "#3AA6A6",
+  mintDim: "#2E8585",
 
   /** Scores, wins, the room code. Used sparingly so it stays special. */
-  gold: "#F2B441",
+  gold: "#9A5B00",
 
   /** Errors, elimination, "liar!". */
-  ruby: "#E23D57",
+  ruby: "#B3261E",
   /** Teams / secondary game accents. */
-  violet: "#9A6BF0",
-  sky: "#4EA8F5",
+  violet: "#6B4FBB",
+  sky: "#2D7FB8",
 } as const;
 
 // ---------------------------------------------------------------------------

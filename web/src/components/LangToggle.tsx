@@ -8,7 +8,7 @@ export const LangToggle = memo(function LangToggle() {
   return (
     <button
       onClick={toggleLang}
-      className="inline-flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-amber-200/60 hover:text-white hover:bg-[#2a1515] transition-all text-xs font-mono"
+      className="inline-flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-sand hover:text-cream hover:bg-surface-raised transition-all text-xs font-mono"
       title={t("lang.switch_to")}
     >
       <Globe className="w-3.5 h-3.5" />

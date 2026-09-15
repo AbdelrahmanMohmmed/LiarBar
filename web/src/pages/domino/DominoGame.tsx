@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Hand, Trophy, Bot, WifiOff, Crown, Users, Info } from "lucide-react";
+import { Trophy, Bot, WifiOff, Crown } from "lucide-react";
 import { useGame } from "@/lib/gameContext";
 import { useLanguage } from "@/lib/languageContext";
 import { Seo } from "@/lib/seo";
 import { BRAND } from "@/lib/brand";
 import DominoTile from "@/components/domino/DominoTile";
 import DominoBoard from "@/components/domino/DominoBoard";
-import KnockMemory from "@/components/domino/KnockMemory";
 import {
   type DominoStateV2,
   type Tile,
@@ -60,11 +59,6 @@ export default function DominoGamePage() {
 
   const [selected, setSelected] = useState<Tile | null>(null);
   const [now, setNow] = useState(() => Date.now());
-  // Open by default. This panel is the whole reason the rewrite is more
-  // interesting than the old game, and a collapsed panel is a panel nobody
-  // discovers — it also fills the space between the table and the hand, which
-  // is otherwise dead on a tall phone.
-  const [showMemory, setShowMemory] = useState(true);
   const lastEventRef = useRef<number>(0);
 
   // Re-attach on a refresh rather than rendering an empty table.
@@ -210,7 +204,17 @@ export default function DominoGamePage() {
   );
 
   return (
-    <div className="page max-w-3xl mx-auto pb-40">
+    /*
+       A column that fills the screen, with the table taking whatever is left
+       between the seat line and the hand. Stripping the two panels out from
+       between them left a large dead gap on a tall phone; now the board grows
+       into it and sits in the middle of the screen, which is where the thing
+       you are supposed to be looking at belongs.
+    */
+    <div
+      className="page max-w-3xl mx-auto flex flex-col"
+      style={{ minHeight: "calc(100dvh - var(--party-dock-h))", paddingBottom: "9rem" }}
+    >
       <Seo
         title={t("domino.title")}
         description={BRAND.description[lang]}
@@ -219,27 +223,23 @@ export default function DominoGamePage() {
         lang={lang}
       />
 
-      {/* ---- Scoreboard ---- */}
-      <ScoreHeader state={state} mySeat={mySeat} />
-
-      {/* ---- Opponents ---- */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
-        {seats.map((seat) => (
-          <SeatCard
-            key={seat.seat}
-            seat={seat}
-            isMe={seat.seat === mySeat}
-            isPartner={partner?.seat === seat.seat}
-            isActive={state.activeSeat === seat.seat}
-            teams={state.mode === "teams"}
-            secondsLeft={state.activeSeat === seat.seat ? turnSecondsLeft : null}
-          />
-        ))}
-      </div>
+      {/* ---- Who holds what ----
+          One line. Across a real table this is all you can see of anyone
+          else's hand — how many tiles are left in it — and everything the
+          screen used to add on top of that (score bars, progress bars,
+          partner badges, a per-seat timer) was competing with the board for
+          attention in a game whose whole content is the board. */}
+      <SeatStrip
+        seats={seats}
+        mySeat={mySeat}
+        activeSeat={state.activeSeat}
+        partnerSeat={partner?.seat ?? null}
+        secondsLeft={turnSecondsLeft}
+      />
 
       {/* ---- Table ---- */}
       <section
-        className="rounded-xl p-3 mb-3 border border-border/70"
+        className="rounded-xl p-3 mb-3 border-2 border-border flex-1 flex flex-col justify-center"
         style={{
           // A felt surface rather than a flat panel: this is the one place in
           // the app that should read as a physical table.
@@ -268,30 +268,6 @@ export default function DominoGamePage() {
         )}
       </section>
 
-      {/* ---- Reading aid ---- */}
-      <div className="mb-3">
-        <button
-          onClick={() => setShowMemory((v) => !v)}
-          className="btn btn-quiet btn-sm w-full justify-between"
-          aria-expanded={showMemory}
-        >
-          <span className="inline-flex items-center gap-2">
-            <Info size={15} />
-            {t("domino.reading_the_table")}
-          </span>
-          <span className="text-sand">{showMemory ? "−" : "+"}</span>
-        </button>
-        {showMemory && (
-          <div className="mt-2 animate-in">
-            <KnockMemory
-              seats={seats}
-              mySeat={mySeat}
-              playedPipCount={state.playedPipCount ?? [0, 0, 0, 0, 0, 0, 0]}
-            />
-          </div>
-        )}
-      </div>
-
       {/* ---- Recap ---- */}
       {state.phase === "round_recap" && state.recap && (
         <RoundRecap
@@ -311,13 +287,11 @@ export default function DominoGamePage() {
         style={{ bottom: "var(--party-dock-h)", paddingBottom: "0.5rem" }}
       >
         <div className="max-w-3xl mx-auto px-3 pt-2">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-xs text-sand inline-flex items-center gap-1.5">
-              <Hand size={13} />
-              {t("domino.your_tiles")} ({hand.length})
-              <span className="text-sand/60">·</span>
-              {t("domino.pips")}: {hand.reduce((n, tile) => n + pips(tile), 0)}
-            </span>
+          <div className="flex items-center justify-end min-h-[28px] mb-1">
+            {/* No tile count and no pip total. You are looking at the tiles;
+                counting them is not work the screen needs to do for you, and
+                the pip total in particular is a calculation the game expects
+                you to be making in your head. */}
 
             {myTurn && !canPlayAnything && (
               <KnockButton
@@ -355,24 +329,28 @@ export default function DominoGamePage() {
                 // you should see first, and it keeps the order stable as tiles
                 // leave (a hand that reshuffles itself is maddening).
                 .sort((a, b) => pips(b) - pips(a))
-                .map((tile) => {
-                  const ends = endsForTile.get(tileKey(tile)) ?? [];
-                  return (
-                    <DominoTile
-                      key={tileKey(tile)}
-                      left={tile.left}
-                      right={tile.right}
-                      orientation="vertical"
-                      size={76}
-                      dimmed={myTurn && ends.length === 0}
-                      active={Boolean(selected && sameTile(selected, tile))}
-                      onClick={() => onTileTap(tile)}
-                      ariaLabel={`${tile.left} ${tile.right}${
-                        ends.length === 0 && myTurn ? ` — ${t("domino.unplayable")}` : ""
-                      }`}
-                    />
-                  );
-                })
+                .map((tile) => (
+                  /*
+                   * Every tile looks the same, whether or not it fits.
+                   *
+                   * The server still says which plays are legal and still
+                   * rejects the rest — but it no longer says so *before* you
+                   * choose. Dimming the tiles that don't fit turns the game
+                   * into picking the one option left, and the part of domino
+                   * that is actually domino is looking at two open ends and
+                   * working out what you can do about them.
+                   */
+                  <DominoTile
+                    key={tileKey(tile)}
+                    left={tile.left}
+                    right={tile.right}
+                    orientation="vertical"
+                    size={76}
+                    active={Boolean(selected && sameTile(selected, tile))}
+                    onClick={() => onTileTap(tile)}
+                    ariaLabel={`${tile.left} ${tile.right}`}
+                  />
+                ))
             )}
           </div>
         </div>
@@ -412,169 +390,71 @@ function KnockButton({
   );
 }
 
-function ScoreHeader({
-  state,
+/**
+ * Every seat on one line: a name and the number of tiles in that hand.
+ *
+ * This replaced a score header and four seat cards. Both were accurate and
+ * both were wrong for the game — domino is played by looking at the table, and
+ * a screen that puts a scoreboard, four progress bars, a partner badge and a
+ * per-seat countdown above the board is asking the player to read instead of
+ * to think. What you can actually see across a real table is how many tiles
+ * are left in front of each person, so that is what this shows.
+ *
+ * The round score moved into the recap between rounds, which is the moment
+ * anybody cares about it.
+ */
+function SeatStrip({
+  seats,
   mySeat,
-}: {
-  state: DominoStateV2;
-  mySeat: number | null;
-}) {
-  const { t } = useLanguage();
-  const teams = state.mode === "teams";
-
-  if (teams) {
-    const myTeam = mySeat !== null ? state.seats[mySeat]?.team : null;
-    return (
-      <header className="surface-lit rounded-xl p-3 mb-3">
-        <div className="flex items-center justify-between text-xs text-sand mb-2">
-          <span>
-            {t("domino.round")} {state.roundNumber}
-          </span>
-          <span>
-            {t("domino.race_to")} {state.targetScore}
-          </span>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          {(["A", "B"] as const).map((team) => (
-            <div
-              key={team}
-              className={`rounded-lg p-2.5 ${
-                myTeam === team ? "bg-mint/10 border border-mint/30" : "bg-surface-sunken"
-              }`}
-            >
-              <div className="flex items-baseline justify-between">
-                <span className="text-xs text-sand">
-                  {team === "A" ? t("domino.team_a") : t("domino.team_b")}
-                  {myTeam === team && ` (${t("domino.you")})`}
-                </span>
-                <span className="font-numeric text-2xl text-gold">
-                  {state.scores[team]}
-                </span>
-              </div>
-              <div className="mt-1.5 h-1 rounded-pill bg-black/30 overflow-hidden">
-                <div
-                  className="h-full bg-gold transition-all duration-500"
-                  style={{
-                    width: `${Math.min(100, (state.scores[team] / state.targetScore) * 100)}%`,
-                  }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      </header>
-    );
-  }
-
-  return (
-    <header className="surface-lit rounded-xl p-3 mb-3">
-      <div className="flex items-center justify-between text-xs text-sand mb-2">
-        <span>
-          {t("domino.round")} {state.roundNumber}
-        </span>
-        <span>
-          {t("domino.race_to")} {state.targetScore}
-        </span>
-      </div>
-      <ul className="space-y-1">
-        {state.seats.map((seat) => (
-          <li key={seat.seat} className="flex items-center gap-2">
-            <span className="text-xs text-cream flex-1 truncate">{seat.name}</span>
-            <div className="w-24 h-1 rounded-pill bg-surface-sunken overflow-hidden">
-              <div
-                className="h-full bg-gold transition-all duration-500"
-                style={{
-                  width: `${Math.min(100, (seat.score / state.targetScore) * 100)}%`,
-                }}
-              />
-            </div>
-            <span className="font-numeric text-sm text-gold w-8 text-end">
-              {seat.score}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </header>
-  );
-}
-
-function SeatCard({
-  seat,
-  isMe,
-  isPartner,
-  isActive,
-  teams,
+  activeSeat,
+  partnerSeat,
   secondsLeft,
 }: {
-  seat: DominoSeatState;
-  isMe: boolean;
-  isPartner: boolean;
-  isActive: boolean;
-  teams: boolean;
+  seats: DominoSeatState[];
+  mySeat: number | null;
+  activeSeat: number | null;
+  partnerSeat: number | null;
   secondsLeft: number | null;
 }) {
   const { t } = useLanguage();
 
   return (
-    <div
-      className={[
-        "rounded-lg p-2.5 border transition",
-        isActive
-          ? "border-coral bg-coral/10 pulse-glow"
-          : "border-border bg-surface-sunken",
-      ].join(" ")}
-    >
-      <div className="flex items-center gap-1.5 mb-1">
-        {!seat.isConnected && !seat.isBot && (
-          <WifiOff size={12} className="text-ruby shrink-0" aria-label={t("domino.offline")} />
-        )}
-        {seat.isBot && <Bot size={12} className="text-sand shrink-0" />}
-        <span className="text-xs text-cream truncate">
-          {seat.flag ? `${seat.flag} ` : ""}
-          {isMe ? t("domino.you") : seat.name.slice(0, SEAT_LABEL_MAX)}
-        </span>
-        {isPartner && (
-          <span className="chip chip-live !px-1.5 !py-0 !text-[9px] shrink-0">
-            {t("domino.partner")}
-          </span>
-        )}
-      </div>
-
-      <div className="flex items-center justify-between">
-        <span className="inline-flex items-center gap-1 text-sand text-xs">
-          <Users size={11} />
-          <span className="font-numeric">{seat.handCount}</span>
-        </span>
-        {teams && (
-          <span className="text-[10px] text-sand">
-            {seat.team === "A" ? t("domino.team_a") : t("domino.team_b")}
-          </span>
-        )}
-        {secondsLeft !== null && (
-          <span
-            className={`font-numeric text-xs ${
-              secondsLeft <= 5 ? "text-ruby" : "text-sand"
-            }`}
-          >
-            {secondsLeft}
-            {t("common.seconds_short")}
-          </span>
-        )}
-      </div>
-
-      {/* A bar rather than a number: at a glance you want "who's nearly out",
-          not an exact count. */}
-      <div className="mt-1.5 flex gap-0.5">
-        {Array.from({ length: 7 }).map((_, i) => (
-          <span
-            key={i}
-            className={`flex-1 h-1 rounded-pill ${
-              i < seat.handCount ? "bg-cream/70" : "bg-cream/10"
-            }`}
-          />
-        ))}
-      </div>
-    </div>
+    <ul className="flex items-center justify-center flex-wrap gap-x-3 gap-y-1 mb-2 text-sm">
+      {seats.map((seat) => {
+        const isMe = seat.seat === mySeat;
+        const isActive = seat.seat === activeSeat;
+        return (
+          <li key={seat.seat} className="inline-flex items-center gap-1.5">
+            {!seat.isConnected && !seat.isBot && (
+              <WifiOff size={11} className="text-ruby shrink-0" aria-label={t("domino.offline")} />
+            )}
+            {seat.isBot && <Bot size={11} className="text-sand shrink-0" />}
+            <span
+              className={
+                isActive ? "font-bold text-coral" : isMe ? "text-cream" : "text-sand"
+              }
+            >
+              {isMe ? t("domino.you") : seat.name.slice(0, SEAT_LABEL_MAX)}
+              {seat.seat === partnerSeat && " ·"}
+            </span>
+            <span className={`font-numeric ${isActive ? "text-coral" : "text-cream"}`}>
+              {seat.handCount}
+            </span>
+            {/* The clock only exists for whoever it is running against. */}
+            {isActive && secondsLeft !== null && (
+              <span
+                className={`font-numeric text-xs ${
+                  secondsLeft <= 5 ? "text-ruby" : "text-sand"
+                }`}
+              >
+                {secondsLeft}
+                {t("common.seconds_short")}
+              </span>
+            )}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
