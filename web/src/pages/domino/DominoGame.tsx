@@ -38,10 +38,43 @@ import { playTileSfx } from "@/utils/sfx";
 
 const SEAT_LABEL_MAX = 12;
 
+/**
+ * Responsive domino size for the player's hand dock.
+ * Scales up substantially on PC / desktop so dominoes feel substantial, tactile,
+ * and easy to read, while remaining comfortably sized on mobile phones.
+ */
+function useHandTileSize(): number {
+  const [size, setSize] = useState(() => {
+    if (typeof window === "undefined") return 58;
+    const w = window.innerWidth;
+    if (w >= 1440) return 116; // Widescreen PC (58px x 116px per tile)
+    if (w >= 1024) return 106; // Desktop / laptop (53px x 106px per tile)
+    if (w >= 768) return 88;   // Tablets (44px x 88px per tile)
+    if (w >= 480) return 72;   // Phablets / horizontal phones (36px x 72px)
+    return 58;                 // Mobile portrait (29px x 58px)
+  });
+
+  useEffect(() => {
+    const onResize = () => {
+      const w = window.innerWidth;
+      if (w >= 1440) setSize(116);
+      else if (w >= 1024) setSize(106);
+      else if (w >= 768) setSize(88);
+      else if (w >= 480) setSize(72);
+      else setSize(58);
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  return size;
+}
+
 export default function DominoGamePage() {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
   const { lang, t } = useLanguage();
+  const handTileSize = useHandTileSize();
   const {
     dominoState,
     myPlayerId,
@@ -235,7 +268,10 @@ export default function DominoGamePage() {
   return (
     <div
       className="page w-full max-w-6xl xl:max-w-7xl mx-auto flex flex-col px-2 sm:px-4 md:px-6"
-      style={{ minHeight: "calc(100dvh - var(--party-dock-h))", paddingBottom: "9rem" }}
+      style={{
+        minHeight: "calc(100dvh - var(--party-dock-h))",
+        paddingBottom: handTileSize >= 90 ? "12rem" : "9rem",
+      }}
     >
       <Seo
         title={t("domino.title")}
@@ -333,12 +369,12 @@ export default function DominoGamePage() {
 
       {/* ---- Your hand (Responsive Bottom Dock) ---- */}
       <section
-        className="fixed inset-x-0 z-30 border-t border-border/70 bg-surface/95 backdrop-blur"
-        style={{ bottom: "var(--party-dock-h)", paddingBottom: "0.5rem" }}
+        className="fixed inset-x-0 z-30 border-t border-border/70 bg-surface/95 backdrop-blur shadow-2xl"
+        style={{ bottom: "var(--party-dock-h)", paddingBottom: "0.75rem" }}
       >
         <div className="w-full max-w-6xl xl:max-w-7xl mx-auto px-3 sm:px-6 pt-2">
-          <div className="flex items-center justify-between min-h-[28px] mb-1">
-            <span className="text-xs text-sand font-medium hidden sm:inline">
+          <div className="flex items-center justify-between min-h-[28px] mb-1.5">
+            <span className="text-xs sm:text-sm text-sand font-semibold hidden sm:inline">
               {lang === "ar" ? "قطعك في اليد" : "Your hand"} ({hand.length})
             </span>
             {myTurn && !canPlayAnything && (
@@ -369,7 +405,7 @@ export default function DominoGamePage() {
           </div>
 
           <div
-            className="flex gap-2 sm:gap-3 overflow-x-auto pb-2 justify-start sm:justify-center items-center"
+            className="flex gap-2 sm:gap-3 md:gap-3.5 overflow-x-auto pb-2 justify-start sm:justify-center items-center py-1"
             style={{ scrollbarWidth: "none" }}
           >
             {hand.length === 0 ? (
@@ -389,8 +425,8 @@ export default function DominoGamePage() {
                         isShaking ? "tile-shake" : ""
                       } ${
                         isSelected
-                          ? "-translate-y-3 shadow-lg shadow-gold/40 ring-2 ring-gold scale-105"
-                          : "hover:-translate-y-1.5 hover:scale-[1.02]"
+                          ? "-translate-y-3 sm:-translate-y-4 shadow-xl shadow-gold/50 ring-2 sm:ring-4 ring-gold scale-105"
+                          : "hover:-translate-y-2 hover:scale-105"
                       }`}
                       style={{
                         padding: 0,
@@ -403,7 +439,7 @@ export default function DominoGamePage() {
                       <DominoTile
                         left={tile.left}
                         right={tile.right}
-                        size={typeof window !== "undefined" && window.innerWidth >= 768 ? 52 : 42}
+                        size={handTileSize}
                         orientation="vertical"
                         active={isSelected}
                       />
