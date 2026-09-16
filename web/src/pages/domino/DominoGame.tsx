@@ -1,6 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Trophy, Bot, WifiOff, Crown } from "lucide-react";
+import {
+  Trophy,
+  Bot,
+  WifiOff,
+  Crown,
+  RotateCcw,
+  Home,
+  Clock,
+  Sparkles,
+  Layers,
+  Check,
+} from "lucide-react";
 import { useGame } from "@/lib/gameContext";
 import { useLanguage } from "@/lib/languageContext";
 import { Seo } from "@/lib/seo";
@@ -18,28 +29,14 @@ import {
 import { playTileSfx } from "@/utils/sfx";
 
 /**
- * The domino table.
+ * The domino table: responsive wide desktop casino table & mobile portrait table.
  *
- * A rewrite against the new engine state (seats, knock memory, server-computed
- * legal plays, a typed event log). The previous page was 1,849 lines that
- * re-derived the rules client-side, disagreed with the server about flipped
- * tiles, and had no way to show a player *why* a tile was unplayable.
- *
- * Three principles, all downstream of "this is played on a phone while
- * talking":
- *
- * 1. **The board answers one question: what are the open ends.** Everything
- *    else is secondary and can be scrolled to.
- * 2. **Unplayable tiles are dimmed, never hidden.** Hiding them would be
- *    cleaner and would also destroy the game: knowing you're holding three
- *    dead tiles is the information you're supposed to be sweating over.
- * 3. **One tap when there's one choice, two when there are two.** Tapping a
- *    tile that fits only one end plays it immediately. A tile that fits both
- *    ends arms the end markers and waits — because guessing wrong there costs
- *    a turn, and the whole round.
+ * All played tiles remain visible on mobile and desktop without scrolling.
+ * Round recap and game over appear as an unmissable, prominent modal overlay
+ * with a live next-round countdown bar so players never miss results.
  */
 
-const SEAT_LABEL_MAX = 10;
+const SEAT_LABEL_MAX = 12;
 
 export default function DominoGamePage() {
   const { roomId } = useParams<{ roomId: string }>();
@@ -54,6 +51,9 @@ export default function DominoGamePage() {
     dominoPlayTile,
     dominoDrawTile,
     dominoKnock,
+    dominoRematch,
+    partyRematch,
+    partyReturnHub,
   } = useGame();
 
   const state = dominoState as unknown as DominoStateV2 | null;
@@ -70,9 +70,7 @@ export default function DominoGamePage() {
     void reconnectRoom(roomId, myPlayerId).catch(() => navigate(`/j/${roomId}`));
   }, [roomId, state?.roomId, myPlayerId, reconnectRoom, navigate]);
 
-  // One shared clock for the turn timer and the recap countdown, rather than
-  // a timer per component. At 4 players that's the difference between one
-  // interval and nine.
+  // One shared clock for the turn timer and the recap countdown
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 250);
     return () => window.clearInterval(id);
@@ -98,9 +96,7 @@ export default function DominoGamePage() {
 
   const canPlayAnything = playable.length > 0;
 
-  // Announce what just happened. The engine types its events precisely so the
-  // client doesn't have to diff state and guess — a knock and a timeout look
-  // identical in a state diff but mean completely different things.
+  // Announce what just happened via audio and toasts
   useEffect(() => {
     const events = state?.events ?? [];
     const latest = events[events.length - 1];
@@ -108,7 +104,13 @@ export default function DominoGamePage() {
     lastEventRef.current = latest.at;
 
     const isMe = latest.seat === mySeat;
+
     switch (latest.kind) {
+      case "play":
+        if (!isMe) {
+          playTileSfx();
+        }
+        break;
       case "knock":
         addToast(
           isMe
@@ -120,28 +122,20 @@ export default function DominoGamePage() {
       case "timeout":
         addToast(
           t("domino.auto_played").replace("{name}", latest.playerName),
-          "info",
+          "error",
         );
-        break;
-      case "round_end":
-        if (latest.method === "blocked") addToast(t("domino.blocked"), "challenge");
-        else if (latest.method === "draw") addToast(t("domino.drawn_round"), "info");
         break;
     }
   }, [state?.events, mySeat, addToast, t]);
 
-  // Tactile audio clack when an opponent or bot places a tile
+  // Audio clack on opponent or bot tile placement
   useEffect(() => {
-    const len = state?.board.length ?? 0;
-    if (len > prevBoardLenRef.current) {
-      const events = state?.events ?? [];
-      const latest = events[events.length - 1];
-      if (latest && latest.seat !== mySeat) {
-        playTileSfx();
-      }
+    const currentLen = state?.board.length ?? 0;
+    if (prevBoardLenRef.current > 0 && currentLen > prevBoardLenRef.current) {
+      playTileSfx();
     }
-    prevBoardLenRef.current = len;
-  }, [state?.board.length, state?.events, mySeat]);
+    prevBoardLenRef.current = currentLen;
+  }, [state?.board.length]);
 
   const play = useCallback(
     async (tile: Tile, end: "left" | "right") => {
@@ -150,51 +144,67 @@ export default function DominoGamePage() {
       try {
         await dominoPlayTile(tile, end);
       } catch (err) {
-        addToast(err instanceof Error ? err.message : t("domino.bad_move"), "error");
+        addToast(
+          err instanceof Error ? err.message : t("domino.bad_move"),
+          "error",
+        );
       }
     },
     [dominoPlayTile, addToast, t],
   );
 
-  const onTileTap = useCallback(
-    (tile: Tile) => {
-      if (!myTurn) return;
-      const key = tileKey(tile);
-      const ends = endsForTile.get(key) ?? [];
-      if (ends.length === 0) {
-        setShakingTile(key);
-        window.setTimeout(() => setShakingTile(null), 400);
-        addToast(t("domino.tile_doesnt_fit"), "info");
-        return;
-      }
-      // One legal end: just play it immediately.
-      if (ends.length === 1) {
-        void play(tile, ends[0]);
-        return;
-      }
-      // Two legal ends: elevate tile in hand and illuminate open ends on the board.
-      setSelected((prev) => (prev && sameTile(prev, tile) ? null : tile));
-    },
-    [myTurn, endsForTile, play, addToast, t],
-  );
+  const onTileTap = (tile: Tile) => {
+    const validEnds = endsForTile.get(tileKey(tile)) ?? [];
 
-  const selectedEnds = selected ? endsForTile.get(tileKey(selected)) ?? [] : [];
+    if (!myTurn || validEnds.length === 0) {
+      const key = tileKey(tile);
+      setShakingTile(key);
+      window.setTimeout(() => setShakingTile(null), 450);
+      if (myTurn) {
+        addToast(t("domino.bad_move"), "info");
+      }
+      return;
+    }
+
+    if (validEnds.length === 1) {
+      void play(tile, validEnds[0]);
+      return;
+    }
+
+    if (selected && sameTile(selected, tile)) {
+      setSelected(null);
+    } else {
+      setSelected(tile);
+    }
+  };
+
+  const selectedEnds = useMemo(() => {
+    if (!selected) return [];
+    return endsForTile.get(tileKey(selected)) ?? [];
+  }, [selected, endsForTile]);
+
+  useEffect(() => {
+    if (!myTurn) setSelected(null);
+  }, [myTurn]);
 
   if (!state) {
     return (
-      <div className="page max-w-3xl mx-auto space-y-3">
-        <div className="skeleton h-16 rounded-lg" />
-        <div className="skeleton h-40 rounded-lg" />
-        <div className="skeleton h-24 rounded-lg" />
+      <div className="page grid place-items-center">
+        <div className="skeleton w-64 h-32 rounded-xl" />
       </div>
     );
   }
 
   const seats = state.seats ?? [];
   const partner =
-    state.myPartnerSeat !== null && state.myPartnerSeat !== undefined
-      ? seats[state.myPartnerSeat]
-      : undefined;
+    state.myPartnerSeat !== null
+      ? seats.find((s) => s.seat === state.myPartnerSeat)
+      : null;
+
+  const isHost = Boolean(
+    partyState?.players.find((p) => p.id === myPlayerId)?.isHost ??
+      state.players.find((p) => p.id === myPlayerId)?.isHost,
+  );
 
   const turnSecondsLeft =
     state.turnDeadline !== null
@@ -206,9 +216,6 @@ export default function DominoGamePage() {
       ? Math.max(0, Math.ceil((state.recap.nextRoundAt - now) / 1000))
       : null;
 
-  // Which end moved last, so the board scroller looks in the right direction.
-  // Read off the board rather than the event log: the log records the tile but
-  // not which side of the snake it landed on.
   const lastPlaced = state.board.length > 0 ? state.board[state.board.length - 1] : null;
   const lastEnd =
     state.board.length === 0
@@ -221,16 +228,13 @@ export default function DominoGamePage() {
     -1,
   );
 
+  const isRecapOpen =
+    (state.phase === "round_recap" || state.phase === "game_over") &&
+    Boolean(state.recap);
+
   return (
-    /*
-       A column that fills the screen, with the table taking whatever is left
-       between the seat line and the hand. Stripping the two panels out from
-       between them left a large dead gap on a tall phone; now the board grows
-       into it and sits in the middle of the screen, which is where the thing
-       you are supposed to be looking at belongs.
-    */
     <div
-      className="page max-w-3xl mx-auto flex flex-col"
+      className="page w-full max-w-6xl xl:max-w-7xl mx-auto flex flex-col px-2 sm:px-4 md:px-6"
       style={{ minHeight: "calc(100dvh - var(--party-dock-h))", paddingBottom: "9rem" }}
     >
       <Seo
@@ -241,30 +245,29 @@ export default function DominoGamePage() {
         lang={lang}
       />
 
-      {/* ---- Who holds what ----
-          One line. Across a real table this is all you can see of anyone
-          else's hand — how many tiles are left in it — and everything the
-          screen used to add on top of that (score bars, progress bars,
-          partner badges, a per-seat timer) was competing with the board for
-          attention in a game whose whole content is the board. */}
+      {/* ---- Who holds what (Responsive Table Header) ---- */}
       <SeatStrip
         seats={seats}
         mySeat={mySeat}
         activeSeat={state.activeSeat}
         partnerSeat={partner?.seat ?? null}
         secondsLeft={turnSecondsLeft}
+        teams={state.mode === "teams"}
+        scores={state.scores}
+        targetScore={state.targetScore}
+        roundNumber={state.roundNumber}
       />
 
-      {/* ---- Table ---- */}
+      {/* ---- The Felt Table ---- */}
       <section
-        className="rounded-2xl p-2 sm:p-4 mb-3 border-4 border-[#2d1e14] flex-1 flex flex-col justify-center relative overflow-hidden"
+        className="rounded-2xl md:rounded-3xl p-2 sm:p-4 mb-3 border-4 md:border-8 border-[#2d1e14] flex-1 flex flex-col justify-center relative overflow-hidden min-h-[440px] md:min-h-[540px] lg:min-h-[620px] shadow-2xl"
         style={{
           background:
-            "radial-gradient(120% 140% at 50% 25%, #184c2b 0%, #113820 50%, #081d11 90%)",
+            "radial-gradient(120% 140% at 50% 30%, #184c2b 0%, #113820 50%, #081d11 90%)",
           boxShadow:
-            "inset 0 0 45px rgba(0,0,0,0.85), 0 8px 24px rgba(0,0,0,0.5)",
-          outline: "1px solid rgba(212, 175, 55, 0.35)",
-          outlineOffset: "-3px",
+            "inset 0 0 60px rgba(0,0,0,0.85), 0 12px 36px rgba(0,0,0,0.6)",
+          outline: "2px solid rgba(212, 175, 55, 0.4)",
+          outlineOffset: "-4px",
         }}
       >
         <DominoBoard
@@ -287,9 +290,9 @@ export default function DominoGamePage() {
         )}
       </section>
 
-      {/* ---- Recap ---- */}
-      {state.phase === "round_recap" && state.recap && (
-        <RoundRecap
+      {/* ---- Unmissable Round Recap & Game Over Centered Modal Overlay ---- */}
+      {isRecapOpen && state.recap && (
+        <RoundRecapModal
           recap={state.recap}
           seats={seats}
           mySeat={mySeat}
@@ -297,23 +300,47 @@ export default function DominoGamePage() {
           teams={state.mode === "teams"}
           scores={state.scores}
           targetScore={state.targetScore}
+          isGameOver={state.phase === "game_over"}
+          isHost={isHost}
+          onRematch={async () => {
+            try {
+              if (partyState?.roomId) {
+                await partyRematch();
+              } else {
+                await dominoRematch();
+              }
+            } catch (err) {
+              addToast(
+                err instanceof Error ? err.message : "Failed to rematch",
+                "error",
+              );
+            }
+          }}
+          onBackToHub={async () => {
+            try {
+              if (partyState?.roomId) {
+                await partyReturnHub();
+                navigate(`/r/${partyState.roomId}`);
+              } else {
+                navigate("/domino");
+              }
+            } catch {
+              navigate("/");
+            }
+          }}
         />
       )}
 
-      {/* ---- Your hand ---- */}
+      {/* ---- Your hand (Responsive Bottom Dock) ---- */}
       <section
         className="fixed inset-x-0 z-30 border-t border-border/70 bg-surface/95 backdrop-blur"
-        // Sits directly on top of the dock rather than guessing at its height,
-        // which was a hardcoded 4.5rem and wrong whenever the dock expanded.
         style={{ bottom: "var(--party-dock-h)", paddingBottom: "0.5rem" }}
       >
-        <div className="max-w-3xl mx-auto px-3 pt-2">
-          <div className="flex items-center justify-end min-h-[28px] mb-1">
-            {/* No tile count and no pip total. You are looking at the tiles;
-                counting them is not work the screen needs to do for you, and
-                the pip total in particular is a calculation the game expects
-                you to be making in your head. */}
-
+        <div className="w-full max-w-6xl xl:max-w-7xl mx-auto px-3 sm:px-6 pt-2">
+          <div className="flex items-center justify-between min-h-[28px] mb-1">
+            <span className="text-xs text-sand font-medium hidden sm:inline">
+              {lang === "ar" ? "قطعك في اليد" : "Your hand"} ({hand.length})
+            </span>
             {myTurn && !canPlayAnything && (
               <KnockButton
                 boneyardCount={state.boneyardCount}
@@ -341,45 +368,48 @@ export default function DominoGamePage() {
             )}
           </div>
 
-          <div className="flex gap-1.5 overflow-x-auto pb-2" style={{ scrollbarWidth: "none" }}>
+          <div
+            className="flex gap-2 sm:gap-3 overflow-x-auto pb-2 justify-start sm:justify-center items-center"
+            style={{ scrollbarWidth: "none" }}
+          >
             {hand.length === 0 ? (
               <span className="text-sm text-sand py-4">{t("domino.no_tiles")}</span>
             ) : (
               [...hand]
-                // Heaviest first: the tiles you most want rid of are the ones
-                // you should see first, and it keeps the order stable as tiles
-                // leave (a hand that reshuffles itself is maddening).
                 .sort((a, b) => pips(b) - pips(a))
-                .map((tile) => (
-                  /*
-                   * Every tile looks the same, whether or not it fits.
-                   *
-                   * The server still says which plays are legal and still
-                   * rejects the rest — but it no longer says so *before* you
-                   * choose. Dimming the tiles that don't fit turns the game
-                   * into picking the one option left, and the part of domino
-                   * that is actually domino is looking at two open ends and
-                   * working out what you can do about them.
-                   */
-                  <DominoTile
-                    key={tileKey(tile)}
-                    left={tile.left}
-                    right={tile.right}
-                    orientation="vertical"
-                    size={76}
-                    active={Boolean(selected && sameTile(selected, tile))}
-                    onClick={() => onTileTap(tile)}
-                    className={[
-                      shakingTile === tileKey(tile) ? "tile-shake" : "",
-                      selected && sameTile(selected, tile)
-                        ? "-translate-y-2.5 drop-shadow-[0_8px_12px_rgba(224,109,83,0.45)]"
-                        : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                    ariaLabel={`${tile.left} ${tile.right}`}
-                  />
-                ))
+                .map((tile) => {
+                  const key = tileKey(tile);
+                  const isSelected = selected !== null && sameTile(tile, selected);
+                  const isShaking = shakingTile === key;
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => onTileTap(tile)}
+                      className={`relative shrink-0 rounded transition-all duration-200 ${
+                        isShaking ? "tile-shake" : ""
+                      } ${
+                        isSelected
+                          ? "-translate-y-3 shadow-lg shadow-gold/40 ring-2 ring-gold scale-105"
+                          : "hover:-translate-y-1.5 hover:scale-[1.02]"
+                      }`}
+                      style={{
+                        padding: 0,
+                        border: "none",
+                        background: "transparent",
+                        cursor: "pointer",
+                      }}
+                      title={`${tile.left}-${tile.right}`}
+                    >
+                      <DominoTile
+                        left={tile.left}
+                        right={tile.right}
+                        size={typeof window !== "undefined" && window.innerWidth >= 768 ? 52 : 42}
+                        orientation="vertical"
+                        active={isSelected}
+                      />
+                    </button>
+                  );
+                })
             )}
           </div>
         </div>
@@ -387,8 +417,6 @@ export default function DominoGamePage() {
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
 
 function KnockButton({
   boneyardCount,
@@ -399,38 +427,30 @@ function KnockButton({
   onKnock: () => void;
   onDraw: () => void;
 }) {
-  const { t } = useLanguage();
-
-  // With tiles left in the boneyard you must draw; only when it's empty may
-  // you knock. Showing the wrong one and letting the server reject it is how
-  // the old version taught people the rules — badly.
-  if (boneyardCount > 0) {
-    return (
-      <button onClick={onDraw} className="btn btn-ghost btn-sm">
-        {t("domino.draw")} ({boneyardCount})
-      </button>
-    );
-  }
-
-  return (
-    <button onClick={onKnock} className="btn btn-primary btn-sm pulse-glow">
-      {t("domino.knock")}
+  const { lang, t } = useLanguage();
+  return boneyardCount > 0 ? (
+    <button
+      onClick={onDraw}
+      className="btn btn-primary btn-sm flex items-center gap-1.5 animate-in"
+    >
+      <Layers size={14} />
+      <span>{lang === "ar" ? `اسحب من البحر (${boneyardCount})` : `Draw (${boneyardCount})`}</span>
+    </button>
+  ) : (
+    <button
+      onClick={onKnock}
+      className="btn btn-primary btn-sm flex items-center gap-1.5 animate-in"
+    >
+      <span>👊</span>
+      <span>{lang === "ar" ? "طَق (معنديش)" : "Knock (Pass)"}</span>
     </button>
   );
 }
 
 /**
- * Every seat on one line: a name and the number of tiles in that hand.
- *
- * This replaced a score header and four seat cards. Both were accurate and
- * both were wrong for the game — domino is played by looking at the table, and
- * a screen that puts a scoreboard, four progress bars, a partner badge and a
- * per-seat countdown above the board is asking the player to read instead of
- * to think. What you can actually see across a real table is how many tiles
- * are left in front of each person, so that is what this shows.
- *
- * The round score moved into the recap between rounds, which is the moment
- * anybody cares about it.
+ * Seat strip rendered responsively:
+ * - Mobile: Clean compact line.
+ * - Desktop: Grand casino table scoreboard with Team A / Team B pods or individual player pods.
  */
 function SeatStrip({
   seats,
@@ -438,56 +458,201 @@ function SeatStrip({
   activeSeat,
   partnerSeat,
   secondsLeft,
+  teams,
+  scores,
+  targetScore,
+  roundNumber,
 }: {
   seats: DominoSeatState[];
   mySeat: number | null;
   activeSeat: number | null;
   partnerSeat: number | null;
   secondsLeft: number | null;
+  teams: boolean;
+  scores: DominoStateV2["scores"];
+  targetScore: number;
+  roundNumber: number;
 }) {
-  const { t } = useLanguage();
+  const { lang, t } = useLanguage();
 
   return (
-    <ul className="flex items-center justify-center flex-wrap gap-x-3 gap-y-1 mb-2 text-sm">
-      {seats.map((seat) => {
-        const isMe = seat.seat === mySeat;
-        const isActive = seat.seat === activeSeat;
-        return (
-          <li key={seat.seat} className="inline-flex items-center gap-1.5">
-            {!seat.isConnected && !seat.isBot && (
-              <WifiOff size={11} className="text-ruby shrink-0" aria-label={t("domino.offline")} />
-            )}
-            {seat.isBot && <Bot size={11} className="text-sand shrink-0" />}
-            <span
-              className={
-                isActive ? "font-bold text-coral" : isMe ? "text-cream" : "text-sand"
-              }
-            >
-              {isMe ? t("domino.you") : seat.name.slice(0, SEAT_LABEL_MAX)}
-              {seat.seat === partnerSeat && " ·"}
-            </span>
-            <span className={`font-numeric ${isActive ? "text-coral" : "text-cream"}`}>
-              {seat.handCount}
-            </span>
-            {/* The clock only exists for whoever it is running against. */}
-            {isActive && secondsLeft !== null && (
+    <>
+      {/* Mobile Compact Header (< md) */}
+      <ul className="flex md:hidden items-center justify-center flex-wrap gap-x-3 gap-y-1 mb-2 text-sm">
+        {seats.map((seat) => {
+          const isMe = seat.seat === mySeat;
+          const isActive = seat.seat === activeSeat;
+          return (
+            <li key={seat.seat} className="inline-flex items-center gap-1.5">
+              {!seat.isConnected && !seat.isBot && (
+                <WifiOff size={11} className="text-ruby shrink-0" aria-label={t("domino.offline")} />
+              )}
+              {seat.isBot && <Bot size={11} className="text-sand shrink-0" />}
               <span
-                className={`font-numeric text-xs ${
-                  secondsLeft <= 5 ? "text-ruby" : "text-sand"
-                }`}
+                className={
+                  isActive ? "font-bold text-coral" : isMe ? "text-cream" : "text-sand"
+                }
               >
-                {secondsLeft}
-                {t("common.seconds_short")}
+                {isMe ? t("domino.you") : seat.name.slice(0, SEAT_LABEL_MAX)}
+                {seat.seat === partnerSeat && " ·"}
               </span>
-            )}
-          </li>
-        );
-      })}
-    </ul>
+              <span className={`font-numeric ${isActive ? "text-coral" : "text-cream"}`}>
+                {seat.handCount}
+              </span>
+              {isActive && secondsLeft !== null && (
+                <span
+                  className={`font-numeric text-xs ${
+                    secondsLeft <= 5 ? "text-ruby font-bold animate-pulse" : "text-sand"
+                  }`}
+                >
+                  {secondsLeft}s
+                </span>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+
+      {/* Desktop Wide Casino Header (>= md) */}
+      <div className="hidden md:flex items-center justify-between gap-4 mb-3 py-2 px-4 rounded-xl bg-surface-sunken/60 border border-border/50">
+        {teams ? (
+          <>
+            {/* Team A Pod */}
+            <div className="flex items-center gap-3 p-2 px-3 rounded-lg bg-teal/10 border border-teal/30">
+              <div className="text-start">
+                <span className="text-[11px] font-bold text-teal block uppercase tracking-wider">
+                  {t("domino.team_a")} (1 & 3)
+                </span>
+                <div className="flex items-center gap-2 mt-0.5 text-xs">
+                  {[0, 2].map((idx) => {
+                    const s = seats[idx];
+                    if (!s) return null;
+                    const isActive = s.seat === activeSeat;
+                    return (
+                      <span
+                        key={idx}
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full ${
+                          isActive ? "bg-coral/25 text-cream font-bold" : "text-sand"
+                        }`}
+                      >
+                        {s.seat === mySeat ? t("domino.you") : s.name}
+                        <span className="font-numeric text-teal font-bold ml-1">({s.handCount})</span>
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="font-numeric text-2xl font-bold text-teal pl-2 border-l border-teal/20">
+                {scores.A}
+              </div>
+            </div>
+
+            {/* Center: Match Progress */}
+            <div className="flex flex-col items-center justify-center">
+              <div className="flex items-center gap-2">
+                <span className="text-xs px-2.5 py-0.5 rounded-full bg-sand/15 text-sand font-medium">
+                  {lang === "ar" ? `الجولة ${roundNumber}` : `Round ${roundNumber}`}
+                </span>
+                <span className="text-xs px-2.5 py-0.5 rounded-full bg-gold/15 text-gold font-bold">
+                  {t("domino.race_to")} {targetScore}
+                </span>
+              </div>
+              {secondsLeft !== null && (
+                <span className="text-xs text-sand mt-1 font-numeric">
+                  {lang === "ar" ? "الوقت المتبقي: " : "Turn time: "}
+                  <strong className={secondsLeft <= 5 ? "text-ruby animate-pulse" : "text-gold"}>
+                    {secondsLeft}s
+                  </strong>
+                </span>
+              )}
+            </div>
+
+            {/* Team B Pod */}
+            <div className="flex items-center gap-3 p-2 px-3 rounded-lg bg-coral/10 border border-coral/30">
+              <div className="font-numeric text-2xl font-bold text-coral pr-2 border-r border-coral/20">
+                {scores.B}
+              </div>
+              <div className="text-end">
+                <span className="text-[11px] font-bold text-coral block uppercase tracking-wider">
+                  {t("domino.team_b")} (2 & 4)
+                </span>
+                <div className="flex items-center gap-2 mt-0.5 text-xs justify-end">
+                  {[1, 3].map((idx) => {
+                    const s = seats[idx];
+                    if (!s) return null;
+                    const isActive = s.seat === activeSeat;
+                    return (
+                      <span
+                        key={idx}
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full ${
+                          isActive ? "bg-coral/25 text-cream font-bold" : "text-sand"
+                        }`}
+                      >
+                        {s.seat === mySeat ? t("domino.you") : s.name}
+                        <span className="font-numeric text-coral font-bold ml-1">({s.handCount})</span>
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </>
+        ) : (
+          /* Solo Mode Desktop Header */
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-2">
+              <span className="text-xs px-2.5 py-0.5 rounded-full bg-gold/15 text-gold font-bold">
+                {t("domino.race_to")} {targetScore}
+              </span>
+              <span className="text-xs text-sand">
+                {lang === "ar" ? `الجولة ${roundNumber}` : `Round ${roundNumber}`}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {seats.map((seat) => {
+                const isMe = seat.seat === mySeat;
+                const isActive = seat.seat === activeSeat;
+                return (
+                  <div
+                    key={seat.seat}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all ${
+                      isActive
+                        ? "bg-coral/20 border-coral text-cream shadow-md shadow-coral/20"
+                        : "bg-surface-sunken border-border/40 text-sand"
+                    }`}
+                  >
+                    {seat.isBot && <Bot size={13} className="text-sand" />}
+                    <span className="text-xs font-bold truncate max-w-[90px]">
+                      {isMe ? t("domino.you") : seat.name}
+                    </span>
+                    <span className="text-xs px-1.5 py-0.2 rounded bg-surface font-numeric font-bold text-cream">
+                      {seat.handCount}
+                    </span>
+                    <span className="text-xs font-numeric text-gold font-bold">
+                      {seat.score} pts
+                    </span>
+                    {isActive && secondsLeft !== null && (
+                      <span className="text-[11px] font-numeric text-ruby font-bold ml-1 animate-pulse">
+                        {secondsLeft}s
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    </>
   );
 }
 
-function RoundRecap({
+/**
+ * Unmissable Centered Modal Overlay for Round Recap and Game Over.
+ * Appears on top of everything with a backdrop blur and countdown bar.
+ */
+function RoundRecapModal({
   recap,
   seats,
   mySeat,
@@ -495,6 +660,10 @@ function RoundRecap({
   teams,
   scores,
   targetScore,
+  isGameOver = false,
+  isHost = false,
+  onRematch,
+  onBackToHub,
 }: {
   recap: NonNullable<DominoStateV2["recap"]>;
   seats: DominoSeatState[];
@@ -503,108 +672,210 @@ function RoundRecap({
   teams: boolean;
   scores: DominoStateV2["scores"];
   targetScore: number;
+  isGameOver?: boolean;
+  isHost?: boolean;
+  onRematch?: () => void;
+  onBackToHub?: () => void;
 }) {
-  const { t } = useLanguage();
+  const { lang, t } = useLanguage();
 
-  const headline =
-    recap.method === "draw"
+  const headline = isGameOver
+    ? t("domino.match_over")
+    : recap.method === "draw"
       ? t("domino.recap_draw")
       : recap.method === "blocked"
         ? t("domino.recap_blocked").replace("{name}", recap.winnerName ?? "")
         : t("domino.recap_domino").replace("{name}", recap.winnerName ?? "");
 
+  const progress =
+    secondsLeft !== null ? Math.max(0, Math.min(100, (secondsLeft / 8) * 100)) : 0;
+
   return (
-    <section className="surface-lit rounded-xl p-4 mb-3 animate-in">
-      <div className="text-center mb-4">
-        <p className="font-display text-xl text-cream">{headline}</p>
-        {recap.points > 0 && (
-          <p className="font-numeric text-3xl text-gold mt-1">+{recap.points}</p>
-        )}
-        {recap.karak && (
-          <p className="chip chip-gold mt-2 inline-flex">
-            <Trophy size={12} />
-            {t("domino.karak")}
-          </p>
-        )}
-        {secondsLeft !== null && (
-          <p className="text-xs text-sand mt-2">
-            {t("domino.next_round_in").replace("{n}", String(secondsLeft))}
-          </p>
-        )}
-      </div>
-
-      {/* Everyone's hand, face up. This is the moment the round pays off —
-          you find out whether the person who kept knocking was genuinely
-          stuck or just sitting on the six-six. */}
-      <div className="space-y-2">
-        {seats.map((seat) => (
-          <div key={seat.seat} className="flex items-center gap-2">
-            <span
-              className={`text-xs w-16 shrink-0 truncate ${
-                seat.seat === recap.winnerSeat ? "text-gold font-bold" : "text-sand"
-              }`}
-            >
-              {seat.seat === recap.winnerSeat && <Crown size={11} className="inline me-1" />}
-              {seat.seat === mySeat ? t("domino.you") : seat.name}
-            </span>
-            <div className="flex gap-0.5 flex-1 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-              {(recap.handsBySeat[seat.seat] ?? []).map((tile, i) => (
-                <DominoTile
-                  key={`${tileKey(tile)}-${i}`}
-                  left={tile.left}
-                  right={tile.right}
-                  size={34}
-                  orientation="vertical"
-                />
-              ))}
-              {(recap.handsBySeat[seat.seat] ?? []).length === 0 && (
-                <span className="text-xs text-live">{t("domino.went_out")}</span>
-              )}
-            </div>
-            <span className="font-numeric text-sm text-sand w-7 text-end shrink-0">
-              {recap.pipsBySeat[seat.seat] ?? 0}
-            </span>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-in"
+      role="dialog"
+      aria-modal="true"
+      aria-label={headline}
+    >
+      <div
+        className="surface-lit w-full max-w-md sm:max-w-lg rounded-2xl p-5 sm:p-6 border-2 border-[#D4AF37]/50 shadow-2xl animate-scale-in max-h-[92dvh] overflow-y-auto flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header Icon & Title */}
+        <div className="text-center mb-4">
+          <div
+            className={`w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-2.5 ${
+              isGameOver
+                ? "bg-gold/25 border-2 border-gold text-gold animate-bounce"
+                : "bg-teal/20 border-2 border-teal text-teal"
+            }`}
+          >
+            {isGameOver ? <Trophy size={30} /> : <Sparkles size={28} />}
           </div>
-        ))}
-      </div>
 
-      {teams && recap.winnerTeam && (
-        <p className="text-center text-xs text-sand mt-3">
-          {t("domino.team_scored")
-            .replace("{team}", recap.winnerTeam === "A" ? t("domino.team_a") : t("domino.team_b"))
-            .replace("{n}", String(recap.points))}
-        </p>
-      )}
+          <h2 className="font-display text-xl sm:text-2xl text-cream font-bold">
+            {headline}
+          </h2>
 
-      {/* The running total, and the only place it appears.
-          It used to sit in a header above the board for the whole round,
-          where it was one more thing between the player and the tiles. This
-          is a race to a number and you do need to know where you are — but
-          the moment you want that is between rounds, which is here. */}
-      <div className="mt-4 pt-3 border-t-2 border-border/30">
-        <p className="text-center text-[11px] uppercase tracking-wider text-sand mb-1.5">
-          {t("domino.race_to")} {targetScore}
-        </p>
-        <ul className="flex items-center justify-center flex-wrap gap-x-4 gap-y-1">
-          {teams
-            ? (["A", "B"] as const).map((team) => (
-                <li key={team} className="inline-flex items-baseline gap-1.5">
-                  <span className="text-xs text-sand">
-                    {team === "A" ? t("domino.team_a") : t("domino.team_b")}
+          {/* Points gained */}
+          {!isGameOver && recap.points > 0 && (
+            <p className="font-numeric text-3xl sm:text-4xl text-gold font-bold mt-1">
+              +{recap.points}
+            </p>
+          )}
+
+          {recap.karak && (
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-coral/20 border border-coral text-xs text-cream font-bold mt-2">
+              <span>☕</span>
+              <span>{t("domino.karak")}</span>
+            </div>
+          )}
+
+          {/* Countdown bar to next round */}
+          {!isGameOver && secondsLeft !== null && (
+            <div className="w-full max-w-xs mx-auto mt-3">
+              <div className="flex justify-between text-xs text-sand mb-1 font-medium">
+                <span>{lang === "ar" ? "الجولة القادمة تبدأ خلال" : "Next round in"}</span>
+                <span className="font-numeric text-gold font-bold">{secondsLeft}s</span>
+              </div>
+              <div className="h-2 w-full bg-surface-sunken rounded-full overflow-hidden border border-border/40">
+                <div
+                  className="h-full bg-gradient-to-r from-teal via-gold to-coral rounded-full transition-all duration-300"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Face-up Reveal of all players' hands */}
+        <div className="space-y-2 mb-4 p-3 rounded-xl bg-surface-sunken border border-border/50">
+          <p className="text-[11px] font-bold text-sand uppercase tracking-wider mb-2">
+            {lang === "ar" ? "كروت كل لاعب في اليد" : "Hand Reveal"}
+          </p>
+          {seats.map((seat) => (
+            <div key={seat.seat} className="flex items-center gap-2 py-0.5">
+              <span
+                className={`text-xs w-20 shrink-0 truncate ${
+                  seat.seat === recap.winnerSeat ? "text-gold font-bold" : "text-sand"
+                }`}
+              >
+                {seat.seat === recap.winnerSeat && <Crown size={12} className="inline me-1 text-gold" />}
+                {seat.seat === mySeat ? t("domino.you") : seat.name}
+              </span>
+              <div className="flex gap-1 flex-1 overflow-x-auto py-1" style={{ scrollbarWidth: "none" }}>
+                {(recap.handsBySeat[seat.seat] ?? []).map((tile, i) => (
+                  <DominoTile
+                    key={`${tileKey(tile)}-${i}`}
+                    left={tile.left}
+                    right={tile.right}
+                    size={32}
+                    orientation="vertical"
+                  />
+                ))}
+                {(recap.handsBySeat[seat.seat] ?? []).length === 0 && (
+                  <span className="text-xs text-teal font-bold py-1">
+                    {t("domino.went_out")} 🎯
                   </span>
-                  <span className="font-numeric text-lg text-gold">{scores[team]}</span>
-                </li>
-              ))
-            : seats.map((seat) => (
-                <li key={seat.seat} className="inline-flex items-baseline gap-1.5">
-                  <span className="text-xs text-sand">
-                    {seat.seat === mySeat ? t("domino.you") : seat.name.slice(0, SEAT_LABEL_MAX)}
-                  </span>
-                  <span className="font-numeric text-lg text-gold">{seat.score}</span>
-                </li>
-              ))}
-        </ul>
+                )}
+              </div>
+              <span className="font-numeric text-xs text-sand font-bold w-8 text-end shrink-0">
+                {recap.pipsBySeat[seat.seat] ?? 0}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {/* Match Scores & Target Progress */}
+        <div className="p-3 rounded-xl bg-surface-sunken/60 border border-border/40 mb-4">
+          <div className="flex justify-between items-center text-xs text-sand font-bold uppercase tracking-wider mb-2">
+            <span>{t("domino.race_to")} {targetScore}</span>
+            {teams && recap.winnerTeam && (
+              <span className="text-gold font-bold">
+                {t("domino.team_scored")
+                  .replace("{team}", recap.winnerTeam === "A" ? t("domino.team_a") : t("domino.team_b"))
+                  .replace("{n}", String(recap.points))}
+              </span>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            {teams
+              ? (["A", "B"] as const).map((team) => {
+                  const score = scores[team];
+                  const pct = Math.min(100, Math.round((score / targetScore) * 100));
+                  const isA = team === "A";
+                  return (
+                    <div key={team}>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className={isA ? "text-teal font-bold" : "text-coral font-bold"}>
+                          {isA ? t("domino.team_a") : t("domino.team_b")}
+                        </span>
+                        <span className="font-numeric font-bold text-cream">
+                          {score} / {targetScore}
+                        </span>
+                      </div>
+                      <div className="h-2 w-full bg-surface rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${
+                            isA ? "bg-teal" : "bg-coral"
+                          }`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })
+              : seats.map((seat) => {
+                  const score = seat.score;
+                  const pct = Math.min(100, Math.round((score / targetScore) * 100));
+                  const isMe = seat.seat === mySeat;
+                  return (
+                    <div key={seat.seat}>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className={isMe ? "text-cream font-bold" : "text-sand"}>
+                          {isMe ? t("domino.you") : seat.name}
+                        </span>
+                        <span className="font-numeric font-bold text-cream">
+                          {score} / {targetScore}
+                        </span>
+                      </div>
+                      <div className="h-1.5 w-full bg-surface rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gold rounded-full transition-all duration-500"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+          </div>
+        </div>
+
+        {/* Game Over Actions (Rematch / Return to Hub) */}
+        {isGameOver && (
+          <div className="flex flex-col sm:flex-row gap-2 pt-1 border-t border-border/50">
+            {isHost && onRematch && (
+              <button
+                onClick={onRematch}
+                className="btn btn-primary btn-lg flex-1 font-bold shadow-lg shadow-coral/25"
+              >
+                <RotateCcw size={18} />
+                {lang === "ar" ? "لفة تانية (إعادة)" : "Rematch"}
+              </button>
+            )}
+            {onBackToHub && (
+              <button
+                onClick={onBackToHub}
+                className="btn btn-ghost btn-lg flex-1"
+              >
+                <Home size={18} />
+                {lang === "ar" ? "الرجوع للّمة" : "Back to Hub"}
+              </button>
+            )}
+          </div>
+        )}
       </div>
-    </section>
+    </div>
   );
 }

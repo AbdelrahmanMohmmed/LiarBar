@@ -1,11 +1,11 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { DominoTileDefs, DominoTileGraphic } from "./DominoTile";
 import type { PlacedTile, BoardEnds } from "@/lib/dominoTypes";
 import { useLanguage } from "@/lib/languageContext";
 
 /**
- * The domino table: a stationary 2D serpentine track designed for portrait mobile
- * and desktop screens.
+ * The domino table: a stationary 2D serpentine track designed for both
+ * mobile phones (compact portrait) and PC/desktop screens (wide landscape).
  *
  * All played tiles remain visible on mobile and desktop without scrolling.
  * Placed tiles are anchored to root (0, 0) and NEVER drift from center.
@@ -33,13 +33,31 @@ export interface SlotCoord {
 }
 
 /**
- * Computes coordinates and track orientation for a given slot index (1-based)
- * on the Right Branch (which moves right, down to row 1, left, down to row 2, etc.)
- *
+ * Hook to reactively detect desktop/wide screen viewports.
+ */
+function useIsDesktop(): boolean {
+  const [isDesktop, setIsDesktop] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.innerWidth >= 768;
+  });
+
+  useEffect(() => {
+    const mql = window.matchMedia("(min-width: 768px)");
+    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    setIsDesktop(mql.matches);
+    mql.addEventListener("change", handler);
+    return () => mql.removeEventListener("change", handler);
+  }, []);
+
+  return isDesktop;
+}
+
+/**
+ * Mobile Portrait Track:
  * Compact horizontal span (x: -120 to +120) with vertical progression to fill
  * portrait mobile tables with large, readable dominoes.
  */
-function getRightBranchSlot(slot: number): SlotCoord {
+function getMobileRightBranchSlot(slot: number): SlotCoord {
   // Row 0: Slots 1..2 (x = 60, 120; y = 0; advancing right)
   if (slot === 1) return { x: 60, y: 0, angle: 0 };
   if (slot === 2) return { x: 120, y: 0, angle: 0 };
@@ -80,12 +98,51 @@ function getRightBranchSlot(slot: number): SlotCoord {
 }
 
 /**
- * Returns the slot coordinates for either the right or left branch.
- * The left branch is a 180° point reflection through the origin (0, 0),
- * ensuring zero collision with the right branch and balanced vertical flow.
+ * Desktop Landscape Track:
+ * Wide horizontal span (x: -300 to +300) that fills PC monitors and landscape displays.
+ * Row 0 alone spans 11 dominoes across the felt, utilizing the full screen width.
  */
-function getBranchSlot(branch: "right" | "left", slot: number): SlotCoord {
-  const rightSlot = getRightBranchSlot(slot);
+function getDesktopRightBranchSlot(slot: number): SlotCoord {
+  // Row 0: Slots 1..5 (x = 60, 120, 180, 240, 300; y = 0; advancing right)
+  if (slot >= 1 && slot <= 5) {
+    return { x: slot * 60, y: 0, angle: 0 };
+  }
+
+  // Turn 1: Slot 6 (x = 335, y = 31; advancing down to Row 1)
+  if (slot === 6) return { x: 335, y: 31, angle: 90 };
+
+  // Row 1: Slots 7..17 (y = 62; advancing left from x = 300 down to x = -300)
+  if (slot >= 7 && slot <= 17) {
+    const col = slot - 7; // 0..10
+    return { x: 300 - col * 60, y: 62, angle: 180 };
+  }
+
+  // Turn 2: Slot 18 (x = -335, y = 93; advancing down to Row 2)
+  if (slot === 18) return { x: -335, y: 93, angle: 90 };
+
+  // Row 2: Slots 19..29 (y = 124; advancing right from x = -300 to x = 300)
+  if (slot >= 19 && slot <= 29) {
+    const col = slot - 19; // 0..10
+    return { x: -300 + col * 60, y: 124, angle: 0 };
+  }
+
+  // Turn 3: Slot 30 (x = 335, y = 155; advancing down to Row 3)
+  if (slot === 30) return { x: 335, y: 155, angle: 90 };
+
+  // Row 3: Slots 31..40 (y = 186; advancing left from x = 300 to -300)
+  const col = Math.min(10, slot - 31);
+  return { x: 300 - col * 60, y: 186, angle: 180 };
+}
+
+/**
+ * Returns slot coordinates for either the right or left branch.
+ * The left branch is an exact 180° point reflection through (0, 0),
+ * mathematically guaranteeing ZERO collision and symmetric balance.
+ */
+function getBranchSlot(branch: "right" | "left", slot: number, isDesktop: boolean): SlotCoord {
+  const rightSlot = isDesktop
+    ? getDesktopRightBranchSlot(slot)
+    : getMobileRightBranchSlot(slot);
   if (branch === "right") {
     return rightSlot;
   }
@@ -104,6 +161,7 @@ export default function DominoBoard({
   lastSeq,
 }: Props) {
   const { t } = useLanguage();
+  const isDesktop = useIsDesktop();
 
   // Decompose board into root tile, left branch, and right branch.
   const { rootTile, leftBranchFromRoot, rightBranchFromRoot } = useMemo(() => {
@@ -140,25 +198,31 @@ export default function DominoBoard({
   const nextRightSlotIdx = rightBranchFromRoot.length + 1;
   const nextLeftSlotIdx = leftBranchFromRoot.length + 1;
 
-  const rightTargetCoord = getBranchSlot("right", nextRightSlotIdx);
-  const leftTargetCoord = getBranchSlot("left", nextLeftSlotIdx);
+  const rightTargetCoord = useMemo(
+    () => getBranchSlot("right", nextRightSlotIdx, isDesktop),
+    [nextRightSlotIdx, isDesktop],
+  );
+  const leftTargetCoord = useMemo(
+    () => getBranchSlot("left", nextLeftSlotIdx, isDesktop),
+    [nextLeftSlotIdx, isDesktop],
+  );
 
   // Compute adaptive zoom centered on (0, 0) to maximize domino size and minimize empty space
   const currentZoom = useMemo(() => {
-    if (board.length === 0) return 1.45;
+    if (board.length === 0) return isDesktop ? 1.35 : 1.45;
 
     let maxSpanX = 60;
     let maxSpanY = 60;
 
     rightBranchFromRoot.forEach((tile, i) => {
-      const slot = getBranchSlot("right", i + 1);
+      const slot = getBranchSlot("right", i + 1, isDesktop);
       const isDbl = tile.left === tile.right;
       maxSpanX = Math.max(maxSpanX, Math.abs(slot.x) + (isDbl ? 20 : 35));
       maxSpanY = Math.max(maxSpanY, Math.abs(slot.y) + (isDbl ? 35 : 20));
     });
 
     leftBranchFromRoot.forEach((tile, i) => {
-      const slot = getBranchSlot("left", i + 1);
+      const slot = getBranchSlot("left", i + 1, isDesktop);
       const isDbl = tile.left === tile.right;
       maxSpanX = Math.max(maxSpanX, Math.abs(slot.x) + (isDbl ? 20 : 35));
       maxSpanY = Math.max(maxSpanY, Math.abs(slot.y) + (isDbl ? 35 : 20));
@@ -173,14 +237,32 @@ export default function DominoBoard({
       maxSpanY = Math.max(maxSpanY, Math.abs(leftTargetCoord.y) + 32);
     }
 
-    // Safe bounds within viewBox="-175 -260 350 520"
-    const zoomX = 160 / maxSpanX;
-    const zoomY = 240 / maxSpanY;
-    const fitZoom = Math.min(zoomX, zoomY);
+    if (isDesktop) {
+      // Desktop bounds: viewBox="-360 -160 720 320"
+      const zoomX = 330 / maxSpanX;
+      const zoomY = 140 / maxSpanY;
+      const fitZoom = Math.min(zoomX, zoomY);
+      return Math.max(1.0, Math.min(1.4, Number(fitZoom.toFixed(2))));
+    } else {
+      // Mobile bounds: viewBox="-175 -260 350 520"
+      const zoomX = 160 / maxSpanX;
+      const zoomY = 240 / maxSpanY;
+      const fitZoom = Math.min(zoomX, zoomY);
+      return Math.max(1.0, Math.min(1.45, Number(fitZoom.toFixed(2))));
+    }
+  }, [
+    board.length,
+    rightBranchFromRoot,
+    leftBranchFromRoot,
+    canClickRight,
+    canClickLeft,
+    rightTargetCoord,
+    leftTargetCoord,
+    isDesktop,
+  ]);
 
-    // Keep zoom between 1.0 (late game) and 1.45 (opening moves)
-    return Math.max(1.0, Math.min(1.45, Number(fitZoom.toFixed(2))));
-  }, [board.length, rightBranchFromRoot, leftBranchFromRoot, canClickRight, canClickLeft, rightTargetCoord, leftTargetCoord]);
+  const viewBox = isDesktop ? "-360 -160 720 320" : "-175 -260 350 520";
+  const tileScale = isDesktop ? 0.62 : 0.58;
 
   return (
     <div
@@ -189,7 +271,7 @@ export default function DominoBoard({
       aria-label={`${t("domino.title")}. ${t("domino.open_end")}: ${ends.left ?? "–"} / ${ends.right ?? "–"}`}
     >
       <svg
-        viewBox="-175 -260 350 520"
+        viewBox={viewBox}
         className="w-full h-full overflow-visible"
         preserveAspectRatio="xMidYMid meet"
       >
@@ -246,7 +328,7 @@ export default function DominoBoard({
                 return (
                   <g
                     key={`root-${rootTile.seq}`}
-                    transform={`translate(0, 0) rotate(${angle}) scale(0.58)`}
+                    transform={`translate(0, 0) rotate(${angle}) scale(${tileScale})`}
                   >
                     <g className={isJustPlayed ? "domino-drop" : ""}>
                       <DominoTileGraphic
@@ -261,7 +343,7 @@ export default function DominoBoard({
               {/* Right Branch tiles */}
               {rightBranchFromRoot.map((tile, i) => {
                 const slotIdx = i + 1;
-                const slot = getBranchSlot("right", slotIdx);
+                const slot = getBranchSlot("right", slotIdx, isDesktop);
                 const isDbl = tile.left === tile.right;
                 const renderAngle = isDbl ? (slot.angle + 90) % 360 : slot.angle;
                 const isJustPlayed = tile.seq === lastSeq;
@@ -270,7 +352,7 @@ export default function DominoBoard({
                 return (
                   <g
                     key={`r-${tile.seq}-${tile.left}-${tile.right}`}
-                    transform={`translate(${slot.x}, ${slot.y}) rotate(${renderAngle}) scale(0.58)`}
+                    transform={`translate(${slot.x}, ${slot.y}) rotate(${renderAngle}) scale(${tileScale})`}
                     className={isOuter && canClickRight ? "cursor-pointer" : ""}
                     onClick={isOuter && canClickRight ? () => onEndClick?.("right") : undefined}
                   >
@@ -288,7 +370,7 @@ export default function DominoBoard({
               {/* Left Branch tiles */}
               {leftBranchFromRoot.map((tile, i) => {
                 const slotIdx = i + 1;
-                const slot = getBranchSlot("left", slotIdx);
+                const slot = getBranchSlot("left", slotIdx, isDesktop);
                 const isDbl = tile.left === tile.right;
                 const renderAngle = isDbl ? (slot.angle + 90) % 360 : slot.angle;
                 const isJustPlayed = tile.seq === lastSeq;
@@ -297,7 +379,7 @@ export default function DominoBoard({
                 return (
                   <g
                     key={`l-${tile.seq}-${tile.left}-${tile.right}`}
-                    transform={`translate(${slot.x}, ${slot.y}) rotate(${renderAngle}) scale(0.58)`}
+                    transform={`translate(${slot.x}, ${slot.y}) rotate(${renderAngle}) scale(${tileScale})`}
                     className={isOuter && canClickLeft ? "cursor-pointer" : ""}
                     onClick={isOuter && canClickLeft ? () => onEndClick?.("left") : undefined}
                   >
