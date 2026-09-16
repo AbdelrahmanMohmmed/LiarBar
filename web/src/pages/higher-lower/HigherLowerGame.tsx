@@ -204,9 +204,11 @@ export default function HigherLowerGame() {
     }
   }, [paramRoomId, handleCopyLink, isAr]);
 
-  const handleSubmitGuess = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!guessInput.trim()) return;
+  const handleSubmitGuess = async (e?: React.FormEvent) => {
+    if (e && typeof e.preventDefault === "function") {
+      e.preventDefault();
+    }
+    if (!guessInput.trim() || isSubmitting) return;
 
     const val = parseInt(guessInput, 10);
     if (isNaN(val) || val < 1 || val > 99) {
@@ -507,12 +509,23 @@ export default function HigherLowerGame() {
               max={99}
               value={guessInput}
               onChange={(e) => setGuessInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void handleSubmitGuess();
+                }
+              }}
               disabled={isSubmitting}
               autoFocus
             />
 
-            <PrimaryButton onClick={() => {}} disabled={isSubmitting} style={{ border: `3px solid ${COLORS.ink}`, boxShadow: `3px 3px 0 ${COLORS.ink}` }}>
-              {c.send}
+            <PrimaryButton
+              type="submit"
+              onClick={handleSubmitGuess}
+              disabled={isSubmitting || !guessInput.trim()}
+              style={{ border: `3px solid ${COLORS.ink}`, boxShadow: `3px 3px 0 ${COLORS.ink}` }}
+            >
+              {isSubmitting ? "..." : c.send}
             </PrimaryButton>
           </form>
         )}

@@ -745,6 +745,10 @@ export const [GameProvider, useGame] = createContextHook(() => {
         success: boolean;
         state: GameState | CodenamesState;
       }>("reconnect_room", { roomId, playerId });
+      setMyRoomId(roomId.toUpperCase());
+      setMyPlayerId(playerId);
+      localStorage.setItem(LS_ROOM_ID, roomId.toUpperCase());
+      localStorage.setItem(LS_PLAYER_ID, playerId);
       applyRoomState(res.state);
     },
     [emitWithAck, applyRoomState],
@@ -863,7 +867,8 @@ export const [GameProvider, useGame] = createContextHook(() => {
   }, [myRoomId, emitWithAck]);
 
   const higherLowerGuess = useCallback(async (guess: number) => {
-    if (!myRoomId) throw new Error("Not in a room");
+    const rid = myRoomId || localStorage.getItem(LS_ROOM_ID);
+    if (!rid) throw new Error("Not in a room");
     await emitWithAck("higher_lower_guess", { guess });
   }, [myRoomId, emitWithAck]);
 
