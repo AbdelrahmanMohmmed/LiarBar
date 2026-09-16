@@ -281,7 +281,7 @@ export class PartyRoom implements GameRoom {
   pickGame(
     gameId: string,
     options: Partial<CreateRoomOptions> = {},
-    { autoStart = true }: { autoStart?: boolean } = {},
+    { autoStart = false }: { autoStart?: boolean } = {},
   ): { success: boolean; error?: string } {
     if (this.destroyed) return { success: false, error: "Party is closed" };
 
@@ -355,12 +355,25 @@ export class PartyRoom implements GameRoom {
     return { success: true };
   }
 
+  /** Update configuration of the currently staged game before starting. */
+  updateOptions(options: Partial<CreateRoomOptions>): { success: boolean; error?: string } {
+    if (this.destroyed) return { success: false, error: "Party is closed" };
+    if (!this.activeGameId) {
+      return { success: false, error: "No game staged" };
+    }
+    const merged = {
+      ...this.activeOptions,
+      ...options,
+    };
+    return this.pickGame(this.activeGameId, merged, { autoStart: false });
+  }
+
   /** Restart the current game with the same settings and the same people. */
   rematch(): { success: boolean; error?: string } {
     if (!this.activeGameId) {
       return { success: false, error: "No game to rematch" };
     }
-    return this.pickGame(this.activeGameId, this.activeOptions ?? {});
+    return this.pickGame(this.activeGameId, this.activeOptions ?? {}, { autoStart: true });
   }
 
   /** Back to the hub — no game running, roster and voice intact. */
@@ -468,6 +481,7 @@ export class PartyRoom implements GameRoom {
       gameId: this.gameId,
       phase: this.phase,
       activeGameId: this.activeGameId,
+      activeOptions: this.activeOptions,
       players: this.players.map((p) => p.toPublicData()),
       maxPlayers: this.maxPlayers,
       leaderboard: this.leaderboard,
@@ -483,6 +497,7 @@ export class PartyRoom implements GameRoom {
       gameId: this.gameId,
       phase: this.phase,
       activeGameId: this.activeGameId,
+      activeOptions: this.activeOptions,
       players: this.players.map((p) =>
         p.id === playerId ? p.toData() : p.toPublicData(),
       ),

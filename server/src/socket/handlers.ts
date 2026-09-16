@@ -1296,7 +1296,7 @@ export function registerSocketHandlers(
     /** Host switches the party into a different game. Works from any phase. */
     socket.on(
       "party_pick_game",
-      (data: { gameId?: string; options?: Partial<CreateRoomOptions> }, callback: Ack) => {
+      (data: { gameId?: string; options?: Partial<CreateRoomOptions>; autoStart?: boolean }, callback: Ack) => {
         const m = hostMembership(callback);
         if (!m) return;
         if (!(m.room instanceof PartyRoom)) {
@@ -1313,9 +1313,36 @@ export function registerSocketHandlers(
         const result = m.room.pickGame(
           String(data?.gameId ?? ""),
           data?.options ?? {},
+          { autoStart: Boolean(data?.autoStart) },
         );
         if (!result.success) {
           fail(callback, result.error ?? "Could not start that game");
+          return;
+        }
+
+        sendPrivateHands(io, m.room);
+        reply(callback, { success: true });
+      },
+    );
+
+    /** Host updates settings of the staged game before starting it. */
+    socket.on(
+      "party_update_options",
+      (data: { options?: Partial<CreateRoomOptions> }, callback: Ack) => {
+        const m = hostMembership(callback);
+        if (!m) return;
+        if (!(m.room instanceof PartyRoom)) {
+          fail(callback, "This room can't configure games");
+          return;
+        }
+        if (!limiter.allow(`${socket.id}:party_update_options`, 30, 10_000)) {
+          fail(callback, "Slow down a moment");
+          return;
+        }
+
+        const result = m.room.updateOptions(data?.options ?? {});
+        if (!result.success) {
+          fail(callback, result.error ?? "Could not update options");
           return;
         }
 

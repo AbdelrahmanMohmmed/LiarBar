@@ -136,6 +136,8 @@ interface GameActions {
   dominoRematch: () => Promise<void>;
   /** Switch the whole party into a different game. Keeps the room + voice. */
   partyPickGame: (gameId: string, options?: Record<string, unknown>) => Promise<void>;
+  /** Update configuration of the staged game before starting it. */
+  partyUpdateOptions: (options: Record<string, unknown>) => Promise<void>;
   /** Same game, same settings, same people, fresh deal. */
   partyRematch: () => Promise<void>;
   /** Abandon the current game, back to the picker. */
@@ -932,6 +934,14 @@ export const [GameProvider, useGame] = createContextHook(() => {
     [myRoomId, emitWithAck],
   );
 
+  const partyUpdateOptions = useCallback(
+    async (options: Record<string, unknown>) => {
+      if (!myRoomId) throw new Error("Not in a room");
+      await emitWithAck("party_update_options", { options });
+    },
+    [myRoomId, emitWithAck],
+  );
+
   const partyRematch = useCallback(async () => {
     if (!myRoomId) throw new Error("Not in a room");
     await emitWithAck("party_rematch", {});
@@ -1193,6 +1203,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
     dominoKnock,
     dominoRematch,
     partyPickGame,
+    partyUpdateOptions,
     partyRematch,
     partyReturnHub,
     partyLeave,

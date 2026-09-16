@@ -33,6 +33,7 @@ export interface PartyState {
   phase: PartyPhase;
   /** Which game is loaded, or null in the hub. */
   activeGameId: string | null;
+  activeOptions?: Record<string, unknown> | null;
   players: RoomPlayerLite[];
   maxPlayers: number;
   leaderboard: PartyScoreEntry[];
