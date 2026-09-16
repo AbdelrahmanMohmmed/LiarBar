@@ -15,6 +15,7 @@ import {
   tileKey,
   pips,
 } from "@/lib/dominoTypes";
+import { playTileSfx } from "@/utils/sfx";
 
 /**
  * The domino table.
@@ -58,8 +59,10 @@ export default function DominoGamePage() {
   const state = dominoState as unknown as DominoStateV2 | null;
 
   const [selected, setSelected] = useState<Tile | null>(null);
+  const [shakingTile, setShakingTile] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const lastEventRef = useRef<number>(0);
+  const prevBoardLenRef = useRef<number>(0);
 
   // Re-attach on a refresh rather than rendering an empty table.
   useEffect(() => {
@@ -127,9 +130,23 @@ export default function DominoGamePage() {
     }
   }, [state?.events, mySeat, addToast, t]);
 
+  // Tactile audio clack when an opponent or bot places a tile
+  useEffect(() => {
+    const len = state?.board.length ?? 0;
+    if (len > prevBoardLenRef.current) {
+      const events = state?.events ?? [];
+      const latest = events[events.length - 1];
+      if (latest && latest.seat !== mySeat) {
+        playTileSfx();
+      }
+    }
+    prevBoardLenRef.current = len;
+  }, [state?.board.length, state?.events, mySeat]);
+
   const play = useCallback(
     async (tile: Tile, end: "left" | "right") => {
       setSelected(null);
+      playTileSfx();
       try {
         await dominoPlayTile(tile, end);
       } catch (err) {
@@ -142,19 +159,20 @@ export default function DominoGamePage() {
   const onTileTap = useCallback(
     (tile: Tile) => {
       if (!myTurn) return;
-      const ends = endsForTile.get(tileKey(tile)) ?? [];
+      const key = tileKey(tile);
+      const ends = endsForTile.get(key) ?? [];
       if (ends.length === 0) {
+        setShakingTile(key);
+        window.setTimeout(() => setShakingTile(null), 400);
         addToast(t("domino.tile_doesnt_fit"), "info");
         return;
       }
-      // One legal end: just play it. Making someone confirm a move with only
-      // one possible outcome is pure friction.
+      // One legal end: just play it immediately.
       if (ends.length === 1) {
         void play(tile, ends[0]);
         return;
       }
-      // Two legal ends: arm the markers and let them choose. Guessing here
-      // costs a turn, and in a close round that's the round.
+      // Two legal ends: elevate tile in hand and illuminate open ends on the board.
       setSelected((prev) => (prev && sameTile(prev, tile) ? null : tile));
     },
     [myTurn, endsForTile, play, addToast, t],
@@ -239,13 +257,14 @@ export default function DominoGamePage() {
 
       {/* ---- Table ---- */}
       <section
-        className="rounded-xl p-3 mb-3 border-2 border-border flex-1 flex flex-col justify-center"
+        className="rounded-2xl p-2 sm:p-4 mb-3 border-4 border-[#2d1e14] flex-1 flex flex-col justify-center relative overflow-hidden"
         style={{
-          // A felt surface rather than a flat panel: this is the one place in
-          // the app that should read as a physical table.
           background:
-            "radial-gradient(120% 140% at 50% 0%, #17301f 0%, #0E1C14 70%)",
-          boxShadow: "inset 0 2px 20px rgba(0,0,0,0.6)",
+            "radial-gradient(120% 140% at 50% 25%, #184c2b 0%, #113820 50%, #081d11 90%)",
+          boxShadow:
+            "inset 0 0 45px rgba(0,0,0,0.85), 0 8px 24px rgba(0,0,0,0.5)",
+          outline: "1px solid rgba(212, 175, 55, 0.35)",
+          outlineOffset: "-3px",
         }}
       >
         <DominoBoard
@@ -255,7 +274,7 @@ export default function DominoGamePage() {
           lastSeq={lastSeq >= 0 ? lastSeq : undefined}
           lastEnd={lastEnd}
           onEndClick={
-            selected && selectedEnds.length > 1
+            selected && selectedEnds.length > 0
               ? (end) => void play(selected, end)
               : undefined
           }
@@ -350,6 +369,14 @@ export default function DominoGamePage() {
                     size={76}
                     active={Boolean(selected && sameTile(selected, tile))}
                     onClick={() => onTileTap(tile)}
+                    className={[
+                      shakingTile === tileKey(tile) ? "tile-shake" : "",
+                      selected && sameTile(selected, tile)
+                        ? "-translate-y-2.5 drop-shadow-[0_8px_12px_rgba(224,109,83,0.45)]"
+                        : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
                     ariaLabel={`${tile.left} ${tile.right}`}
                   />
                 ))
