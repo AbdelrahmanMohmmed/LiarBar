@@ -594,6 +594,32 @@ export const [VoiceProvider, useVoice] = createContextHook(() => {
   // Connect to every other human player. Only the smaller ID initiates; the
   // larger ID waits for the incoming offer. This yields exactly one audio
   // m-line per pair and lets muted users listen immediately.
+  //
+  // `rejoinSeq` nudges this effect when the session was re-adopted after a
+  // socket drop (below) — the roster itself may be unchanged, but every peer
+  // connection still has to be rebuilt from scratch.
+  const [rejoinSeq, setRejoinSeq] = useState(0);
+  useEffect(() => {
+    const onRejoined = () => setRejoinSeq((n) => n + 1);
+    window.addEventListener("room_rejoined", onRejoined);
+    return () => window.removeEventListener("room_rejoined", onRejoined);
+  }, []);
+
+  // After a socket drop the server re-adopts the session and gameContext
+  // announces "room_rejoined". The old RTCPeerConnections may even look
+  // connected, but their signaling session is gone and their ICE path usually
+  // died with the network — the reliable recovery is the same one a page
+  // reopen gets: tear the mesh down and let the effect below rebuild it from
+  // the roster. The mic stream is deliberately kept: re-opening it would
+  // re-trigger the permission prompt and lose the player's mute choice.
+  useEffect(() => {
+    if (rejoinSeq === 0) return;
+    for (const peerId of Array.from(peersRef.current.keys())) {
+      closePeer(peerId);
+    }
+    setPeerHealth({});
+  }, [rejoinSeq, closePeer]);
+
   useEffect(() => {
     if (!myPlayerId) return;
 
@@ -609,7 +635,7 @@ export const [VoiceProvider, useVoice] = createContextHook(() => {
     }
 
     setPeerCount(peerIds.length);
-  }, [peerKey, myPlayerId, ensurePeer, closePeer]);
+  }, [peerKey, myPlayerId, rejoinSeq, ensurePeer, closePeer]);
 
   // Leaving the room is the only thing that stops voice. Navigating between
   // the lobby and a game keeps the mesh and the mic alive.

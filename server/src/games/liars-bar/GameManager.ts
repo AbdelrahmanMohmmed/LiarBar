@@ -65,10 +65,15 @@ export interface GameState {
   skipVotesNeeded: number; // how many votes needed to skip
   challengeStartedAt: number | null; // timestamp when challenge window opened
   turnDeadline: number | null; // turn limit timestamp
+  /** Active vote-kick: target playerId -> voters, plus when it expires. */
+  kickVotes: Record<string, string[]>;
+  kickVoteDeadline: number | null;
 }
 
 const CHALLENGE_DURATION_OPTIONS = [5, 10] as const;
 const MIN_CHALLENGE_TIME_BEFORE_VOTE_MS = 3000; // 3 seconds minimum before votes count
+/** A vote-kick expires if it isn't resolved within this window. */
+const KICK_VOTE_TTL_MS = 60_000;
 
 export class GameManager implements GameRoom {
   readonly gameId = "liars-bar";
@@ -106,6 +111,10 @@ export class GameManager implements GameRoom {
   // Vote system state
   skipVotes: Set<string>;
   challengeStartedAt: number | null;
+  // Vote-kick state (target playerId -> voters)
+  private kickVotes: Map<string, Set<string>>;
+  private kickVoteDeadline: number | null;
+  private kickVoteTimer: NodeJS.Timeout | null;
 
   private broadcast: (state: GameState) => void;
   /**
@@ -179,6 +188,9 @@ export class GameManager implements GameRoom {
     this.challengeDuration = (CHALLENGE_DURATION_OPTIONS as readonly number[]).includes(challengeDuration) ? challengeDuration : 5;
     this.skipVotes = new Set();
     this.challengeStartedAt = null;
+    this.kickVotes = new Map();
+    this.kickVoteDeadline = null;
+    this.kickVoteTimer = null;
   }
 
   addPlayer(name: string, socketId: string, isHost: boolean = false, playerId?: string): Player {
@@ -521,9 +533,14 @@ export class GameManager implements GameRoom {
     this.revealDeadline = null;
     this.revealTimer = null;
 
-    // Loser takes the entire central pile
+    // Loser takes the entire central pile — unless they were kicked or left
+    // during the reveal window. Their Player object survives in this closure,
+    // and feeding the pile to a seat that no longer exists would silently
+    // delete those cards from the game.
     const pileCards = [...this.centralPile];
-    loser.addCards(pileCards);
+    if (this.getPlayer(loser.id)) {
+      loser.addCards(pileCards);
+    }
 
     this.logAction({
       type: "pile_taken",
@@ -915,10 +932,116 @@ export class GameManager implements GameRoom {
     }
   }
 
+  /**
+   * Vote to kick a player from the game.
+   *
+   * Mirrors the Rento rule that a vote is a toggle, so a misclick is undoable,
+   * and needs a strict majority of the OTHER players to pass. A 2-player game
+   * can never vote-kick: with one voter there is no majority to out-vote the
+   * accuser, and the only use a lone "vote" could serve is griefing.
+   */
+  voteKick(voterId: string, targetPlayerId: string): {
+    success: boolean;
+    error?: string;
+    votesNow?: number;
+    votesNeeded?: number;
+  } {
+    if (this.destroyed) return { success: false, error: "Game destroyed" };
+    if (this.phase === "lobby" || this.phase === "game_over") {
+      return { success: false, error: "Game is not active" };
+    }
+    if (voterId === targetPlayerId) {
+      return { success: false, error: "Cannot vote for yourself" };
+    }
+    if (this.players.length <= 2) {
+      return { success: false, error: "Need more than 2 players to vote-kick" };
+    }
+
+    const voter = this.getPlayer(voterId);
+    const target = this.getPlayer(targetPlayerId);
+    if (!voter || !target) return { success: false, error: "Invalid player" };
+
+    let votes = this.kickVotes.get(targetPlayerId);
+    if (!votes) {
+      votes = new Set();
+      this.kickVotes.set(targetPlayerId, votes);
+    }
+
+    // Toggle: a second click from the same voter retracts their vote.
+    if (votes.has(voterId)) votes.delete(voterId);
+    else votes.add(voterId);
+
+    if (votes.size === 0) {
+      this.clearKickVoteTimer();
+      this.kickVotes.delete(targetPlayerId);
+      if (this.kickVotes.size === 0) this.kickVoteDeadline = null;
+      const state = this.toState();
+      this.broadcast(state);
+      return { success: true, votesNow: 0, votesNeeded: this.kickVotesNeeded(targetPlayerId) };
+    }
+
+    // Start the expiry clock on the first vote against a target.
+    if (!this.kickVoteDeadline) {
+      this.kickVoteDeadline = Date.now() + KICK_VOTE_TTL_MS;
+      this.clearKickVoteTimer();
+      this.kickVoteTimer = setTimeout(() => {
+        this.expireKickVotes();
+      }, KICK_VOTE_TTL_MS);
+      this.kickVoteTimer.unref?.();
+    }
+
+    const votesNeeded = this.kickVotesNeeded(targetPlayerId);
+    const currentVotes = votes.size;
+
+    if (currentVotes >= votesNeeded) {
+      this.kickPlayer(targetPlayerId, `${target.name} was voted out by the players.`);
+      return { success: true, votesNow: currentVotes, votesNeeded };
+    }
+
+    const state = this.toState();
+    this.broadcast(state);
+    return { success: true, votesNow: currentVotes, votesNeeded };
+  }
+
+  /** Majority of everyone except the target (bots included — they occupy seats). */
+  private kickVotesNeeded(targetPlayerId: string): number {
+    const eligible = this.players.filter((p) => p.id !== targetPlayerId).length;
+    return Math.floor(eligible / 2) + 1;
+  }
+
+  private clearKickVoteTimer(): void {
+    if (this.kickVoteTimer) {
+      clearTimeout(this.kickVoteTimer);
+      this.kickVoteTimer = null;
+    }
+  }
+
+  /** Let a stale vote die quietly rather than hanging on the roster forever. */
+  private expireKickVotes(): void {
+    if (this.destroyed) return;
+    this.clearKickVoteTimer();
+    this.kickVoteDeadline = null;
+    if (this.kickVotes.size > 0) {
+      this.kickVotes.clear();
+      this.broadcast(this.toState());
+    }
+  }
+
   /** Serialize to GameState */
   toState(): GameState {
     const eligibleVoters = this.players.filter((p) => p.id !== this.lastPlayerId).length;
     const votesNeeded = Math.floor(eligibleVoters / 2) + 1;
+
+    const kickVotesPublic: Record<string, string[]> = {};
+    let minKickDeadline: number | null = null;
+    for (const [targetId, voters] of this.kickVotes) {
+      // Drop votes for seats that no longer exist (a kicked/removed target).
+      if (!this.getPlayer(targetId)) continue;
+      kickVotesPublic[targetId] = [...voters];
+      if (this.kickVoteDeadline !== null) {
+        minKickDeadline = minKickDeadline === null ? this.kickVoteDeadline : Math.min(minKickDeadline, this.kickVoteDeadline);
+      }
+    }
 
     return {
       roomId: this.roomId,
@@ -947,6 +1070,8 @@ export class GameManager implements GameRoom {
       skipVotesNeeded: votesNeeded,
       challengeStartedAt: this.challengeStartedAt,
       turnDeadline: this.turnDeadline,
+      kickVotes: kickVotesPublic,
+      kickVoteDeadline: minKickDeadline,
     };
   }
 
@@ -988,6 +1113,7 @@ export class GameManager implements GameRoom {
     this.clearRevealTimer();
     this.clearBotTimers();
     this.clearTurnTimer();
+    this.clearKickVoteTimer();
   }
 
   private startTurnTimer(): void {
@@ -1037,7 +1163,7 @@ export class GameManager implements GameRoom {
     }
   }
 
-  kickPlayer(playerId: string): void {
+  kickPlayer(playerId: string, reason?: string): void {
     const idx = this.players.findIndex((p) => p.id === playerId);
     if (idx === -1) return;
 
@@ -1048,9 +1174,14 @@ export class GameManager implements GameRoom {
       type: "play",
       playerId: "system",
       playerName: "Game",
-      data: { message: `${player.name} was kicked for inactivity.` },
+      data: { message: reason ?? `${player.name} was kicked for inactivity.` },
       timestamp: Date.now(),
     });
+
+    // The vote that produced this kick must not outlive its target.
+    this.clearKickVoteTimer();
+    this.kickVotes.delete(playerId);
+    if (this.kickVotes.size === 0) this.kickVoteDeadline = null;
 
     this.players.splice(idx, 1);
 

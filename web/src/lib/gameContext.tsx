@@ -110,6 +110,8 @@ interface GameActions {
   callLiar: () => Promise<void>;
   passTurn: () => Promise<void>;
   voteSkip: () => Promise<{ votesNow?: number; votesNeeded?: number }>;
+  /** Liar's Bar: toggle your vote to kick a player. Majority of the others wins. */
+  voteKick: (targetId: string) => Promise<{ votesNow?: number; votesNeeded?: number }>;
   sendChat: (message: string) => void;
   sendWebRTCSignal: (targetId: string, signal: unknown) => void;
   addToast: (
@@ -303,6 +305,14 @@ export const [GameProvider, useGame] = createContextHook(() => {
   const myPlayerIdRef = useRef(myPlayerId);
   myPlayerIdRef.current = myPlayerId;
 
+  /**
+   * Current room id, readable inside the socket-listener effect. The listener
+   * registers once, but "should I rejoin after a reconnect?" always needs the
+   * CURRENT answer, not the one from mount time.
+   */
+  const myRoomIdRef = useRef(myRoomId);
+  myRoomIdRef.current = myRoomId;
+
   const addToast = useCallback(
     (message: string, type: ToastNotification["type"] = "info") => {
       const id = Math.random().toString(36).slice(2);
@@ -369,8 +379,59 @@ export const [GameProvider, useGame] = createContextHook(() => {
   useEffect(() => {
     const socket = getSocket();
 
+    /**
+     * First `connect` of this page load, vs every later one. Page-load
+     * restoration is each page's own job (they call reconnectRoom with the
+     * stored session). Later connects are mid-session drops — network blip,
+     * phone lock, laptop sleep — and nobody is watching for those, so THIS is
+     * where the room is restored. Without it, a dropped socket meant the game
+     * went on without you while your screen showed a stale table: the server
+     * kept your seat warm for two minutes, but the client had already given up
+     * driving it.
+     */
+    let everConnected = false;
+
     const onConnect = () => {
       setIsConnected(true);
+
+      if (!everConnected) {
+        everConnected = true;
+        return;
+      }
+
+      const roomId = myRoomIdRef.current;
+      const playerId = myPlayerIdRef.current;
+      if (!roomId || !playerId) return;
+
+      socket.emit(
+        "reconnect_room",
+        { roomId, playerId },
+        (res: { error?: string; state?: AnyRoomState } | undefined) => {
+          if (res && !res.error && res.state) {
+            setMyRoomId(roomId.toUpperCase());
+            setMyPlayerId(playerId);
+            applyRoomStateRef.current(res.state);
+            // Voice listens for this: the mesh must rebuild because every
+            // RTCPeerConnection died with the old socket's session.
+            window.dispatchEvent(
+              new CustomEvent("room_rejoined", { detail: { roomId } }),
+            );
+          } else if (res?.error) {
+            // The room is gone (swept) or the seat no longer exists: the
+            // stored keys are a dead end. Clear them so the next launch is a
+            // clean start instead of a loop of failed rejoins.
+            try {
+              localStorage.removeItem(LS_ROOM_ID);
+              localStorage.removeItem(LS_PLAYER_ID);
+            } catch {
+              /* private mode */
+            }
+            setMyRoomId(null);
+            setMyPlayerId(null);
+            addToast(res.error, "error");
+          }
+        },
+      );
     };
 
     const onDisconnect = () => {
@@ -823,6 +884,19 @@ export const [GameProvider, useGame] = createContextHook(() => {
     return { votesNow: res.votesNow, votesNeeded: res.votesNeeded };
   }, [myRoomId, emitWithAck]);
 
+  const voteKick = useCallback(
+    async (targetId: string): Promise<{ votesNow?: number; votesNeeded?: number }> => {
+      if (!myRoomId) throw new Error("Not in a room");
+      const res = await emitWithAck<{
+        success: boolean;
+        votesNow?: number;
+        votesNeeded?: number;
+      }>("vote_kick", { roomId: myRoomId, targetId });
+      return { votesNow: res.votesNow, votesNeeded: res.votesNeeded };
+    },
+    [myRoomId, emitWithAck],
+  );
+
   const sendChat = useCallback(
     (message: string) => {
       if (!myRoomId) return;
@@ -1187,6 +1261,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
     callLiar,
     passTurn,
     voteSkip,
+    voteKick,
     sendChat,
     sendWebRTCSignal,
     addToast,

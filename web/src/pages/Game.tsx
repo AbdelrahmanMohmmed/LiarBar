@@ -29,6 +29,7 @@ export default function Game() {
     callLiar,
     passTurn,
     voteSkip,
+    voteKick,
     sendChat,
     addToast,
     reconnectRoom,
@@ -248,6 +249,26 @@ export default function Game() {
     }
   }, [voteSkip, addToast]);
 
+  const handleVoteKick = useCallback(
+    async (targetId: string) => {
+      try {
+        const result = await voteKick(targetId);
+        if (typeof result.votesNow === "number" && typeof result.votesNeeded === "number") {
+          addToast(
+            `${t("game.votes")} ${result.votesNow}/${result.votesNeeded}`,
+            "info",
+          );
+        }
+      } catch (err) {
+        addToast(
+          err instanceof Error ? err.message : "Failed to vote",
+          "error",
+        );
+      }
+    },
+    [voteKick, addToast, t],
+  );
+
   const lastPlayer = gameState?.lastPlayerId
     ? gameState.players.find((p) => p.id === gameState.lastPlayerId)
     : null;
@@ -359,6 +380,7 @@ export default function Game() {
             myPlayerId={myPlayerId!}
             selectedCards={selectedCards}
             onCardSelect={handleCardSelect}
+            onVoteKick={handleVoteKick}
           />
         </div>
 

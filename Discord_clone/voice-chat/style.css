@@ -1,0 +1,335 @@
+/* Plain CSS, no frameworks. Readability over polish — the spec asks for a
+   correct architecture, not a beautiful UI. */
+
+:root {
+  --bg: #14161a;
+  --panel: #1c2027;
+  --panel-2: #232830;
+  --line: #2f3640;
+  --text: #e7ebf0;
+  --muted: #8b95a3;
+  --accent: #5b8def;
+  --good: #3ddc84;
+  --warn: #f2c14e;
+  --bad: #ef5b5b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.45 "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+.app {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 12px;
+}
+
+.app-header h1 {
+  font-size: 16px;
+  letter-spacing: 2px;
+  margin: 0;
+  color: var(--muted);
+}
+
+.identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.username-input {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 6px 8px;
+  width: 150px;
+  font: inherit;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.mono {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12px;
+}
+
+.banner {
+  background: #3a2530;
+  border: 1px solid var(--bad);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 12px 0 0;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+@media (max-width: 720px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.panel h2 {
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--muted);
+  margin: 0 0 10px;
+}
+
+.channel-root {
+  font-size: 12px;
+  letter-spacing: 1px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.room-list {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+}
+
+.room-list li {
+  padding: 4px 0;
+}
+
+.room-btn {
+  background: none;
+  border: 0;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  padding: 4px 6px;
+  border-radius: 6px;
+  width: 100%;
+  text-align: left;
+}
+
+.room-btn:hover {
+  background: var(--panel-2);
+}
+
+.room-btn.active {
+  background: var(--panel-2);
+  color: var(--accent);
+}
+
+.join-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.join-row label {
+  color: var(--muted);
+}
+
+select {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 6px 8px;
+  font: inherit;
+}
+
+button {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--text);
+  cursor: pointer;
+  padding: 7px 12px;
+  font: inherit;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+button.danger:hover:not(:disabled) {
+  border-color: var(--bad);
+  color: var(--bad);
+}
+
+button.on {
+  border-color: var(--warn);
+  color: var(--warn);
+}
+
+.state-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.state-badge {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 11px;
+  letter-spacing: 1px;
+  padding: 3px 10px;
+  color: var(--muted);
+}
+
+.state-badge.CONNECTED {
+  border-color: var(--good);
+  color: var(--good);
+}
+
+.state-badge.CONNECTING,
+.state-badge.RECONNECTING {
+  border-color: var(--warn);
+  color: var(--warn);
+}
+
+.state-badge.DISCONNECTED {
+  border-color: var(--bad);
+  color: var(--bad);
+}
+
+.player-list {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  min-height: 60px;
+}
+
+.player {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+}
+
+.player + .player {
+  margin-top: 4px;
+}
+
+.player.speaking {
+  border-color: var(--good);
+  background: #1d2a24;
+}
+
+.player.self {
+  border-style: dashed;
+}
+
+.player .dot {
+  font-size: 11px;
+}
+
+.player .name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.player .tags {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.tag-speaking {
+  color: var(--good);
+}
+
+.tag-warn {
+  color: var(--warn);
+}
+
+.tag-bad {
+  color: var(--bad);
+}
+
+.controls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.log-panel {
+  margin-top: 16px;
+}
+
+.log-panel h2 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--muted);
+}
+
+.log {
+  background: #0f1115;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin: 0;
+  max-height: 180px;
+  overflow: auto;
+  padding: 10px;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12px;
+  color: #b9c2ce;
+  white-space: pre-wrap;
+}
+
+/* Remote audio elements only exist to play tracks; they are never visible. */
+.remote-audio {
+  display: none;
+}

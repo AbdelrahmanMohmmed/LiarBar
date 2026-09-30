@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useGame } from "@/lib/gameContext";
+import { useGame, storedSession } from "@/lib/gameContext";
 import { useLanguage } from "@/lib/languageContext";
 import { HelpCircle, ArrowLeft } from "lucide-react";
 import RentoLobbyGame from "@/pages/lobby/games/RentoLobbyGame";
@@ -43,10 +43,14 @@ export default function RentoGame() {
 
   // Reconnect on mount (e.g. after a page refresh or a dropped connection
   // mid-match) — every other *Game.tsx screen already does this.
+  //
+  // This used to read the pre-rename `liarsbar_*` keys inline, which nothing
+  // has written since the rebrand — so this page's refresh recovery was dead
+  // code and a refresh mid-match always landed you on "reconnecting…" with a
+  // dead room. storedSession() reads the current keys (with legacy fallback).
   useEffect(() => {
     if (reconnected) return;
-    const storedRoomId = localStorage.getItem("liarsbar_roomId");
-    const storedPlayerId = localStorage.getItem("liarsbar_playerId");
+    const { roomId: storedRoomId, playerId: storedPlayerId } = storedSession();
 
     if (paramRoomId && storedRoomId === paramRoomId && storedPlayerId) {
       reconnectRoom(paramRoomId, storedPlayerId)

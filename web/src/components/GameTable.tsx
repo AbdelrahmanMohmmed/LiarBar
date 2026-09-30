@@ -5,13 +5,15 @@ import { Card as CardView, SuitIcon } from "@/components/Card";
 import { useTheme } from "@/lib/themeContext";
 import { useLanguage } from "@/lib/languageContext";
 import { cn } from "@/lib/utils";
-import { Crown, Bot, User, Zap, Clock, Eye } from "lucide-react";
+import { Crown, Bot, User, Zap, Clock, Eye, UserX } from "lucide-react";
 
 interface GameTableProps {
   gameState: GameState;
   myPlayerId: string;
   selectedCards: number[];
   onCardSelect: (index: number) => void;
+  /** Liar's Bar vote-kick: toggle your vote against a player. Undefined hides the control. */
+  onVoteKick?: (targetId: string) => void;
 }
 
 /**
@@ -175,6 +177,7 @@ export const GameTable = memo(function GameTable({
   myPlayerId,
   selectedCards,
   onCardSelect,
+  onVoteKick,
 }: GameTableProps) {
   const { assets } = useTheme();
   const { t } = useLanguage();
@@ -182,6 +185,15 @@ export const GameTable = memo(function GameTable({
     () => getPlayerPositions(gameState.players.length),
     [gameState.players.length],
   );
+
+  // Majority of the other seats (the target doesn't vote on their own kicking),
+  // matching the server's kickVotesNeeded exactly.
+  const kickVotesNeeded = useMemo(() => {
+    const eligible = Math.max(0, gameState.players.length - 1);
+    return Math.floor(eligible / 2) + 1;
+  }, [gameState.players.length]);
+  // 2-player tables can never vote-kick — one voter has no majority behind them.
+  const kickPossible = gameState.players.length > 2;
 
   const [countdown, setCountdown] = useState<number | null>(null);
   const [turnCountdown, setTurnCountdown] = useState<number | null>(null);
@@ -307,6 +319,8 @@ export const GameTable = memo(function GameTable({
           (gameState.phase === "playing" ||
             gameState.phase === "waiting_for_challenge");
         const isLastPlayer = player.id === gameState.lastPlayerId;
+        const kickVotes = gameState.kickVotes?.[player.id] ?? [];
+        const myKickVote = kickVotes.includes(myPlayerId);
 
         return (
           <div
@@ -391,6 +405,33 @@ export const GameTable = memo(function GameTable({
                   <Zap className="w-3 h-3 text-amber-400 animate-pulse" />
                 )}
               </div>
+
+              {/* Vote-kick: count + toggle. Shown for anyone else at the table
+                  while the game runs; disabled where a kick can't mathematically
+                  happen (2 players) so the button explains itself. */}
+              {onVoteKick && !isMe && gameState.phase !== "game_over" && gameState.phase !== "lobby" && (
+                <button
+                  onClick={() => onVoteKick(player.id)}
+                  disabled={!kickPossible}
+                  title={
+                    !kickPossible
+                      ? t("game.kick_need_players")
+                      : myKickVote
+                        ? t("game.kick_cancel_vote")
+                        : t("game.kick_vote")
+                  }
+                  className={cn(
+                    "mt-0.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold transition-all",
+                    myKickVote
+                      ? "bg-red-500/30 text-red-300 ring-1 ring-red-400/40"
+                      : "bg-black/30 text-amber-100/50 hover:bg-red-500/20 hover:text-red-300",
+                    !kickPossible && "opacity-30 cursor-not-allowed hover:bg-black/30 hover:text-amber-100/50",
+                  )}
+                >
+                  <UserX className="w-2.5 h-2.5" />
+                  {kickVotes.length > 0 ? `${kickVotes.length}/${kickVotesNeeded}` : ""}
+                </button>
+              )}
 
               {/* Turn Countdown */}
               {isCurrent && gameState.phase === "playing" && turnCountdown !== null && (

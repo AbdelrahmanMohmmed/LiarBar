@@ -75,7 +75,17 @@ export const config: ServerConfig = {
   port: parseInt(process.env.PORT || "3001", 10),
   allowedOrigins: parseOrigins(process.env.ALLOWED_ORIGINS),
   sweepIntervalMs: 60_000,
-  emptyRoomGraceMs: 2 * 60_000,
+  /**
+   * Room with no connected humans is removed after this idle time.
+   *
+   * This is the "closed my browser, came back" window — a phone lock, a
+   * laptop sleep, or a browser closed mid-game. Two minutes was tighter than
+   * the scenario it exists for: someone whose browser crashed and who reopens
+   * it a few minutes later should land back in the match, not in an error
+   * screen. Five minutes covers the realistic comebacks without keeping
+   * genuinely abandoned rooms around for long.
+   */
+  emptyRoomGraceMs: 5 * 60_000,
   finishedRoomTtlMs: 10 * 60_000,
   idleRoomTtlMs: 2 * 60 * 60_000,
   maxNameLength: 24,

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Game Voice Chat</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="app-header">
+        <h1>GAME VOICE CHAT</h1>
+        <div class="identity">
+          <input id="username-input" class="username-input" aria-label="Your name" maxlength="24" />
+          <span id="player-id" class="muted mono"></span>
+        </div>
+      </header>
+
+      <p id="banner" class="banner" hidden></p>
+
+      <main class="layout">
+        <!-- Channel list, Discord style -->
+        <section class="panel">
+          <h2>Voice Channels</h2>
+          <div class="channel-tree">
+            <div class="channel-root">GAME</div>
+            <ul id="room-list" class="room-list"></ul>
+          </div>
+
+          <div class="join-row">
+            <label for="room-select">Room:</label>
+            <select id="room-select"></select>
+            <button id="join-btn" class="primary">Join Voice</button>
+          </div>
+        </section>
+
+        <!-- Current room + roster + controls -->
+        <section class="panel">
+          <h2 id="current-room">Not connected</h2>
+          <div class="state-row">
+            <span id="connection-badge" class="state-badge">IDLE</span>
+            <span id="reconnect-info" class="muted"></span>
+          </div>
+
+          <ul id="player-list" class="player-list"></ul>
+
+          <div class="controls">
+            <button id="mute-btn" disabled>🎤 Mute</button>
+            <button id="deafen-btn" disabled>🔊 Deafen</button>
+            <button id="leave-btn" class="danger" disabled>Leave</button>
+          </div>
+        </section>
+      </main>
+
+      <footer class="log-panel">
+        <h2>Event log</h2>
+        <pre id="log" class="log"></pre>
+      </footer>
+    </div>
+
+    <script type="module" src="app.js"></script>
+  </body>
+</html>

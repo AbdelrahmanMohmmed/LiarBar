@@ -538,6 +538,29 @@ export function registerSocketHandlers(
       });
     });
 
+    // Vote to kick a player out of the game. Toggle semantics: clicking again
+    // retracts the vote. Majority of the other seats (bots included) wins.
+    socket.on("vote_kick", (data: { targetId?: string }, callback: Ack) => {
+      const m = liarsBarMembership(callback);
+      if (!m) return;
+
+      const targetId = String(data?.targetId ?? "");
+      if (!targetId) {
+        fail(callback, "Missing targetId");
+        return;
+      }
+      const result = m.room.voteKick(m.player.id, targetId);
+      if (!result.success) {
+        fail(callback, result.error ?? "Cannot vote");
+        return;
+      }
+      reply(callback, {
+        success: true,
+        votesNow: result.votesNow,
+        votesNeeded: result.votesNeeded,
+      });
+    });
+
     socket.on("pass_turn", (_data: unknown, callback: Ack) => {
       const m = liarsBarMembership(callback);
       if (!m) return;

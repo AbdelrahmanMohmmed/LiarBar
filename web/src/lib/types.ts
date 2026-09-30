@@ -116,6 +116,10 @@ export interface GameState {
   skipVotesNeeded: number; // how many votes needed to skip
   challengeStartedAt: number | null; // timestamp when challenge window opened
   turnDeadline: number | null; // turn limit timestamp
+  /** Active vote-kick: target playerId -> voter ids. */
+  kickVotes?: Record<string, string[]>;
+  /** When the current vote-kick expires (client clock), if one is active. */
+  kickVoteDeadline?: number | null;
 }
 
 export interface ChatMessage {

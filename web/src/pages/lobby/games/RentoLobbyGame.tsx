@@ -3,7 +3,7 @@ import { useGame } from "@/lib/gameContext";
 import { getSocket } from "@/lib/socket";
 import { useLanguage } from "@/lib/languageContext";
 import { VoiceControls } from "@/components/VoiceControls";
-import { MessageCircle, Send, Crown, UserX } from "lucide-react";
+import { MessageCircle, Send, Crown, UserX, AlertTriangle } from "lucide-react";
 import { flagImageUrl } from "@/lib/utils";
 
 const CELL_SIZE = 78;       // each tile is 78×78 — compact board, less vertical scroll
@@ -372,8 +372,47 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    canvas.width = CANVAS_W;
-    canvas.height = CANVAS_H;
+    /*
+      Responsive, DPR-aware board sizing.
+
+      The canvas used to be a fixed 1140px backing store displayed at
+      `width: 100%` — fine on a phone, but on a 1920 screen the board sat in
+      the middle of a metre of empty space, and wherever the display size
+      differed from 1140 CSS px the tiles were rescaled by the browser and
+      the text went soft.
+
+      Now the display size follows the available column width (capped so the
+      board never becomes a wall), and the backing store follows the display
+      size × devicePixelRatio, so a 1920 user gets a bigger board rendered
+      at native sharpness. The drawing code below always works in the same
+      1140-unit logical space — a per-frame transform maps it onto whatever
+      the backing store currently is.
+    */
+    const wrapper = canvas.parentElement;
+    const MAX_BOARD_CSS = 1500; // generous cap: fills a 1920 viewport next to the sidebar
+    const MIN_BOARD_CSS = 320;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+
+    const applyCanvasSize = () => {
+      const avail = wrapper?.clientWidth ?? CANVAS_W;
+      const target = Math.max(MIN_BOARD_CSS, Math.min(avail, MAX_BOARD_CSS));
+      const neededW = Math.round(target * dpr);
+      if (canvas.width !== neededW) {
+        canvas.width = neededW;
+        canvas.height = neededW;
+        canvas.style.width = `${target}px`;
+        canvas.style.height = `${target}px`;
+      }
+    };
+    applyCanvasSize();
+
+    let ro: ResizeObserver | null = null;
+    if (wrapper && typeof ResizeObserver !== "undefined") {
+      ro = new ResizeObserver(applyCanvasSize);
+      ro.observe(wrapper);
+    } else {
+      window.addEventListener("resize", applyCanvasSize);
+    }
 
     let raf = 0;
     let flashT = 0;
@@ -405,8 +444,12 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
       flashT += dt;
 
       const st = stateRef.current;
+      // Map the fixed logical space (CANVAS_W×CANVAS_H units) onto the
+      // current backing store — every draw call below is unchanged.
+      const logicalScale = canvas.width / CANVAS_W;
+      ctx.setTransform(logicalScale, 0, 0, logicalScale, 0, 0);
       ctx.fillStyle = "#1C1714";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
       if (!st) { raf = requestAnimationFrame(loop); return; }
 
@@ -809,7 +852,11 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      ro?.disconnect();
+      window.removeEventListener("resize", applyCanvasSize);
+    };
   }, [myPlayerId, isAr]);
 
   const i18n = {
@@ -913,12 +960,10 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
           <div className="relative w-full overflow-x-auto">
             <canvas
               ref={canvasRef}
-              width={CANVAS_W}
-              height={CANVAS_H}
               className="rounded-2xl border border-white/10 touch-none"
               style={{
-                width: "100%",
-                maxWidth: CANVAS_W,
+                // Display size is driven from the effect (available width,
+                // capped) so the backing store and CSS size always agree.
                 imageRendering: "auto",
                 background: "#1C1714",
                 display: "block",
@@ -1127,6 +1172,25 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
             })}
           </div>
 
+          {/* Debt warning: negative money is NOT bankruptcy (the server only
+              eliminates you if your turn timer runs out while still in debt,
+              you confess, or you're voted out) — but nothing else on screen
+              said that, so a red balance read as "I already lost". Say what a
+              negative balance actually means and what to do about it. */}
+          {me && !me.bankrupt && me.money < 0 && state?.phase === "playing" && (
+            <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 px-3.5 py-3 animate-pop-in">
+              <div className="text-rose-300 font-bold text-xs flex items-center gap-1.5">
+                <AlertTriangle size={13} className="flex-shrink-0" />
+                {isAr ? "أنت في دَين!" : "You're in debt!"}
+              </div>
+              <p className="text-rose-200/70 text-[11px] leading-snug mt-1">
+                {isAr
+                  ? "بِع المنازل أو الملكيات (أو تفاوض على تبادل) قبل انتهاء وقت الدور — وإلا ستُعلن إفلاسك."
+                  : "Sell houses or properties (or trade) before your turn timer ends — otherwise you go bankrupt."}
+              </p>
+            </div>
+          )}
+
           {/* Bankrupt action */}
           {me && !me.bankrupt && state?.phase === "playing" && (
             <button
@@ -1317,7 +1381,7 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
       {/* Bankrupt confirm modal */}
       {showBankruptConfirm && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-pop-in" onClick={() => setShowBankruptConfirm(false)}>
-          <div className="bg-surface-raised border border-rose-500/30 rounded-2xl p-6 w-full max-w-sm space-y-4 shadow-2xl shadow-rose-900/30 animate-bubble-in" onClick={(e) => e.stopPropagation()}>
+          <div className="border border-rose-500/30 rounded-2xl p-6 w-full max-w-sm space-y-4 shadow-2xl shadow-rose-900/30 animate-bubble-in bg-[#1E1714]" onClick={(e) => e.stopPropagation()}>
             <div className="text-white font-bold text-lg">{i18n.bankruptConfirmTitle}</div>
             <p className="text-white/60 text-sm">{i18n.bankruptConfirmBody}</p>
             <div className="flex gap-3 justify-end">
@@ -1328,79 +1392,136 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
         </div>
       )}
 
-      {/* Trade Modal */}
+      {/* Trade Modal — explicit dark Rento theme. It used `bg-surface-raised`,
+          which is white under the light theme, and a native <select> whose
+          dropdown is OS-styled white in every theme — together they made the
+          one screen you spend the most time reading (choose whom, choose
+          what) the brightest thing in the game. */}
       {showTradeModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-surface-raised border border-coral/30 rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl shadow-black/40 animate-bubble-in max-h-[90vh] overflow-y-auto">
-            <div className="text-white font-bold text-lg">{editingTradeId ? i18n.editTradeTitle : i18n.tradeTitle}</div>
-
-            {/* Select player */}
-            <div>
-              <label className="text-sand text-sm font-bold">{i18n.selectPlayer}</label>
-              <select
-                value={tradeTarget}
-                onChange={(e) => setTradeTarget(e.target.value)}
-                disabled={!!editingTradeId}
-                className="w-full mt-1 p-2 rounded-lg bg-white/10 border border-white/20 text-white transition-colors focus:border-coral focus:outline-none disabled:opacity-60"
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={resetTradeForm}>
+          <div
+            className="rounded-2xl w-full max-w-2xl shadow-2xl shadow-black/60 animate-bubble-in max-h-[92vh] overflow-y-auto border border-white/10"
+            style={{ background: "linear-gradient(160deg, #241D18 0%, #14100E 70%)" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-white/10 sticky top-0 z-10" style={{ background: "rgba(20,16,14,0.95)", backdropFilter: "blur(6px)" }}>
+              <div className="text-white font-bold text-lg flex items-center gap-2">
+                <span aria-hidden>🔁</span>
+                {editingTradeId ? i18n.editTradeTitle : i18n.tradeTitle}
+              </div>
+              <button
+                onClick={resetTradeForm}
+                className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/15 text-white/70 hover:text-white flex items-center justify-center transition-colors"
+                aria-label={i18n.close}
               >
-                <option value="">{isAr ? "اختر لاعب..." : "Select player..."}</option>
-                {otherAlivePlayers.map((p: any) => (
-                  <option key={p.id} value={p.id}>{p.token} {p.name} (${p.money})</option>
-                ))}
-              </select>
+                ✕
+              </button>
             </div>
 
-            {/* Offer section */}
-            <div className="space-y-2">
-              <div className="text-amber-400 font-bold text-sm">{i18n.offerProperties}</div>
-              {me?.properties?.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {me.properties.map((pid: number) => {
-                    const cell = state.board?.[pid];
-                    if (!cell) return null;
-                    const selected = offerProperties.includes(pid);
-                    return (
-                      <button
-                        key={pid}
-                        onClick={() => {
-                          setOfferProperties(prev =>
-                            selected ? prev.filter(p => p !== pid) : [...prev, pid]
-                          );
-                        }}
-                        className={`px-2.5 py-1 rounded-full text-xs font-bold border transition-all duration-150 hover:scale-105 active:scale-95 ${
-                          selected
-                            ? "bg-amber-500/30 border-amber-400 text-amber-300"
-                            : "bg-white/5 border-white/20 text-white hover:border-white/40"
-                        }`}
+            <div className="p-5 space-y-4">
+            {/* Select player — custom picker. The native <select> this replaces
+                rendered a white OS dropdown where names were truncated and
+                money invisible; these cards show token, name and balance and
+                are obvious tap targets. */}
+            <div>
+              <label className="text-sand text-sm font-bold flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-coral inline-block" />
+                {i18n.selectPlayer}
+              </label>
+              <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {otherAlivePlayers.map((p: any) => {
+                  const selected = tradeTarget === p.id;
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => setTradeTarget(p.id)}
+                      disabled={!!editingTradeId}
+                      className={`flex items-center gap-2 px-2.5 py-2 rounded-xl border text-left transition-all duration-150 disabled:opacity-60 ${
+                        selected
+                          ? "border-coral bg-coral/15 shadow-[0_0_0_1px_rgba(232,86,63,0.6)]"
+                          : "border-white/10 bg-white/[0.04] hover:border-white/25 hover:bg-white/[0.08]"
+                      }`}
+                    >
+                      <span
+                        className="w-7 h-7 rounded-full flex items-center justify-center text-sm flex-shrink-0"
+                        style={{ background: playerColors[p.id] ?? "#666", boxShadow: selected ? "0 0 0 2px #E8563F" : "none" }}
                       >
-                        {isAr ? cell.nameAr : cell.name}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-
-              <div className="text-amber-400 font-bold text-sm">{i18n.offerMoney}</div>
-              <input
-                type="number"
-                min={0}
-                max={me?.money ?? 0}
-                value={offerMoney}
-                onChange={(e) => setOfferMoney(Math.max(0, parseInt(e.target.value) || 0))}
-                className="w-full p-2 rounded-lg bg-white/10 border border-white/20 text-white transition-colors focus:border-amber-400 focus:outline-none"
-                placeholder="$0"
-              />
+                        {p.token}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-white text-xs font-bold truncate">{p.name}</span>
+                        <span className="block text-amber-300/90 text-[11px] font-mono">${p.money}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+                {otherAlivePlayers.length === 0 && (
+                  <div className="col-span-full text-white/40 text-xs py-2">{isAr ? "لا يوجد لاعبون" : "No players to trade with"}</div>
+                )}
+              </div>
             </div>
 
-            {/* Request section */}
-            {tradeTarget && (
-              <div className="space-y-2">
-                <div className="text-rose-400 font-bold text-sm">{i18n.requestProperties}</div>
+            {/* Offer / request columns — side by side where they fit, so the
+                "what am I giving vs getting" comparison is one glance. */}
+            <div className="grid md:grid-cols-2 gap-4">
+              {/* Offer section */}
+              <div className="rounded-xl border border-amber-400/20 bg-amber-400/[0.04] p-3.5 space-y-2.5">
+                <div className="text-amber-400 font-bold text-sm flex items-center gap-1.5">
+                  <span aria-hidden>↑</span> {i18n.offerProperties}
+                </div>
+                {me?.properties?.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {me.properties.map((pid: number) => {
+                      const cell = state.board?.[pid];
+                      if (!cell) return null;
+                      const selected = offerProperties.includes(pid);
+                      return (
+                        <button
+                          key={pid}
+                          onClick={() => {
+                            setOfferProperties(prev =>
+                              selected ? prev.filter(p => p !== pid) : [...prev, pid]
+                            );
+                          }}
+                          className={`px-2.5 py-1 rounded-full text-xs font-bold border transition-all duration-150 hover:scale-105 active:scale-95 ${
+                            selected
+                              ? "bg-amber-500/30 border-amber-400 text-amber-300"
+                              : "bg-white/[0.05] border-white/15 text-white/80 hover:border-white/40 hover:text-white"
+                          }`}
+                        >
+                          {isAr ? cell.nameAr : cell.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-white/30 text-xs">{i18n.noProperties}</div>
+                )}
+
+                <div className="text-amber-400 font-bold text-sm pt-1">{i18n.offerMoney}</div>
+                <input
+                  type="number"
+                  min={0}
+                  max={me?.money ?? 0}
+                  value={offerMoney}
+                  onChange={(e) => setOfferMoney(Math.max(0, parseInt(e.target.value) || 0))}
+                  className="w-full p-2 rounded-lg bg-black/40 border border-white/15 text-white font-mono transition-colors focus:border-amber-400 focus:outline-none"
+                  placeholder="$0"
+                />
+              </div>
+
+              {/* Request section */}
+              <div className={`rounded-xl border border-rose-400/20 bg-rose-400/[0.04] p-3.5 space-y-2.5 ${!tradeTarget ? "opacity-50 pointer-events-none" : ""}`}>
+                <div className="text-rose-400 font-bold text-sm flex items-center gap-1.5">
+                  <span aria-hidden>↓</span> {i18n.requestProperties}
+                </div>
                 {(() => {
                   const target = state.players?.find((p: any) => p.id === tradeTarget);
-                  if (!target?.properties?.length) return <div className="text-gray-400 text-xs">{isAr ? "لا ملكيات" : "No properties"}</div>;
+                  if (!tradeTarget) return <div className="text-white/30 text-xs">{isAr ? "اختر لاعباً أولاً" : "Pick a player first"}</div>;
+                  if (!target?.properties?.length) return <div className="text-white/30 text-xs">{isAr ? "لا ملكيات" : "No properties"}</div>;
                   return (
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-1.5">
                       {target.properties.map((pid: number) => {
                         const cell = state.board?.[pid];
                         if (!cell) return null;
@@ -1416,7 +1537,7 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
                             className={`px-2.5 py-1 rounded-full text-xs font-bold border transition-all duration-150 hover:scale-105 active:scale-95 ${
                               selected
                                 ? "bg-rose-500/30 border-rose-400 text-rose-300"
-                                : "bg-white/5 border-white/20 text-white hover:border-white/40"
+                                : "bg-white/[0.05] border-white/15 text-white/80 hover:border-white/40 hover:text-white"
                             }`}
                           >
                             {isAr ? cell.nameAr : cell.name}
@@ -1427,7 +1548,7 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
                   );
                 })()}
 
-                <div className="text-rose-400 font-bold text-sm">{i18n.requestMoney}</div>
+                <div className="text-rose-400 font-bold text-sm pt-1">{i18n.requestMoney}</div>
                 <input
                   type="number"
                   min={0}
@@ -1437,27 +1558,29 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
                   })()}
                   value={requestMoney}
                   onChange={(e) => setRequestMoney(Math.max(0, parseInt(e.target.value) || 0))}
-                  className="w-full p-2 rounded-lg bg-white/10 border border-white/20 text-white transition-colors focus:border-rose-400 focus:outline-none"
+                  className="w-full p-2 rounded-lg bg-black/40 border border-white/15 text-white font-mono transition-colors focus:border-rose-400 focus:outline-none"
                   placeholder="$0"
                 />
               </div>
-            )}
+            </div>
 
             {/* Action buttons */}
-            <div className="flex gap-3 justify-end">
+            <div className="flex gap-3 justify-end pt-1">
               <button
                 onClick={resetTradeForm}
-                className="px-4 py-2 rounded-full bg-gray-600 hover:bg-gray-500 font-bold text-sm transition-all hover:scale-105 active:scale-95"
+                className="px-4 py-2 rounded-full bg-white/10 hover:bg-white/20 text-white font-bold text-sm transition-all hover:scale-105 active:scale-95"
               >
                 {i18n.cancel}
               </button>
               <button
                 onClick={submitTrade}
                 disabled={!tradeTarget || (offerProperties.length === 0 && offerMoney === 0 && requestProperties.length === 0 && requestMoney === 0)}
-                className="px-4 py-2 rounded-full bg-blue-600 hover:bg-blue-500 font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:scale-105 active:scale-95 disabled:hover:scale-100"
+                className="px-5 py-2 rounded-full font-bold text-sm text-white disabled:opacity-40 disabled:cursor-not-allowed transition-all hover:scale-105 active:scale-95 disabled:hover:scale-100"
+                style={{ background: "linear-gradient(135deg, #E8563F, #E23D57)", boxShadow: "0 8px 24px -6px rgba(232,86,63,0.5)" }}
               >
                 {editingTradeId ? i18n.save : i18n.propose}
               </button>
+            </div>
             </div>
           </div>
         </div>
@@ -1505,7 +1628,7 @@ export default function RentoLobbyGame(props?: { state?: any; myPlayerId?: strin
 
         return (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setViewingTradeId(null)}>
-            <div className="bg-surface-raised border border-coral/30 rounded-2xl p-6 w-full max-w-lg space-y-4 shadow-2xl shadow-black/40 animate-bubble-in max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="border border-coral/30 rounded-2xl p-6 w-full max-w-lg space-y-4 shadow-2xl shadow-black/40 animate-bubble-in max-h-[90vh] overflow-y-auto bg-[#1E1714]" onClick={(e) => e.stopPropagation()}>
               <div className="text-white font-bold text-lg">{i18n.tradeDetails}</div>
               <div className="text-white/50 text-xs -mt-2">{fromPlayer?.name} {i18n.with} {toPlayer?.name}</div>
               <div className="flex gap-3">

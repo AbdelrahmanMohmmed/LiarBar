@@ -497,7 +497,7 @@ export class RentoGame implements GameRoom {
 
     switch (cell.type) {
       case "tax": {
-        const tax = Math.min(200, Math.floor(ps.money * 0.1));
+        const tax = Math.min(200, Math.floor(Math.max(0, ps.money) * 0.1));
         ps.money -= tax;
         this.lastAction = `${name} paid $${tax} in taxes.`;
         break;
@@ -759,11 +759,32 @@ export class RentoGame implements GameRoom {
     const ps = this.playerStates.get(playerId);
     if (!ps || ps.bankrupt) return;
     const wasCurrent = this.getCurrentPlayerId() === playerId;
+
+    // Return everything to the unowned pool so the remaining players can buy
+    // it again — a bankruptcy must not delete wealth from the game. Houses go
+    // with the properties (they have no independent value to anyone else),
+    // and the debt is wiped: the player is out, a dead negative balance has
+    // no one left to pay.
     ps.properties = [];
     ps.houses.clear();
+    ps.upgradedColors.clear();
+    ps.money = 0;
+    ps.position = 0;
+    ps.inJail = false;
+    ps.jailTurns = 0;
     ps.bankrupt = true;
+
     this.lastAction = message;
     this.kickVotes.delete(playerId);
+
+    // Their outgoing proposals would otherwise hang as "pending" forever and
+    // any proposal targeting them references a seat that can no longer pay or
+    // receive — resolve both sides of every pending trade they were part of.
+    for (const [tradeId, trade] of this.tradeProposals) {
+      if (trade.fromPlayerId === playerId || trade.toPlayerId === playerId) {
+        this.tradeProposals.delete(tradeId);
+      }
+    }
 
     if (wasCurrent && this.phase === "playing") {
       this.doublesCount = 0;
@@ -1024,6 +1045,37 @@ export class RentoGame implements GameRoom {
     this.botTimers.push(botTimer);
   }
 
+  /**
+   * A bot in debt liquidates: sell houses, then whole properties, cheapest
+   * first, until it's back in credit — the same options a human has, so the
+   * "negative money isn't bankruptcy" rule can't be gamed by dying slowly as
+   * a bot. Returns true if the debt was cleared.
+   */
+  private botLiquidateDebt(botId: string): boolean {
+    const ps = this.playerStates.get(botId);
+    if (!ps || ps.bankrupt) return false;
+    if (ps.money >= 0) return true; // nothing to do — already solvent
+
+    let guard = 0;
+    while (ps.money < 0 && guard++ < 100) {
+      // Sell the cheapest house first.
+      const houseIds = [...ps.houses.keys()]
+        .filter((pid) => ps.properties.includes(pid))
+        .sort((a, b) => (this.board[a]?.price ?? 0) - (this.board[b]?.price ?? 0));
+      if (houseIds.length > 0) {
+        this.sellHouse(botId, houseIds[0]);
+        continue;
+      }
+      // Then sell the cheapest property.
+      const propIds = [...ps.properties].sort(
+        (a, b) => (this.board[a]?.price ?? 0) - (this.board[b]?.price ?? 0),
+      );
+      if (propIds.length === 0) return false; // nothing left to sell
+      this.sellProperty(botId, propIds[0]);
+    }
+    return ps.money >= 0;
+  }
+
   private runBotTurn(botId: string) {
     if (this.phase !== "playing" || this.moveLock) return;
     const currentId = this.getCurrentPlayerId();
@@ -1031,6 +1083,19 @@ export class RentoGame implements GameRoom {
 
     const ps = this.playerStates.get(botId);
     if (!ps || ps.bankrupt) return;
+
+    // In debt: try to sell out of it. A bot that can't clear its debt with
+    // everything liquidated goes bankrupt — the same deadline a human has.
+    if (ps.money < 0) {
+      const cleared = this.botLiquidateDebt(botId);
+      if (cleared) {
+        this.lastAction = `${this.getPlayerName(botId)} sold assets to cover their debts.`;
+        this.broadcast();
+      } else {
+        this.eliminatePlayer(botId, `${this.getPlayerName(botId)} couldn't cover their debts and went bankrupt!`);
+        return;
+      }
+    }
 
     // Step 1: Roll dice
     const rollResult = this.rollDice(botId);
