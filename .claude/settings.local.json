@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)",
+      "Bash(tail -60 /tmp/rento_server.log)",
+      "Read(//tmp/**)"
+    ]
+  }
+}

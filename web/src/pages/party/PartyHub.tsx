@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Play, Bot, Trophy, Wifi, WifiOff, Crown, Grid3x3, SlidersHorizontal } from "lucide-react";
+import { Play, Bot, Trophy, Wifi, WifiOff, Crown, Grid3x3, SlidersHorizontal, UserMinus } from "lucide-react";
 import { useGame } from "@/lib/gameContext";
 import { useLanguage } from "@/lib/languageContext";
 import { getGame, BRAND } from "@/lib/brand";
@@ -9,6 +9,7 @@ import { Seo } from "@/lib/seo";
 import { Logo } from "@/components/brand/Logo";
 import GamePicker from "@/components/party/GamePicker";
 import GameSettingsDrawer from "@/components/party/GameSettingsDrawer";
+import { gameSettingsPath } from "@/lib/gameSettingsRoutes";
 import { LangToggle } from "@/components/LangToggle";
 
 /**
@@ -27,6 +28,7 @@ export default function PartyHub() {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
   const { lang, t } = useLanguage();
+  const isAr = lang === "ar";
   const {
     partyState,
     myPlayerId,
@@ -34,8 +36,11 @@ export default function PartyHub() {
     isConnected,
     reconnectRoom,
     partyPickGame,
+    partyKick,
     partyUpdateOptions,
     startGame,
+    codenamesJoinTeam,
+    codenamesSetLanguage,
     addBot,
     removeBot,
     addToast,
@@ -44,6 +49,8 @@ export default function PartyHub() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [starting, setStarting] = useState(false);
+  // Two-step kick: the first tap arms the row, the second removes the player.
+  const [kickTargetId, setKickTargetId] = useState<string | null>(null);
 
   // Landing here directly (refresh, or opening the link on a second device
   // where the id is already stored) has to re-attach to the room rather than
@@ -62,7 +69,46 @@ export default function PartyHub() {
 
   const me = partyState?.players.find((p) => p.id === myPlayerId);
   const isHost = Boolean(me?.isHost);
+
+  /**
+   * Every game has a settings page: Rento's own, or the shared one whose
+   * controls mirror that game's setup route. The host is sent there; everyone
+   * else keeps the read-only sheet, since there is nothing for them to change.
+   */
+  const openGameSettings = () => {
+    const gameId = partyState?.activeGameId;
+    if (!gameId) return;
+    if (isHost) {
+      navigate(gameSettingsPath(gameId, partyState.roomId));
+      return;
+    }
+    setSettingsOpen(true);
+  };
   const activeMeta = partyState?.activeGameId ? getGame(partyState.activeGameId) : undefined;
+
+  /**
+   * The Codenames game staged inside this party, if any.
+   *
+   * Team and role choices live in the sub-room, so the hub reads them off
+   * `subGameState` — the only place the server publishes assignments before a
+   * deal. Codenames has no bots, so every seat has to be a real person.
+   */
+  const codenamesLobby = useMemo(() => {
+    if (partyState?.activeGameId !== "codenames") return null;
+    const sub = partyState.subGameState as
+      | {
+          phase?: string;
+          language?: "ar" | "en";
+          assignments?: Record<
+            string,
+            { team: "red" | "teal" | null; role: "spymaster" | "operative" | null }
+          >;
+        }
+      | null
+      | undefined;
+    if (!sub || sub.phase !== "lobby") return null;
+    return sub;
+  }, [partyState?.activeGameId, partyState?.subGameState]);
 
   const optionsSummary = useMemo(() => {
     const gameId = partyState?.activeGameId;
@@ -122,7 +168,25 @@ export default function PartyHub() {
   }
 
   const humans = partyState.players.filter((p) => !p.isBot);
-  const canStart = Boolean(partyState.activeGameId) && partyState.players.length >= 2;
+  /** Codenames can only deal once both teams are actually staffed. */
+  const codenamesReady = (() => {
+    if (!codenamesLobby) return true;
+    const humans = partyState.players.filter((p) => !p.isBot);
+    if (humans.length < 4) return false;
+    const assignment = (id: string) => codenamesLobby.assignments?.[id];
+    for (const team of ["red", "teal"] as const) {
+      const members = humans.filter((p) => assignment(p.id)?.team === team);
+      const spies = members.filter((p) => assignment(p.id)?.role === "spymaster").length;
+      const ops = members.filter((p) => assignment(p.id)?.role === "operative").length;
+      if (spies !== 1 || ops < 1) return false;
+    }
+    return true;
+  })();
+
+  const canStart =
+    Boolean(partyState.activeGameId) &&
+    partyState.players.length >= 2 &&
+    codenamesReady;
 
   const handleStart = async () => {
     setStarting(true);
@@ -190,7 +254,7 @@ export default function PartyHub() {
               </div>
               <button
                 type="button"
-                onClick={() => setSettingsOpen(true)}
+                onClick={openGameSettings}
                 className="btn btn-quiet btn-sm shrink-0 flex items-center gap-1.5 border border-border/60 text-cream hover:border-sand/50"
                 title={t("party.game_settings")}
               >
@@ -228,7 +292,7 @@ export default function PartyHub() {
           </button>
           {activeMeta && (
             <button
-              onClick={() => setSettingsOpen(true)}
+              onClick={openGameSettings}
               className="btn btn-ghost btn-lg flex items-center justify-center gap-2 border border-border/60"
             >
               <SlidersHorizontal size={18} className="text-sand" />
@@ -245,6 +309,144 @@ export default function PartyHub() {
           <p className="text-center text-xs text-sand mt-3">{t("party.waiting_host")}</p>
         )}
       </section>
+
+      {/* ---- Codenames teams ---- */}
+      {codenamesLobby && (
+        <section className="surface rounded-xl p-4 mb-4">
+          <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
+            <h2 className="font-display text-base text-cream">
+              {isAr ? "فرق كودنيمز" : "Codenames teams"}
+            </h2>
+            <div className="flex items-center gap-1.5">
+              {(["ar", "en"] as const).map((code) => {
+                const active = (codenamesLobby.language ?? lang) === code;
+                return (
+                  <button
+                    key={code}
+                    type="button"
+                    disabled={!isHost}
+                    onClick={() =>
+                      codenamesSetLanguage(code).catch((err) =>
+                        addToast(
+                          err instanceof Error
+                            ? err.message
+                            : isAr
+                              ? "تعذر تغيير اللغة"
+                              : "Could not change the language",
+                          "error",
+                        ),
+                      )
+                    }
+                    className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                      active
+                        ? "bg-teal/20 border-teal text-cream font-bold"
+                        : "border-border/60 text-sand"
+                    } ${isHost ? "cursor-pointer" : "cursor-default opacity-70"}`}
+                  >
+                    {code === "ar" ? "العربية" : "English"}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <p className="text-xs text-sand mb-3">
+            {isAr
+              ? "اختار فريقك ودورك قبل ما تبدأ اللعبة."
+              : "Pick your team and role before the game starts."}
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {(["red", "teal"] as const).map((team) => {
+              const teamName =
+                team === "red"
+                  ? isAr
+                    ? "الفريق الأحمر"
+                    : "Red team"
+                  : isAr
+                    ? "الفريق الأزرق"
+                    : "Blue team";
+              const members = partyState.players.filter(
+                (p) => !p.isBot && codenamesLobby.assignments?.[p.id]?.team === team,
+              );
+              const spymaster = members.find(
+                (p) => codenamesLobby.assignments?.[p.id]?.role === "spymaster",
+              );
+              const operatives = members.filter(
+                (p) => codenamesLobby.assignments?.[p.id]?.role === "operative",
+              );
+              const joinAs = (role: "spymaster" | "operative") =>
+                codenamesJoinTeam(team, role).catch((err) =>
+                  addToast(
+                    err instanceof Error
+                      ? err.message
+                      : isAr
+                        ? "تعذر الانضمام للفريق"
+                        : "Could not join that team",
+                    "error",
+                  ),
+                );
+
+              return (
+                <div key={team} className="rounded-lg border border-border/60 overflow-hidden">
+                  <div
+                    className={`px-3 py-2 text-sm font-bold text-white ${
+                      team === "red" ? "bg-ruby" : "bg-mint"
+                    }`}
+                  >
+                    {teamName}
+                  </div>
+                  <div className="p-3 space-y-1.5">
+                    <div className="text-[11px] font-bold uppercase tracking-wide text-sand">
+                      {isAr ? "قائد التلميح" : "Spymaster"}
+                    </div>
+                    {spymaster ? (
+                      <div className="text-sm text-cream">
+                        ♦ {spymaster.name}
+                        {spymaster.id === myPlayerId ? ` (${t("party.you")})` : ""}
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => joinAs("spymaster")}
+                        className="w-full text-start text-xs px-2 py-1.5 rounded-md border border-dashed border-sand/40 text-sand hover:border-sand/70"
+                      >
+                        {isAr ? "انضم كقائد" : "Join as spymaster"}
+                      </button>
+                    )}
+
+                    <div className="text-[11px] font-bold uppercase tracking-wide text-sand pt-1">
+                      {isAr ? "مخمّنين" : "Operatives"}
+                    </div>
+                    {operatives.map((p) => (
+                      <div key={p.id} className="text-sm text-cream">
+                        ● {p.name}
+                        {p.id === myPlayerId ? ` (${t("party.you")})` : ""}
+                      </div>
+                    ))}
+                    {!operatives.some((p) => p.id === myPlayerId) && (
+                      <button
+                        type="button"
+                        onClick={() => joinAs("operative")}
+                        className="w-full text-start text-xs px-2 py-1.5 rounded-md border border-dashed border-sand/40 text-sand hover:border-sand/70"
+                      >
+                        {isAr ? "انضم كمخمّن" : "Join as operative"}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {!codenamesReady && (
+            <p className="text-xs text-sand mt-3">
+              {isAr
+                ? "كل فريق محتاج قائد واحد ومخمّن واحد على الأقل، واللعبة محتاجة ٤ لاعبين."
+                : "Each team needs one spymaster and at least one operative, and the game needs 4 players."}
+            </p>
+          )}
+        </section>
+      )}
 
       {/* ---- Who's here ---- */}
       <section className="surface rounded-xl p-4 mb-4">
@@ -290,6 +492,34 @@ export default function PartyHub() {
                 )}
               </span>
               {p.isHost && <Crown size={14} className="text-gold shrink-0" />}
+              {isHost && !p.isBot && p.id !== myPlayerId &&
+                (kickTargetId === p.id ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setKickTargetId(null);
+                      partyKick(p.id).catch((err) =>
+                        addToast(
+                          err instanceof Error ? err.message : t("party.kick_failed"),
+                          "error",
+                        ),
+                      );
+                    }}
+                    className="text-[11px] font-bold text-ruby px-2 py-0.5 rounded-full border border-ruby/40 hover:bg-ruby/10 shrink-0"
+                  >
+                    {t("party.kick_confirm")}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setKickTargetId(p.id)}
+                    className="text-ruby/80 hover:text-ruby px-1 shrink-0"
+                    aria-label={t("party.kick")}
+                    title={t("party.kick")}
+                  >
+                    <UserMinus size={15} />
+                  </button>
+                ))}
               {p.isBot && (
                 <>
                   <Bot size={14} className="text-sand shrink-0" />
@@ -342,7 +572,8 @@ export default function PartyHub() {
         canPick={isHost}
         onPick={async (gameId, options) => {
           await partyPickGame(gameId, options);
-          setSettingsOpen(true);
+          // Straight to the new game's settings page, same as tapping the button.
+          navigate(gameSettingsPath(gameId, partyState.roomId));
         }}
       />
 

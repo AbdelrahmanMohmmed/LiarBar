@@ -28,6 +28,8 @@ const COPY = {
     startGame: "ابدأ اللعبة",
     starting: "جارٍ البدء...",
     needTeams: "كل فريق يحتاج قائداً ومخمّناً واحداً على الأقل",
+    boardLanguage: "لغة الكلمات",
+    languageLocked: "اللغة تتقفل بعد بدء اللعبة",
     needMorePlayers: "تحتاج 4 لاعبين على الأقل",
     waitingForHost: "بانتظار أن يبدأ المضيف اللعبة…",
     joinTitle: "انضم إلى الغرفة",
@@ -60,6 +62,8 @@ const COPY = {
     startGame: "Start game",
     starting: "Starting...",
     needTeams: "Each team needs a spymaster and at least one operative",
+    boardLanguage: "Board language",
+    languageLocked: "Language locks when the game starts",
     needMorePlayers: "Need at least 4 players",
     waitingForHost: "Waiting for the host to start the game…",
     joinTitle: "Join the room",
@@ -78,7 +82,7 @@ export default function CodenamesRoom() {
   const navigate = useNavigate();
   const {
     codenamesState, myPlayerId, myRoomId, joinRoom, reconnectRoom,
-    codenamesJoinTeam, startGame, addToast,
+    codenamesJoinTeam, codenamesSetLanguage, startGame, addToast,
   } = useGame();
   const { lang } = useLanguage();
   const isAr = lang === "ar";
@@ -342,6 +346,51 @@ export default function CodenamesRoom() {
             onJoinSpymaster={() => handleJoinTeam("teal", "spymaster")}
             onJoinOperative={() => handleJoinTeam("teal", "operative")}
           />
+        </div>
+
+        <div
+          style={{
+            marginTop: 20,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            flexWrap: "wrap",
+          }}
+        >
+          <span style={{ fontSize: 13, color: COLORS.textSecondary }}>{c.boardLanguage}</span>
+          {(["ar", "en"] as const).map((code) => {
+            const active = codenamesState.language === code;
+            return (
+              <button
+                key={code}
+                type="button"
+                disabled={!isHost || codenamesState.phase !== "lobby"}
+                title={
+                  isHost && codenamesState.phase === "lobby" ? undefined : c.languageLocked
+                }
+                onClick={() =>
+                  codenamesSetLanguage(code).catch((err) =>
+                    addToast(err instanceof Error ? err.message : "Failed to change language", "error"),
+                  )
+                }
+                style={{
+                  border: `2px solid ${COLORS.ink}`,
+                  background: active ? COLORS.ink : COLORS.white,
+                  color: active ? COLORS.cream : COLORS.ink,
+                  fontFamily: "'Baloo 2', sans-serif",
+                  fontWeight: 700,
+                  fontSize: 13,
+                  padding: "6px 12px",
+                  borderRadius: 999,
+                  cursor: isHost ? "pointer" : "default",
+                  opacity: isHost ? 1 : 0.6,
+                }}
+              >
+                {code === "ar" ? "العربية" : "English"}
+              </button>
+            );
+          })}
         </div>
 
         <div style={{ marginTop: 20, textAlign: "center" }}>

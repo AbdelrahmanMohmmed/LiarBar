@@ -122,6 +122,8 @@ interface GameActions {
   resetGame: () => void;
   leaveRoom: () => void;
   codenamesJoinTeam: (team: CodenamesTeam, role: CodenamesRole) => Promise<void>;
+  /** Host-only: swap the Codenames word language before the board is dealt. */
+  codenamesSetLanguage: (language: "ar" | "en") => Promise<void>;
   codenamesGiveClue: (word: string, count: number) => Promise<void>;
   codenamesGuess: (cardIndex: number) => Promise<void>;
   codenamesEndTurn: () => Promise<void>;
@@ -138,6 +140,8 @@ interface GameActions {
   dominoRematch: () => Promise<void>;
   /** Switch the whole party into a different game. Keeps the room + voice. */
   partyPickGame: (gameId: string, options?: Record<string, unknown>) => Promise<void>;
+  /** Host-only: remove a human from the party roster. */
+  partyKick: (playerId: string) => Promise<void>;
   /** Update configuration of the staged game before starting it. */
   partyUpdateOptions: (options: Record<string, unknown>) => Promise<void>;
   /** Same game, same settings, same people, fresh deal. */
@@ -494,6 +498,16 @@ export const [GameProvider, useGame] = createContextHook(() => {
       );
     };
 
+    /**
+     * The host removed us from the party. The server has already dropped our
+     * session, so there is nothing left to reconnect to: clear the local copy
+     * and land on the home page rather than staring at a roster we're not in.
+     */
+    const onPartyKicked = () => {
+      leaveRoomRef.current();
+      window.location.assign("/");
+    };
+
     const onSuperseded = (data: { roomId: string }) => {
       setSupersededRoomId(data?.roomId ?? null);
     };
@@ -518,6 +532,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
     socket.on("chat_message", onChatMessage);
     socket.on("webrtc_signal", onWebRTCSignal);
     socket.on("session_superseded", onSuperseded);
+    socket.on("party_kicked", onPartyKicked);
     socket.on("error", onError);
 
     // Check for stored room/player
@@ -545,6 +560,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
       socket.off("chat_message", onChatMessage);
       socket.off("webrtc_signal", onWebRTCSignal);
       socket.off("session_superseded", onSuperseded);
+      socket.off("party_kicked", onPartyKicked);
       socket.off("error", onError);
     };
   }, [addToast]);
@@ -914,6 +930,14 @@ export const [GameProvider, useGame] = createContextHook(() => {
     [myRoomId, emitWithAck],
   );
 
+  const codenamesSetLanguage = useCallback(
+    async (language: "ar" | "en") => {
+      if (!myRoomId) throw new Error("Not in a room");
+      await emitWithAck("codenames_set_language", { language });
+    },
+    [myRoomId, emitWithAck],
+  );
+
   const codenamesGiveClue = useCallback(
     async (word: string, count: number) => {
       if (!myRoomId) throw new Error("Not in a room");
@@ -1009,6 +1033,14 @@ export const [GameProvider, useGame] = createContextHook(() => {
     async (gameId: string, options: Record<string, unknown> = {}) => {
       if (!myRoomId) throw new Error("Not in a room");
       await emitWithAck("party_pick_game", { gameId, options });
+    },
+    [myRoomId, emitWithAck],
+  );
+
+  const partyKick = useCallback(
+    async (playerId: string) => {
+      if (!myRoomId) throw new Error("Not in a room");
+      await emitWithAck("party_kick", { playerId });
     },
     [myRoomId, emitWithAck],
   );
@@ -1269,6 +1301,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
     resetGame,
     leaveRoom,
     codenamesJoinTeam,
+    codenamesSetLanguage,
     codenamesGiveClue,
     codenamesGuess,
     codenamesEndTurn,
@@ -1283,6 +1316,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
     dominoKnock,
     dominoRematch,
     partyPickGame,
+    partyKick,
     partyUpdateOptions,
     partyRematch,
     partyReturnHub,

@@ -48,6 +48,7 @@ export class SnakeGame implements GameRoom {
   private tickTimer: NodeJS.Timeout | null = null;
   private countdownTimer: NodeJS.Timeout | null = null;
   private startTime = 0;
+  private pendingDirs = new Map<string, Dir[]>();
 
   constructor(roomId: string, maxPlayers: number, callbacks: GameRoomCallbacks, duration = 60) {
     this.roomId = roomId;
@@ -115,6 +116,7 @@ export class SnakeGame implements GameRoom {
 
   startGame(): unknown | null {
     this.snakes = [];
+    this.pendingDirs.clear();
     const spawns = [
       { x: 4, y: 4, dir: DIRS.right as Dir },
       { x: COLS - 5, y: 4, dir: DIRS.left as Dir },
@@ -183,9 +185,16 @@ export class SnakeGame implements GameRoom {
     if (!s) return { success: false, error: "Not playing" };
     const nd = DIRS[dir];
     if (!nd) return { success: false, error: "Invalid direction" };
-    const cur = s.dir;
-    if (nd.x === -cur.x && nd.y === -cur.y) return { success: false, error: "Cannot reverse" };
-    s.dir = { ...nd };
+    // Validate against the last queued direction (or the committed heading if the
+    // queue is empty) so two quick key presses can't combine into a 180° turn and
+    // make a snake crash into its own neck.
+    const queue = this.pendingDirs.get(playerId);
+    const base = queue && queue.length ? queue[queue.length - 1] : s.dir;
+    if (nd.x === -base.x && nd.y === -base.y) return { success: false, error: "Cannot reverse" };
+    if (nd.x === base.x && nd.y === base.y) return { success: true };
+    if (queue && queue.length >= 2) return { success: true };
+    if (queue) queue.push({ ...nd });
+    else this.pendingDirs.set(playerId, [{ ...nd }]);
     return { success: true };
   }
 
@@ -207,14 +216,25 @@ export class SnakeGame implements GameRoom {
       }
     }
 
+    // apply at most one buffered turn per snake per tick
+    for (const s of this.snakes) {
+      if (!s.alive) continue;
+      const queue = this.pendingDirs.get(s.playerId);
+      if (queue && queue.length) {
+        s.dir = queue.shift()!;
+        if (!queue.length) this.pendingDirs.delete(s.playerId);
+      }
+    }
+
     const deaths: SnakeState[] = [];
     for (const s of this.snakes) {
       if (!s.alive) continue;
       const head = s.body[0];
-      const nx = head.x + s.dir.x;
-      const ny = head.y + s.dir.y;
+      // wall wrapping: leaving one edge re-enters on the opposite side
+      const nx = ((head.x + s.dir.x) % COLS + COLS) % COLS;
+      const ny = ((head.y + s.dir.y) % ROWS + ROWS) % ROWS;
       const eat = nx === this.food.x && ny === this.food.y;
-      if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS || occupied.has(nx + "," + ny)) {
+      if (occupied.has(nx + "," + ny)) {
         s.alive = false;
         deaths.push(s);
         continue;
@@ -254,20 +274,20 @@ export class SnakeGame implements GameRoom {
     let bestScore = -Infinity;
     for (const d of options) {
       if (d.x === -s.dir.x && d.y === -s.dir.y) continue;
-      const nx = head.x + d.x;
-      const ny = head.y + d.y;
-      if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS) continue;
+      const nx = ((head.x + d.x) % COLS + COLS) % COLS;
+      const ny = ((head.y + d.y) % ROWS + ROWS) % ROWS;
       if (occupied.has(nx + "," + ny)) continue;
 
-      // Score: prefer food, penalize cells near walls/occupied, add randomness
+      // Score: prefer food, penalize cells near occupied, add randomness
       const dist = Math.abs(nx - this.food.x) + Math.abs(ny - this.food.y);
       let score = -dist * 2 + (Math.random() * 3);
 
       // Lookahead: check if next cell has exits (avoid dead ends)
       let exits = 0;
       for (const nd of [{ x: 0, y: -1 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 1, y: 0 }]) {
-        const ax = nx + nd.x, ay = ny + nd.y;
-        if (ax >= 0 && ax < COLS && ay >= 0 && ay < ROWS && !occupied.has(ax + "," + ay)) exits++;
+        const ax = ((nx + nd.x) % COLS + COLS) % COLS;
+        const ay = ((ny + nd.y) % ROWS + ROWS) % ROWS;
+        if (!occupied.has(ax + "," + ay)) exits++;
       }
       score += exits * 3;
 

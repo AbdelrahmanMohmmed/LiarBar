@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import ArcadeShell from "@/components/ArcadeShell";
 import { useLanguage } from "@/lib/languageContext";
+import OnScreenArrows from "@/components/OnScreenArrows";
 
 const COLS = 20;
 const ROWS = 20;
@@ -18,6 +19,9 @@ export default function SnakeGame() {
   const [score, setScore] = useState(0);
   const [hiScore, setHiScore] = useState(0);
 
+  // The direction setter lives inside the render loop's closure, so the
+  // on-screen pad reaches it through a ref.
+  const dirRef = useRef<(d: Dir) => void>(() => {});
   const phaseRef = useRef<Phase>(phase);
   const scoreRef = useRef(score);
   phaseRef.current = phase;
@@ -73,6 +77,8 @@ export default function SnakeGame() {
       else if (d === "left" && dir !== "right") nextDir = "left";
       else if (d === "right" && dir !== "left") nextDir = "right";
     };
+
+    dirRef.current = setDir;
 
     const step = () => {
       dir = nextDir;
@@ -307,6 +313,7 @@ export default function SnakeGame() {
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("keydown", onKey);
+      dirRef.current = () => {};
       canvas.removeEventListener("touchstart", onTouchStart);
       canvas.removeEventListener("touchend", onTouchEnd);
       canvas.removeEventListener("pointerdown", onPointerDown);
@@ -341,6 +348,9 @@ export default function SnakeGame() {
           </div>
         )}
       </div>
+      {phase === "playing" && (
+        <OnScreenArrows onDir={(d) => dirRef.current(d)} />
+      )}
     </ArcadeShell>
   );
 }

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useGame, storedSession } from "@/lib/gameContext";
 import { useLanguage } from "@/lib/languageContext";
-import { HelpCircle, ArrowLeft } from "lucide-react";
+import { HelpCircle, ArrowLeft, Settings } from "lucide-react";
 import RentoLobbyGame from "@/pages/lobby/games/RentoLobbyGame";
 
 const HOW_TO = {
@@ -14,6 +14,7 @@ const HOW_TO = {
     help: "1. اضغط ارمي النرد لتتحرك حول اللوحة.\n2. إذا وقفت على مدينة غير مملوكة، اشترِها.\n3. إذا وقفت على مدينة لخصم، ادفع له الإيجار.\n4. تستطيع التبادل مع اللاعبين الآخرين (عقارات أو مال).\n5. إذا حصلت على رقمين متطابقين (دبل)، ارمِ مرة أخرى.\n6. تنتهي اللعبة عندما يُفلس جميع الخصوم ما عدا واحد!",
     howGot: "مفاتيح التحكم",
     controls: "الكمبيوتر: أسهم المفاتيح للتحرك، مسافة للنرد. الهاتف: استخدم أزرار الشاشة.",
+    settings: "الإعدادات",
   },
   en: {
     back: "Home",
@@ -23,6 +24,7 @@ const HOW_TO = {
     help: "1. Press Roll Dice to move around the board.\n2. If you land on an unowned city, buy it.\n3. If you land on a rival's city, pay them rent.\n4. You can trade with other players (properties or money).\n5. Roll doubles (same two dice) to roll again.\n6. The game ends when every rival but one goes bankrupt!",
     howGot: "Controls",
     controls: "Keyboard: arrow keys to move, Space to roll. Phone: use the on-screen buttons.",
+    settings: "Settings",
   },
 } as const;
 
@@ -139,6 +141,20 @@ export default function RentoGame() {
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button
+            onClick={() => navigate("/rento/settings")}
+            style={{
+              background: "transparent",
+              border: "none",
+              color: "rgba(255,255,255,0.7)",
+              cursor: "pointer",
+              padding: 4,
+            }}
+            aria-label={c.settings}
+            title={c.settings}
+          >
+            <Settings size={18} />
+          </button>
           <button
             onClick={() => setShowHelp(true)}
             style={{

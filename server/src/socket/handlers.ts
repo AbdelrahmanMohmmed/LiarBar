@@ -640,6 +640,37 @@ export function registerSocketHandlers(
       },
     );
 
+    /**
+     * Host swaps the word language of a Codenames game still in its lobby.
+     * The engine is edited in place, so team picks already made survive it.
+     */
+    socket.on(
+      "codenames_set_language",
+      (data: { language?: string }, callback: Ack) => {
+        const m = hostMembership(callback);
+        if (!m) return;
+
+        const room = activeGameRoom(m.room);
+        if (!(room instanceof CodenamesGame)) {
+          fail(callback, "Action not supported by this game");
+          return;
+        }
+        const language = data?.language;
+        if (language !== "ar" && language !== "en") {
+          fail(callback, "Invalid language");
+          return;
+        }
+
+        const result = room.setLanguage(language);
+        if (!result.success) {
+          fail(callback, result.error ?? "Cannot change language");
+          return;
+        }
+        broadcastState(io, m.room);
+        reply(callback, { success: true });
+      },
+    );
+
     socket.on("codenames_end_turn", (_data: unknown, callback: Ack) => {
       const m = codenamesMembership(callback);
       if (!m) return;
@@ -1446,6 +1477,53 @@ export function registerSocketHandlers(
      * seat warm for a reconnect; this frees it so the party isn't stuck at
      * "5/5 players" with a ghost in one chair.
      */
+    /**
+     * Host removes someone from the party.
+     *
+     * No majority is needed, unlike the in-game vote-kick: the host owns the
+     * roster. Bots go through remove_bot instead, and the host can never
+     * remove themselves. The kicked client is told before its session is
+     * unbound, because afterwards nothing on that socket can reach them.
+     */
+    socket.on("party_kick", (data: { playerId?: string }, callback: Ack) => {
+      const m = hostMembership(callback);
+      if (!m) return;
+      if (!(m.room instanceof PartyRoom)) {
+        fail(callback, "This room has no party roster");
+        return;
+      }
+
+      const { room, player } = m;
+      const targetId = String(data?.playerId ?? "");
+      if (!targetId || targetId === player.id) {
+        fail(callback, "You can't kick yourself");
+        return;
+      }
+      const target = room.getPlayer(targetId);
+      if (!target) {
+        fail(callback, "Player not found");
+        return;
+      }
+      if (target.isBot) {
+        fail(callback, "Bots are removed with remove_bot");
+        return;
+      }
+
+      const targetSocketId = target.socketId;
+      room.removePlayer(targetId);
+      if (targetSocketId) {
+        // The sub-game keeps its own player copy; disconnect it so a kicked
+        // player cannot keep acting in the game the party is sitting in.
+        room.activeSubRoom?.handleDisconnect(targetSocketId);
+        io.to(targetSocketId).emit("party_kicked", { roomId: room.roomId });
+        registry.unbindSocket(targetSocketId);
+        io.in(targetSocketId).socketsLeave(room.roomId);
+      }
+
+      broadcastState(io, room);
+      reply(callback, { success: true });
+    });
+
     socket.on("party_leave", (_data: unknown, callback: Ack) => {
       const m = membership();
       if (!m) {

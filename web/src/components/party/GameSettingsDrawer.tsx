@@ -20,6 +20,11 @@ import { getGame, gameLabel, gameEmoji, type GameMeta } from "@/lib/brand";
 interface Props {
   open: boolean;
   onClose: () => void;
+  /**
+   * Render the panel inline instead of in a modal overlay. The settings page
+   * uses this so the same controls serve the page and the sheet.
+   */
+  embedded?: boolean;
   gameId: string;
   options: Record<string, unknown> | null;
   onUpdate: (options: Record<string, unknown>) => Promise<void> | void;
@@ -31,6 +36,7 @@ interface Props {
 export default function GameSettingsDrawer({
   open,
   onClose,
+  embedded = false,
   gameId,
   options,
   onUpdate,
@@ -70,25 +76,24 @@ export default function GameSettingsDrawer({
     }
   };
 
-  return (
+  const card = (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/75 backdrop-blur-sm animate-in"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-label={t("party.game_settings")}
+      className={
+        embedded
+          ? "surface-lit w-full overflow-hidden flex flex-col rounded-2xl border border-border/80 shadow-xl"
+          : "surface-lit w-full sm:max-w-xl max-h-[90dvh] overflow-hidden flex flex-col rounded-t-2xl sm:rounded-2xl border border-border/80 shadow-2xl animate-scale-in"
+      }
+      style={{ paddingBottom: "var(--safe-b)" }}
+      onClick={(e) => e.stopPropagation()}
     >
-      <div
-        className="surface-lit w-full sm:max-w-xl max-h-[90dvh] overflow-hidden flex flex-col rounded-t-2xl sm:rounded-2xl border border-border/80 shadow-2xl animate-scale-in"
-        style={{ paddingBottom: "var(--safe-b)" }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Mobile pull handle */}
+      {/* Mobile pull handle */}
+      {!embedded && (
         <div className="sm:hidden flex justify-center pt-3 pb-1">
           <div className="h-1.5 w-12 rounded-full bg-sand/30" />
         </div>
+      )}
 
-        {/* Header */}
+      {/* Header */}
         <header className="flex items-center justify-between gap-3 px-5 py-4 border-b border-border/60 bg-surface-sunken/40">
           <div className="flex items-center gap-3 min-w-0">
             <span className="text-3xl shrink-0" aria-hidden>
@@ -108,13 +113,15 @@ export default function GameSettingsDrawer({
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="btn btn-quiet btn-sm shrink-0 rounded-full p-2"
-            aria-label={t("common.close")}
-          >
-            <X size={18} />
-          </button>
+          {!embedded && (
+            <button
+              onClick={onClose}
+              className="btn btn-quiet btn-sm shrink-0 rounded-full p-2"
+              aria-label={t("common.close")}
+            >
+              <X size={18} />
+            </button>
+          )}
         </header>
 
         {/* Body content */}
@@ -581,6 +588,19 @@ export default function GameSettingsDrawer({
           )}
         </footer>
       </div>
+  );
+
+  if (embedded) return card;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/75 backdrop-blur-sm animate-in"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label={t("party.game_settings")}
+    >
+      {card}
     </div>
   );
 }

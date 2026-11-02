@@ -162,6 +162,25 @@ export class CodenamesGame implements GameRoom {
     return { success: true };
   }
 
+  /**
+   * Swap the word pool before the board is dealt.
+   *
+   * Editing the engine in place (rather than rebuilding the room) is the whole
+   * point: teams are picked in the lobby, and a language change that threw
+   * those assignments away would make the host choose between the two.
+   */
+  setLanguage(language: Lang): { success: boolean; error?: string } {
+    if (this.phase !== "lobby") {
+      return { success: false, error: "Language is locked once the game starts" };
+    }
+    if (language !== "ar" && language !== "en") {
+      return { success: false, error: "Invalid language" };
+    }
+    this.language = language;
+    this.emit();
+    return { success: true };
+  }
+
   giveClue(playerId: string, word: string, count: number): { success: boolean; error?: string } {
     if (this.phase !== "playing" || !this.turn || this.turn.phase !== "clue") {
       return { success: false, error: "Not awaiting a clue right now" };

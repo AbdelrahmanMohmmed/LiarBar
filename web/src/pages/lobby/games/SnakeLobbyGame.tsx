@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useGame } from "@/lib/gameContext";
 import { getSocket } from "@/lib/socket";
 import { useLanguage } from "@/lib/languageContext";
+import OnScreenArrows from "@/components/OnScreenArrows";
 
 export default function SnakeLobbyGame() {
   const { activeSubState, myPlayerId } = useGame();
@@ -144,10 +145,15 @@ export default function SnakeLobbyGame() {
           </div>
         )}
       </div>
+      {state?.phase === "playing" && (
+        <OnScreenArrows
+          onDir={(dir) => getSocket().emit("snake_set_dir", { dir })}
+        />
+      )}
       <p className="text-white/40 text-xs text-center max-w-md">
         {isAr
-          ? "أسهم أو WASD للتحرك. اجعل صديقك يصطدم بجسد أفعاك لقتله! أعلى نقطة عند انتهاء الوقت يفوز."
-          : "Arrows / WASD to move. Make a friend crash into your body to kill them! Highest score when time runs out wins."}
+          ? "أسهم أو WASD للتحرك. الجدران ملفوفة — اخرج من جهة واظهر من الجهة الأخرى. اجعل صديقك يصطدم بجسد أفعاك لقتله! أعلى نقطة عند انتهاء الوقت يفوز."
+          : "Arrows / WASD to move. Walls wrap — exit one side and re-enter the other. Make a friend crash into your body to kill them! Highest score when time runs out wins."}
       </p>
     </div>
   );

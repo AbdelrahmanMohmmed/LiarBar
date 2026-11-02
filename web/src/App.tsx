@@ -122,6 +122,8 @@ const WyrGamePage = lazyPage(() => import("./pages/wyr/WyrGame"));
 const RentoHome = lazyPage(() => import("./pages/rento/RentoHome"));
 const RentoRoom = lazyPage(() => import("./pages/rento/RentoRoom"));
 const RentoGame = lazyPage(() => import("./pages/rento/RentoGame"));
+const RentoSettings = lazyPage(() => import("./pages/rento/RentoSettings"));
+const GameSettingsPage = lazyPage(() => import("./pages/party/GameSettingsPage"));
 
 const LobbyHome = lazyPage(() => import("./pages/lobby/LobbyHome"));
 const LobbyRoom = lazyPage(() => import("./pages/lobby/LobbyRoom"));
@@ -207,6 +209,8 @@ const App = () => (
                   {/* The party is the durable room; /j/:code is the short invite
                       link every WhatsApp message carries. */}
                   <Route path="/r/:roomId" element={<PartyHub />} />
+                  {/* The host's settings page for a game staged in the party. */}
+                  <Route path="/r/:roomId/settings/:gameId" element={<GameSettingsPage />} />
                   <Route path="/j/:roomId" element={<JoinParty />} />
 
                   <Route path="/play" element={<Index />} />
@@ -243,6 +247,7 @@ const App = () => (
                   <Route path="/rento" element={<RentoHome />} />
                   <Route path="/rento/room/:roomId" element={<RentoRoom />} />
                   <Route path="/rento/game/:roomId" element={<RentoGame />} />
+                  <Route path="/rento/settings" element={<RentoSettings />} />
 
                   <Route path="/lobby" element={<LobbyHome />} />
                   <Route path="/lobby/:roomId" element={<LobbyRoom />} />
